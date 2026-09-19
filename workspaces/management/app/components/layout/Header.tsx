@@ -1,0 +1,106 @@
+'use client';
+import React from 'react';
+import {
+  RefreshCw,
+  Menu,
+  Sun,
+  Moon,
+  Database,
+} from 'lucide-react';
+import { cn } from '../../lib/utils';
+import { useTheme } from '../../context/ThemeContext';
+
+interface HeaderProps {
+  currentTabTitle?: string;
+  subtitle?: string;
+  onRefresh: () => void;
+  isRefreshing?: boolean;
+  onOpenMobileMenu?: () => void;
+  // Kept optional for backwards compatibility
+  role?: string;
+  allowNegativeOrders?: boolean;
+  onToggleStockOverride?: (enabled: boolean) => void | Promise<void>;
+  onSwitchRole?: (role: any) => void;
+  onOpenStockIn?: () => void;
+  onOpenStockOut?: () => void;
+  onOpenStockAdjustment?: () => void;
+  onOpenNewProduct?: () => void;
+  onOpenTallyExport?: () => void;
+  onOpenHelp?: () => void;
+}
+
+export const Header: React.FC<HeaderProps> = ({
+  currentTabTitle = 'Executive Business Insights',
+  subtitle = 'Enterprise business intelligence, financial valuation, and sales velocity',
+  onRefresh,
+  isRefreshing = false,
+  onOpenMobileMenu,
+}) => {
+  const { isDark, toggleTheme } = useTheme();
+
+  return (
+    <header
+      id="app-header"
+      className="min-h-16 border-b border-slate-800 bg-slate-900 shrink-0 px-4 sm:px-6 py-2.5 flex items-center justify-between gap-3 z-10 transition-colors"
+    >
+      {/* Left: Mobile Hamburger & Page Title */}
+      <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+        {onOpenMobileMenu && (
+          <button
+            id="btn-mobile-menu"
+            onClick={onOpenMobileMenu}
+            title="Open navigation menu"
+            className="md:hidden p-2 text-slate-400 hover:text-slate-100 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer shrink-0"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+        )}
+
+        <div className="min-w-0">
+          <h2 className="text-sm sm:text-base font-bold text-slate-100 leading-tight truncate">
+            {currentTabTitle}
+          </h2>
+          <p className="text-[11px] text-slate-400 truncate hidden sm:block">{subtitle}</p>
+        </div>
+      </div>
+
+      {/* Right: Live Database Status, Theme Toggle & Refresh */}
+      <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+        {/* Database Status Capsule */}
+        <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800/60 border border-slate-700/60 text-xs">
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-500 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-600 dark:bg-indigo-500"></span>
+          </span>
+          <span className="text-slate-300 font-medium text-[11px]">
+            4,315 Master SKUs <span className="text-slate-600">•</span> 804 Dealers <span className="text-slate-600">•</span> 211 Suppliers
+          </span>
+        </div>
+
+        <button
+          id="btn-theme-toggle"
+          onClick={toggleTheme}
+          title={isDark ? 'Switch to Light Theme' : 'Switch to Dark Theme'}
+          className="p-2 text-slate-400 hover:text-amber-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-all duration-150 ease-out hover:scale-110 active:scale-90 cursor-pointer"
+        >
+          {isDark ? (
+            <Sun className="w-4 h-4 text-amber-400 transition-transform duration-200 rotate-0 hover:rotate-45" />
+          ) : (
+            <Moon className="w-4 h-4 text-sky-600 transition-transform duration-200 -rotate-12 hover:rotate-0" />
+          )}
+        </button>
+
+        {/* Refresh button */}
+        <button
+          id="btn-header-refresh"
+          onClick={onRefresh}
+          disabled={isRefreshing}
+          title="Refresh Business Intelligence & Analytics"
+          className="p-2 text-slate-400 hover:text-indigo-600 dark:text-indigo-400 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
+        >
+          <RefreshCw className={cn('w-4 h-4', isRefreshing && 'animate-spin text-indigo-600 dark:text-indigo-400')} />
+        </button>
+      </div>
+    </header>
+  );
+};

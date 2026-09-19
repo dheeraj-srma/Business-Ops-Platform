@@ -1,0 +1,6 @@
+{
+  "name": "Nalka Metal Industries - Inventory Master",
+  "description": "Stock and inventory management system for Nalka Metal Industries Private Limited (Faridabad) with real-time stock movements, multi-category tracking, negative balance reconciliation, and live TallyPrime synchronization.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
