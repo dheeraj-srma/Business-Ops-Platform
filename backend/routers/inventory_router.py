@@ -1,21 +1,129 @@
 # backend/routers/inventory_router.py
+import math
 import logging
-from typing import List, Dict, Any
-from fastapi import APIRouter, HTTPException, Depends
+from typing import List, Dict, Any, Optional
+from fastapi import APIRouter, HTTPException, Depends, Query, status
 from schemas.inventory import ProductCreateSchema
+from schemas.inventory_schemas import InventoryItemResponse, InventoryListResponse
 from services.inventory_service import InventoryService
-from auth import require_role
+from auth import require_role, require_permission
 
 logger = logging.getLogger("inventory_router")
 router = APIRouter(prefix="/api", tags=["Inventory & Products"])
 
-@router.get("/inventory")
-def list_inventory():
+@router.get(
+    "/inventory",
+    response_model=InventoryListResponse,
+    summary="List inventory items",
+    description="Retrieves inventory stock levels with permission verification, search, and pagination support."
+)
+def list_inventory(
+    page: int = Query(1, ge=1, description="Page number"),
+    page_size: int = Query(50, ge=1, le=500, description="Items per page"),
+    search: Optional[str] = Query(None, description="Search term for SKU, name, or category"),
+    status_filter: Optional[str] = Query(None, alias="status", description="Stock health status filter"),
+    current_user: dict = Depends(require_permission("inventory.view"))
+):
     try:
-        return InventoryService.list_inventory()
+        raw_items = InventoryService.list_inventory()
+        
+        # Apply filtering
+        if search:
+            search_clean = search.strip().lower()
+            raw_items = [
+                item for item in raw_items
+                if search_clean in str(item.get("sku", "")).lower()
+                or search_clean in str(item.get("name", "")).lower()
+                or search_clean in str(item.get("Category", "")).lower()
+            ]
+        if status_filter:
+            raw_items = [item for item in raw_items if str(item.get("status", "")).upper() == status_filter.upper()]
+
+        total_count = len(raw_items)
+        total_pages = max(1, math.ceil(total_count / page_size)) if total_count > 0 else 1
+
+        start_idx = (page - 1) * page_size
+        end_idx = start_idx + page_size
+        paged_batch = raw_items[start_idx:end_idx]
+
+        mapped_items: List[InventoryItemResponse] = []
+        for p in paged_batch:
+            q_on_hand = float(p.get("physical_stock", p.get("Current Stock", p.get("currentStock", 0.0))))
+            q_reserved = float(p.get("reserved_stock", p.get("Reserved Quantity", p.get("reservedStock", 0.0))))
+            q_avail = float(p.get("available_stock", p.get("Available Stock", p.get("availableStock", q_on_hand - q_reserved))))
+            cost_p = float(p.get("Cost Price", p.get("unitCost", p.get("cost_price", 0.0))))
+            sale_p = float(p.get("Price", p.get("default_sale_price", cost_p)))
+
+            mapped_items.append(InventoryItemResponse(
+                id=str(p.get("id", p.get("sku", ""))),
+                sku=str(p.get("sku", p.get("SKU", ""))),
+                name=str(p.get("name", p.get("Item Name", ""))),
+                category=str(p.get("category", p.get("Category", p.get("Brand", "General")))),
+                brand=str(p.get("Brand", "Nalka Metals")),
+                cost_price=round(cost_p, 2),
+                sale_price=round(sale_p, 2),
+                physical_stock=round(q_on_hand, 4),
+                reserved_stock=round(q_reserved, 4),
+                available_stock=round(q_avail, 4),
+                unit=str(p.get("unit", p.get("Unit", "NOS"))),
+                status=str(p.get("status", "HEALTHY")),
+                is_active=bool(p.get("is_active", p.get("isActive", True))),
+                updated_at=str(p.get("Updated At", "")) if p.get("Updated At") else None,
+            ))
+
+        return InventoryListResponse(
+            items=mapped_items,
+            total_count=total_count,
+            page=page,
+            page_size=page_size,
+            total_pages=total_pages
+        )
     except Exception as exc:
         logger.error(f"Error listing inventory: {exc}")
-        return []
+        raise HTTPException(status_code=500, detail="Failed to retrieve inventory items.")
+
+@router.get(
+    "/inventory/{product_id}",
+    response_model=InventoryItemResponse,
+    summary="Get inventory details for product"
+)
+def get_inventory_item(
+    product_id: str,
+    current_user: dict = Depends(require_permission("inventory.view"))
+):
+    try:
+        raw_items = InventoryService.list_inventory()
+        p = next((item for item in raw_items if str(item.get("id")) == str(product_id) or str(item.get("sku")).lower() == str(product_id).lower()), None)
+        if not p:
+            raise HTTPException(status_code=404, detail=f"Inventory record for product '{product_id}' not found.")
+            
+        q_on_hand = float(p.get("physical_stock", p.get("Current Stock", p.get("currentStock", 0.0))))
+        q_reserved = float(p.get("reserved_stock", p.get("Reserved Quantity", p.get("reservedStock", 0.0))))
+        q_avail = float(p.get("available_stock", p.get("Available Stock", p.get("availableStock", q_on_hand - q_reserved))))
+        cost_p = float(p.get("Cost Price", p.get("unitCost", p.get("cost_price", 0.0))))
+        sale_p = float(p.get("Price", p.get("default_sale_price", cost_p)))
+
+        return InventoryItemResponse(
+            id=str(p.get("id", p.get("sku", ""))),
+            sku=str(p.get("sku", p.get("SKU", ""))),
+            name=str(p.get("name", p.get("Item Name", ""))),
+            category=str(p.get("category", p.get("Category", p.get("Brand", "General")))),
+            brand=str(p.get("Brand", "Nalka Metals")),
+            cost_price=round(cost_p, 2),
+            sale_price=round(sale_p, 2),
+            physical_stock=round(q_on_hand, 4),
+            reserved_stock=round(q_reserved, 4),
+            available_stock=round(q_avail, 4),
+            unit=str(p.get("unit", p.get("Unit", "NOS"))),
+            status=str(p.get("status", "HEALTHY")),
+            is_active=bool(p.get("is_active", p.get("isActive", True))),
+            updated_at=str(p.get("Updated At", "")) if p.get("Updated At") else None,
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error(f"Error getting inventory for product '{product_id}': {exc}")
+        raise HTTPException(status_code=500, detail=str(exc))
 
 @router.post("/inventory")
 def add_product(
@@ -102,4 +210,3 @@ def fix_inventory_reconciliation(
         )
     except ValueError as ve:
         raise HTTPException(status_code=400, detail=str(ve))
-

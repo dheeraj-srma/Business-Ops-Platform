@@ -127,7 +127,8 @@ Migration is executed strictly domain-by-domain starting with low-risk read oper
 | **0. Auth & Session** | `POST /api/auth/login`, `GET /api/auth/me`, `POST /api/auth/logout` | All Workspaces | Medium | **`CENTRALIZED`** (Phase 3) |
 | **1. Products** | `GET /api/products`, `GET /api/products/{id}` | Sales, Operations | Low | **`CENTRALIZED`** (Phase 4) |
 | **2. Customers** | `GET /api/customers`, `GET /api/customers/{id}` | Sales, Operations | Low | **`CENTRALIZED`** (Phase 4) |
-| **3. Inventory** | `GET /api/inventory`, `POST /api/inventory/adjust` | Operations, Management | Medium | **`LEGACY`** |
+| **3. Inventory (Reads)** | `GET /api/inventory`, `GET /api/inventory/{id}` | Operations, Management | Medium | **`CENTRALIZED`** (Phase 5A) |
+| **3b. Inventory (Writes)** | `POST /api/inventory/adjust`, Stock-in, Reservations | Operations | High | **`LEGACY`** |
 | **4. Orders** | `GET /api/orders`, `POST /api/orders` | Sales, Operations, Management | High | **`LEGACY`** |
 | **5. Returns** | `GET /api/returns`, `POST /api/returns` | Operations, Management | Medium | **`LEGACY`** |
 | **6. Analytics** | `GET /api/analytics/*`, `GET /api/dashboard/*` | Management | Low | **`LEGACY`** |
