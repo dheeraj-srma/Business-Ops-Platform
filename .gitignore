@@ -15,11 +15,14 @@
 *.pem
 *.log
 
-# local env files
+# local env files (never commit)
+.env
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
+workspaces/*/.env
+workspaces/*/.env.local
 
 # vercel
 .vercel
