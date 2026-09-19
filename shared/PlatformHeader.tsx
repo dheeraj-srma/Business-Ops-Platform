@@ -3,33 +3,26 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { ShoppingCart, Boxes, BarChart3, LogOut, User, Shield, ChevronDown } from 'lucide-react';
+import { ShoppingCart, Boxes, BarChart3, LogOut, User, Shield } from 'lucide-react';
+import { getAuthSession, clearAuthSession, hasWorkspaceAccess, UserProfile } from './auth';
 
 export default function PlatformHeader() {
   const pathname = usePathname();
   const router = useRouter();
-  const [userProfile, setUserProfile] = useState<{ email?: string; role?: string; name?: string } | null>(null);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
 
   useEffect(() => {
-    try {
-      const savedSession = localStorage.getItem('nalka_terminal_session') || localStorage.getItem('app_user');
-      if (savedSession) {
-        const parsed = JSON.parse(savedSession);
-        setUserProfile(parsed.profile || parsed.user || { name: 'Authorized User', role: 'manager' });
-      } else {
-        setUserProfile({ name: 'Operations User', role: 'admin' });
-      }
-    } catch (e) {
-      setUserProfile({ name: 'Operations User', role: 'admin' });
+    const session = getAuthSession();
+    if (session && session.user) {
+      setUserProfile(session.user);
+    } else {
+      setUserProfile(null);
     }
-  }, []);
+  }, [pathname]);
 
   const handleLogout = () => {
-    try {
-      localStorage.removeItem('nalka_terminal_session');
-      localStorage.removeItem('app_auth');
-      localStorage.removeItem('app_role');
-    } catch (e) {}
+    clearAuthSession();
+    setUserProfile(null);
     router.push('/login');
   };
 
@@ -39,6 +32,11 @@ export default function PlatformHeader() {
 
   // If on login page, don't render header
   if (pathname === '/login') return null;
+
+  const userRole = userProfile?.role || 'viewer';
+  const canAccessSales = hasWorkspaceAccess('sales', userRole);
+  const canAccessOperations = hasWorkspaceAccess('operations', userRole);
+  const canAccessManagement = hasWorkspaceAccess('management', userRole);
 
   return (
     <header className="sticky top-0 z-50 w-full bg-slate-900/95 backdrop-blur-md border-b border-slate-800 text-slate-100 shadow-lg">
@@ -52,55 +50,63 @@ export default function PlatformHeader() {
             <span>BUSINESS OPS PLATFORM</span>
           </Link>
 
-          {/* Workspace Nav Tabs */}
+          {/* Permission-Aware Workspace Nav Tabs */}
           <nav className="hidden md:flex items-center gap-1 bg-slate-950/60 p-1 rounded-xl border border-slate-800/80">
-            <Link
-              href="/sales"
-              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                isSalesActive
-                  ? 'bg-indigo-600 text-white shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-              }`}
-            >
-              <ShoppingCart className="w-3.5 h-3.5" />
-              <span>Sales Workspace</span>
-            </Link>
+            {canAccessSales && (
+              <Link
+                href="/sales"
+                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  isSalesActive
+                    ? 'bg-indigo-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                }`}
+              >
+                <ShoppingCart className="w-3.5 h-3.5" />
+                <span>Sales Workspace</span>
+              </Link>
+            )}
 
-            <Link
-              href="/operations"
-              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                isOperationsActive
-                  ? 'bg-indigo-600 text-white shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-              }`}
-            >
-              <Boxes className="w-3.5 h-3.5" />
-              <span>Operations Workspace</span>
-            </Link>
+            {canAccessOperations && (
+              <Link
+                href="/operations"
+                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  isOperationsActive
+                    ? 'bg-indigo-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                }`}
+              >
+                <Boxes className="w-3.5 h-3.5" />
+                <span>Operations Workspace</span>
+              </Link>
+            )}
 
-            <Link
-              href="/management"
-              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                isManagementActive
-                  ? 'bg-indigo-600 text-white shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-              }`}
-            >
-              <BarChart3 className="w-3.5 h-3.5" />
-              <span>Management Workspace</span>
-            </Link>
+            {canAccessManagement && (
+              <Link
+                href="/management"
+                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  isManagementActive
+                    ? 'bg-indigo-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                }`}
+              >
+                <BarChart3 className="w-3.5 h-3.5" />
+                <span>Management Workspace</span>
+              </Link>
+            )}
           </nav>
         </div>
 
         {/* User Info & Actions */}
         <div className="flex items-center gap-3">
-          <div className="hidden sm:flex items-center gap-2 px-3 py-1 bg-slate-800/60 rounded-lg border border-slate-700/50 text-xs">
-            <User className="w-3.5 h-3.5 text-indigo-400" />
-            <span className="font-medium text-slate-200">{userProfile?.name || 'User'}</span>
-            <span className="px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 font-mono text-[10px] uppercase">
-              {userProfile?.role || 'User'}
-            </span>
-          </div>
+          {userProfile && (
+            <div className="hidden sm:flex items-center gap-2 px-3 py-1 bg-slate-800/60 rounded-lg border border-slate-700/50 text-xs">
+              <User className="w-3.5 h-3.5 text-indigo-400" />
+              <span className="font-medium text-slate-200">{userProfile.full_name || userProfile.email}</span>
+              <span className="px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 font-mono text-[10px] uppercase">
+                {userProfile.role}
+              </span>
+            </div>
+          )}
 
           <button
             onClick={handleLogout}
@@ -113,32 +119,38 @@ export default function PlatformHeader() {
         </div>
       </div>
 
-      {/* Mobile Workspace Tabs Bar */}
+      {/* Mobile Permission-Aware Nav Bar */}
       <div className="flex md:hidden border-t border-slate-800 px-2 py-1.5 bg-slate-950 overflow-x-auto gap-1">
-        <Link
-          href="/sales"
-          className={`flex-1 text-center py-1.5 px-2 rounded-md text-[11px] font-semibold whitespace-nowrap ${
-            isSalesActive ? 'bg-indigo-600 text-white' : 'text-slate-400'
-          }`}
-        >
-          Sales
-        </Link>
-        <Link
-          href="/operations"
-          className={`flex-1 text-center py-1.5 px-2 rounded-md text-[11px] font-semibold whitespace-nowrap ${
-            isOperationsActive ? 'bg-indigo-600 text-white' : 'text-slate-400'
-          }`}
-        >
-          Operations
-        </Link>
-        <Link
-          href="/management"
-          className={`flex-1 text-center py-1.5 px-2 rounded-md text-[11px] font-semibold whitespace-nowrap ${
-            isManagementActive ? 'bg-indigo-600 text-white' : 'text-slate-400'
-          }`}
-        >
-          Management
-        </Link>
+        {canAccessSales && (
+          <Link
+            href="/sales"
+            className={`flex-1 text-center py-1.5 px-2 rounded-md text-[11px] font-semibold whitespace-nowrap ${
+              isSalesActive ? 'bg-indigo-600 text-white' : 'text-slate-400'
+            }`}
+          >
+            Sales
+          </Link>
+        )}
+        {canAccessOperations && (
+          <Link
+            href="/operations"
+            className={`flex-1 text-center py-1.5 px-2 rounded-md text-[11px] font-semibold whitespace-nowrap ${
+              isOperationsActive ? 'bg-indigo-600 text-white' : 'text-slate-400'
+            }`}
+          >
+            Operations
+          </Link>
+        )}
+        {canAccessManagement && (
+          <Link
+            href="/management"
+            className={`flex-1 text-center py-1.5 px-2 rounded-md text-[11px] font-semibold whitespace-nowrap ${
+              isManagementActive ? 'bg-indigo-600 text-white' : 'text-slate-400'
+            }`}
+          >
+            Management
+          </Link>
+        )}
       </div>
     </header>
   );

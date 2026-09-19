@@ -1,6 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
+import RouteGuard from '@/shared/RouteGuard';
 
 const ManagementApp = dynamic(() => import('@/workspaces/management/ManagementWorkspaceWrapper'), {
   ssr: false,
@@ -15,5 +16,9 @@ const ManagementApp = dynamic(() => import('@/workspaces/management/ManagementWo
 });
 
 export default function ManagementWorkspacePage() {
-  return <ManagementApp />;
+  return (
+    <RouteGuard workspace="management">
+      <ManagementApp />
+    </RouteGuard>
+  );
 }

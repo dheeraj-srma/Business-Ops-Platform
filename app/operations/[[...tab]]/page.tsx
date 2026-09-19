@@ -1,6 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
+import RouteGuard from '@/shared/RouteGuard';
 
 const OperationsApp = dynamic(() => import('@/workspaces/operations/src/App'), {
   ssr: false,
@@ -15,5 +16,9 @@ const OperationsApp = dynamic(() => import('@/workspaces/operations/src/App'), {
 });
 
 export default function OperationsWorkspacePage() {
-  return <OperationsApp />;
+  return (
+    <RouteGuard workspace="operations">
+      <OperationsApp />
+    </RouteGuard>
+  );
 }

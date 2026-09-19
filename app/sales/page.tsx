@@ -1,6 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
+import RouteGuard from '@/shared/RouteGuard';
 
 const SalesApp = dynamic(() => import('@/workspaces/sales/src/App'), {
   ssr: false,
@@ -15,5 +16,9 @@ const SalesApp = dynamic(() => import('@/workspaces/sales/src/App'), {
 });
 
 export default function SalesWorkspacePage() {
-  return <SalesApp />;
+  return (
+    <RouteGuard workspace="sales">
+      <SalesApp />
+    </RouteGuard>
+  );
 }
