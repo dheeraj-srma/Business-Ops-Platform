@@ -1,8 +1,8 @@
 # backend/auth.py
-"""Authentication and Server-Side Role-Based Access Control (RBAC) Module.
+"""Authentication and Server-Side Permission-Based Access Control Module.
 
-Provides JWT session token verification, role permission enforcement,
-and cryptographic HMAC signature verification for external webhooks.
+Provides JWT session token verification, HttpOnly cookie extraction,
+permission-based authorization enforcement, and cryptographic HMAC webhook verification.
 """
 
 import os
@@ -29,23 +29,47 @@ TALLY_WEBHOOK_SECRET = os.environ.get("TALLY_WEBHOOK_SECRET") or os.environ.get(
 
 security_scheme = HTTPBearer(auto_error=False)
 
-# ─── ROLE & PERMISSION DEFINITIONS ──────────────────────────────────────────
-ROLE_HIERARCHY = {
-    "admin": ["admin", "stock_manager", "order_manager", "salesman", "customer", "viewer"],
-    "stock_manager": ["stock_manager", "viewer"],
-    "order_manager": ["order_manager", "viewer"],
-    "salesman": ["salesman", "viewer"],
-    "customer": ["customer", "viewer"],
-    "viewer": ["viewer"],
+# ─── ROLE & PERMISSION MATRIX ──────────────────────────────────────────────
+PERMISSION_MAP: Dict[str, List[str]] = {
+    "admin": [
+        "orders.create", "orders.view", "customers.view", "products.view",
+        "inventory.view", "inventory.manage", "orders.process", "returns.manage",
+        "analytics.view", "reports.view", "users.manage", "system.manage"
+    ],
+    "stock_manager": [
+        "orders.view", "customers.view", "products.view",
+        "inventory.view", "inventory.manage", "orders.process", "returns.manage"
+    ],
+    "order_manager": [
+        "orders.view", "customers.view", "products.view",
+        "inventory.view", "orders.process"
+    ],
+    "salesman": [
+        "orders.create", "orders.view", "customers.view", "products.view"
+    ],
+    "customer": [
+        "orders.create", "orders.view"
+    ],
+    "viewer": [
+        "orders.view", "products.view"
+    ]
 }
 
 
+def get_role_permissions(role: str) -> List[str]:
+    """Returns granular permission set for a given role string."""
+    role_clean = (role or "").strip().lower()
+    return PERMISSION_MAP.get(role_clean, PERMISSION_MAP["viewer"])
+
+
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
-    """Generates a cryptographically signed JWT access token."""
+    """Generates a cryptographically signed JWT access token containing role & permissions."""
     to_encode = data.copy()
     now = datetime.utcnow()
     expire = now + (expires_delta if expires_delta else timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
     
+    role = to_encode.get("role", "viewer").lower()
+    to_encode["permissions"] = get_role_permissions(role)
     to_encode.update({
         "exp": expire,
         "iat": now,
@@ -76,17 +100,23 @@ def verify_access_token(token: str) -> dict:
 
 
 def get_current_user(
+    request: Request,
     credentials: Optional[HTTPAuthorizationCredentials] = Security(security_scheme)
 ) -> dict:
-    """FastAPI dependency extracting and verifying the authenticated user session."""
-    if not credentials or not credentials.credentials:
+    """FastAPI dependency extracting JWT session token from Bearer header OR HttpOnly cookie."""
+    token = None
+    if credentials and credentials.credentials:
+        token = credentials.credentials
+    elif request and request.cookies.get("nalka_token"):
+        token = request.cookies.get("nalka_token")
+    
+    if not token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authentication token required.",
             headers={"WWW-Authenticate": "Bearer"},
         )
     
-    token = credentials.credentials
     payload = verify_access_token(token)
     
     user_id = payload.get("user_id") or payload.get("sub")
@@ -102,33 +132,49 @@ def get_current_user(
         "user_id": user_id,
         "email": payload.get("email", ""),
         "role": role,
+        "permissions": payload.get("permissions", get_role_permissions(role)),
         "salesman_id": payload.get("salesman_id"),
         "full_name": payload.get("full_name", "Authenticated User"),
     }
 
 
-def require_role(allowed_roles: List[str]):
-    """FastAPI dependency factory enforcing server-side Role-Based Access Control (RBAC)."""
-    normalized_allowed = [r.lower() for r in allowed_roles]
-
-    def role_checker(current_user: dict = Depends(get_current_user)) -> dict:
+def require_permission(required_permission: str):
+    """FastAPI dependency factory enforcing granular Permission-Based Access Control."""
+    def permission_checker(current_user: dict = Depends(get_current_user)) -> dict:
         user_role = current_user.get("role", "viewer").lower()
         
         # Admin override
         if user_role == "admin":
             return current_user
             
-        if user_role not in normalized_allowed:
+        user_permissions = current_user.get("permissions") or get_role_permissions(user_role)
+        if required_permission not in user_permissions:
             logger.warning(
-                f"RBAC Access Denied: User '{current_user.get('email')}' with role '{user_role}' "
-                f"attempted to access endpoint requiring {allowed_roles}"
+                f"Permission Denied: User '{current_user.get('email')}' lacking required permission '{required_permission}'"
             )
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Access denied: Requires one of roles {allowed_roles}",
+                detail=f"Access denied: Required permission '{required_permission}' missing.",
             )
             
         return current_user
+
+    return permission_checker
+
+
+def require_role(allowed_roles: List[str]):
+    """FastAPI dependency factory enforcing Role-Based Access Control (legacy compatibility)."""
+    normalized_allowed = [r.lower() for r in allowed_roles]
+
+    def role_checker(current_user: dict = Depends(get_current_user)) -> dict:
+        user_role = current_user.get("role", "viewer").lower()
+        if user_role == "admin" or user_role in normalized_allowed:
+            return current_user
+            
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Access denied: Requires one of roles {allowed_roles}",
+        )
 
     return role_checker
 
@@ -147,7 +193,6 @@ def verify_webhook_signature(raw_body: bytes, signature_header: Optional[str], s
         logger.error("Webhook rejection: Webhook secret not configured on server")
         return False
 
-    # Normalize signature header format (support hex signature or 'sha256=...' prefix)
     clean_signature = signature_header.strip()
     if clean_signature.startswith("sha256="):
         clean_signature = clean_signature[7:]
@@ -158,9 +203,4 @@ def verify_webhook_signature(raw_body: bytes, signature_header: Optional[str], s
         hashlib.sha256
     ).hexdigest()
 
-    # Constant-time string comparison to prevent timing attacks
-    is_valid = hmac.compare_digest(expected_signature.lower(), clean_signature.lower())
-    if not is_valid:
-        logger.warning("Webhook rejection: Invalid cryptographic signature match")
-        
-    return is_valid
+    return hmac.compare_digest(expected_signature.lower(), clean_signature.lower())

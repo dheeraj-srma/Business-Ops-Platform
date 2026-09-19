@@ -1,7 +1,7 @@
 # backend/routers/auth_router.py
 import uuid
 import logging
-from fastapi import APIRouter, HTTPException, Depends, status
+from fastapi import APIRouter, HTTPException, Depends, status, Response
 from schemas.auth import LoginRequestSchema, TokenResponseSchema, UserProfileSchema
 from auth import create_access_token, get_current_user
 from supabase_client import get_supabase_client
@@ -25,10 +25,10 @@ def verify_password(plain_password: str, stored_pass_or_hash: str) -> bool:
     return plain_password == stored_pass_or_hash
 
 @router.post("/login", response_model=TokenResponseSchema)
-def login(credentials: LoginRequestSchema):
+def login(credentials: LoginRequestSchema, response: Response):
     """
     Authenticates user credentials against Supabase Auth & Users Database table.
-    Enforces strict password verification, account activation checks, and role authorization.
+    Sets HttpOnly, SameSite=Lax cookie and mints cryptographically signed JWT token.
     """
     try:
         email_clean = credentials.email.strip().lower()
@@ -102,6 +102,15 @@ def login(credentials: LoginRequestSchema):
                     "salesman_id": None,
                     "password": "password123"
                 },
+                "stock@nalkametals.com": {
+                    "id": "usr-stk-001",
+                    "email": "stock@nalkametals.com",
+                    "full_name": "Stock Operations Manager",
+                    "role": "stock_manager",
+                    "is_active": True,
+                    "salesman_id": None,
+                    "password": "password123"
+                },
                 "sales@nalkametals.com": {
                     "id": "usr-sls-001",
                     "email": "sales@nalkametals.com",
@@ -144,6 +153,16 @@ def login(credentials: LoginRequestSchema):
 
         token = create_access_token(token_payload)
 
+        # Set secure HttpOnly cookie for server-side Next.js Edge Middleware inspection
+        response.set_cookie(
+            key="nalka_token",
+            value=token,
+            httponly=True,
+            samesite="lax",
+            max_age=86400,
+            path="/"
+        )
+
         return TokenResponseSchema(
             access_token=token,
             token_type="bearer",
@@ -160,6 +179,12 @@ def login(credentials: LoginRequestSchema):
     except Exception as exc:
         logger.error(f"Error authenticating user: {exc}")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+@router.post("/logout")
+def logout(response: Response):
+    """Clears HttpOnly auth cookie upon logout."""
+    response.delete_cookie(key="nalka_token", path="/")
+    return {"message": "Logged out successfully."}
 
 @router.get("/me")
 def get_auth_me(current_user: dict = Depends(get_current_user)):

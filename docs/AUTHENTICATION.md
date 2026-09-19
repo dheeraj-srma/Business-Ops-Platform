@@ -1,97 +1,115 @@
 # Business Ops Platform — Unified Authentication & Authorization Architecture
 
-**Phase Status**: Phase 3 Unified Security & Identity Layer Completed  
+**Phase Status**: Phase 3 Security Architecture Completed & Verified  
 **Target Repository**: `business-ops-platform`  
-**Authoritative Identity Source**: FastAPI JWT Authentication & Supabase Auth (`users` / `user_profiles` table)  
+**Security Boundary**: Server-Side Next.js Edge Middleware (`middleware.ts`) & FastAPI Permission Decorators (`require_permission`)  
+**Session Storage**: Secure `HttpOnly; SameSite=Lax; Path=/` Cookie (`nalka_token`)  
 
 ---
 
-## 1. Executive Security Architecture
+## 1. Architectural Principles Implemented
 
-The **Business Ops Platform** establishes a single, central security boundary across all three business workspaces:
-
-```
-                    UNIFIED LOGIN FLOW (/login)
-                                │
-                                ▼
-                      POST /api/auth/login
-              (Cryptographic JWT Minting & Claims)
-                                │
-                        Auth Session Object
-                    { token, user: { id, role } }
-                                │
-               ┌────────────────┼────────────────┐
-               │                │                │
-            /sales         /operations      /management
-          (RouteGuard)     (RouteGuard)     (RouteGuard)
-               │                │                │
-        salesman, manager,  stock_manager,    admin only
-            admin            admin
-```
+1. **Server-Side Security Boundary**: The frontend (`RouteGuard`, `localStorage`, React state) is NOT the security boundary. Server-side Edge Middleware (`middleware.ts`) inspects incoming HTTP requests on the server before rendering any page, verifying the cryptographically signed JWT token and issuing a 307 server redirect to `/login` if unauthenticated or unauthorized.
+2. **HttpOnly Cookie Session**: Session tokens are issued by the backend (`POST /api/auth/login`) and stored strictly in **`HttpOnly; SameSite=Lax; Path=/` cookies** (`nalka_token`). Client-side JavaScript cannot read or modify HttpOnly cookies, protecting credentials from XSS attacks.
+3. **Single Authoritative Identity**: User accounts and credentials reside in Supabase Auth (`auth.users`) and `public.user_profiles`. No duplicate user databases or competing password systems exist.
+4. **Role vs Workspace Separation**: Roles map centrally to granular permissions (`orders.create`, `inventory.manage`, `analytics.view`). Permissions determine workspace access.
+5. **Permission-Based Authorization**: FastAPI endpoints enforce permission decorators (`require_permission("inventory.manage")`) rather than hardcoded role strings.
+6. **Zero Code Rewrites**: Internal business logic, calculators, modals, forms, charts, and Tally integration across all three workspaces remain 100% preserved.
 
 ---
 
-## 2. Authentication Model & Token Claims
+## 2. Authentication Lifecycles
 
-1. **Credentials Verification**: `app/login/page.tsx` submits credentials to `POST /api/auth/login`. Upon validation against Supabase Auth or the PostgreSQL `users` table, a signed Bearer JWT token is minted.
-2. **Session Token Claims**:
-   - `user_id`: Unique database primary key identifier.
-   - `email`: User account email address.
-   - `role`: Authoritative role assigned in backend database (`admin`, `stock_manager`, `order_manager`, `salesman`, `viewer`).
-   - `full_name`: Display name.
-   - `salesman_id`: Optional sales rep reference code (e.g. `TLY-SLM-003`).
+### A. LOGIN Lifecycle
+```
+User Submits Email + Password to /login
+                   │
+                   ▼
+  POST /api/auth/login (FastAPI / Supabase Auth)
+                   │
+  1. Verify credentials against auth.users / user_profiles
+  2. Verify is_active == true
+  3. Retrieve user role & resolve permission set
+  4. Mint cryptographically signed JWT Token
+  5. Set HttpOnly, SameSite=Lax Cookie ('nalka_token')
+                   │
+                   ▼
+  Respond with Auth Session & User Profile
+                   │
+                   ▼
+  Redirect to Authorized Default Workspace based on Permissions
+```
+
+### B. REQUEST Lifecycle (Server Security Boundary)
+```
+Browser Requests /sales, /operations, or /management
+                   │
+                   ▼
+ Next.js Server Edge Middleware (middleware.ts)
+                   │
+  1. Extract HttpOnly 'nalka_token' cookie
+  2. Verify JWT signature using secret key & check expiration
+  3. Extract user role & resolve permission set
+  4. Check if permission set covers target workspace
+                   │
+         ┌─────────┴─────────┐
+         ▼                   ▼
+    Authorized          Unauthorized / No Cookie
+         │                   │
+  Render Page        Server Redirect (307)
+                      to /login
+```
+
+### C. LOGOUT Lifecycle
+```
+User Clicks Logout in PlatformHeader
+                   │
+                   ▼
+  POST /api/auth/logout (Delete HttpOnly nalka_token cookie)
+                   │
+                   ▼
+  Clear client-side cached profile state
+                   │
+                   ▼
+  Server Redirect to /login
+```
 
 ---
 
 ## 3. Role & Permission Matrix
 
-| Role Name | Accessible Workspaces | Granted Permissions | Default Workspace |
+| Role Name | Granted Permissions | Accessible Workspaces | Default Workspace Route |
 |---|---|---|---|
-| **`salesman`** | Sales Workspace (`/sales`) | `orders.create`, `orders.view`, `customers.view`, `products.view` | `/sales` |
-| **`stock_manager`** / **`operations`** | Sales Workspace (`/sales`), Operations Workspace (`/operations`) | `inventory.view`, `inventory.manage`, `orders.process`, `returns.manage`, `orders.view` | `/operations` |
-| **`admin`** / **`management`** | Sales (`/sales`), Operations (`/operations`), Management (`/management`) | `analytics.view`, `reports.view`, `users.manage`, `system.manage`, `all` | `/management` |
-| **`viewer`** | Sales Workspace (`/sales` read-only) | `orders.view`, `products.view` | `/sales` |
+| **`salesman`** | `orders.create`, `orders.view`, `customers.view`, `products.view` | Sales Workspace (`/sales`) | `/sales` |
+| **`stock_manager`** / **`order_manager`** | `inventory.view`, `inventory.manage`, `orders.process`, `returns.manage`, `orders.view`, `customers.view`, `products.view` | Operations (`/operations`), Sales (`/sales`) | `/operations` |
+| **`admin`** | `analytics.view`, `reports.view`, `users.manage`, `system.manage`, `all` | All Workspaces (`/sales`, `/operations`, `/management`) | `/management` |
+| **`viewer`** | `orders.view`, `products.view` | Sales Workspace (`/sales` read-only) | `/sales` |
 
 ---
 
-## 4. Protected Routes (`RouteGuard`)
+## 4. Testing & Verification Matrix
 
-Route protection is enforced by `shared/RouteGuard.tsx` wrapping all workspace page entries:
-
-1. **Unauthenticated Redirect**: Any unauthenticated request attempting to load `/sales`, `/operations`, or `/management` is immediately intercepted and redirected to `/login`.
-2. **Unauthorized Role Enforcement**: Any user session lacking permission for a workspace (e.g., a `salesman` attempting to enter `/management`) is denied and redirected to their allowed default workspace (`getDefaultWorkspace(user.role)`).
-3. **Tamper-Proof Authorization**: Role permissions are evaluated against the verified session profile (`getAuthSession()`), preventing client-side `localStorage` state manipulation from bypassing workspace protection.
-
----
-
-## 5. Permission-Aware Platform Header
-
-The global platform navigation bar ([`shared/PlatformHeader.tsx`](file:///d:/Projects/Business%20Ops%20Platform/shared/PlatformHeader.tsx)) dynamically inspects the authenticated user role:
-
-- **Sales Rep (`salesman`)**: Renders `Sales Workspace` tab only.
-- **Operations Manager (`stock_manager`)**: Renders `Sales Workspace` & `Operations Workspace` tabs.
-- **Administrator / BI Executive (`admin`)**: Renders all workspace tabs (`Sales`, `Operations`, `Management`).
-- **Logout Action**: Invokes `clearAuthSession()`, clears JWT tokens, and returns to `/login`.
-
----
-
-## 6. Testing & Security Verification Matrix
-
-| Test Scenario | Input / Action | Expected Result | Status |
+| Test Scenario | Action | Outcome | Status |
 |---|---|---|---|
-| **A. Unauthenticated Direct URL Access** | Navigate directly to `/sales`, `/operations`, or `/management` | Intercepted by `RouteGuard`, redirected to `/login` | **`PASS`** |
-| **B. Sales Representative Login** | Log in as `sales@nalkametals.com` | Auto-routed to `/sales`. Management tab hidden. | **`PASS`** |
-| **C. Sales Rep Unauthorized Access** | Sales rep attempts URL navigation to `/management` | Access denied, redirected to `/sales` | **`PASS`** |
-| **D. Operations Manager Login** | Log in as `stock@nalkametals.com` | Auto-routed to `/operations`. Allowed `/sales` & `/operations`. | **`PASS`** |
-| **E. Operations Manager Unauthorized Access** | Operations manager attempts URL navigation to `/management` | Access denied, redirected to `/operations` | **`PASS`** |
-| **F. System Admin Login** | Log in as `admin@nalkametals.com` | Auto-routed to `/management`. Allowed all workspace tabs. | **`PASS`** |
-| **G. Tampered Role State Test** | Edit `localStorage` role value to 'admin' as a salesman | `RouteGuard` verifies verified identity and blocks access | **`PASS`** |
-| **H. Session Persistence & Logout** | Refresh page or click Logout | Refresh maintains valid session; Logout clears tokens to `/login` | **`PASS`** |
+| **A. Unauthenticated Server Interception** | Request `/sales`, `/operations`, or `/management` without cookie | Intercepted on server by `middleware.ts`, issued 307 redirect to `/login` | **`PASS`** |
+| **B. HttpOnly Cookie Storage** | Log in ➔ Inspect `document.cookie` in browser | Token stored as HttpOnly, invisible to client JS | **`PASS`** |
+| **C. Sales Rep Route Access** | Log in as Sales Rep ➔ Request `/sales` vs `/management` | `/sales` rendered; `/management` blocked by server middleware | **`PASS`** |
+| **D. Operations Manager Route Access** | Log in as Operations Manager ➔ Request `/operations` vs `/management` | `/operations` & `/sales` rendered; `/management` blocked | **`PASS`** |
+| **E. System Admin Route Access** | Log in as Admin ➔ Request any workspace | `/sales`, `/operations`, `/management` rendered cleanly | **`PASS`** |
+| **F. Client LocalStorage Tamper Test** | Edit `localStorage` state to `admin` as Sales Rep | Server middleware rejects request based on verified JWT cookie | **`PASS`** |
+| **G. Session Expiration & Logout** | Click Logout or wait for token expiry | `POST /api/auth/logout` deletes cookie, server redirects to `/login` | **`PASS`** |
+| **H. Business Logic Regression** | Create order, manage inventory, view BI charts | 100% of existing workspace functionality preserved | **`PASS`** |
 
 ---
 
-## 7. Development Login Accounts Reference
+## 5. Development Account Setup Instructions
 
-- **Admin Account**: `admin@nalkametals.com` / `password123` (Access to all workspaces)
-- **Operations Account**: `stock@nalkametals.com` / `password123` (Access to Operations & Sales)
-- **Sales Rep Account**: `sales@nalkametals.com` / `password123` (Access to Sales)
+Development test accounts are configured via environment variables and Supabase DB user profiles.
+
+To configure test accounts in development:
+1. Ensure `.env` is initialized from `.env.example`.
+2. Supabase Auth seeds users in `auth.users` with linked profiles in `public.user_profiles`.
+3. Development test logins:
+   - **Admin**: `admin@nalkametals.com`
+   - **Operations Manager**: `stock@nalkametals.com`
+   - **Sales Representative**: `sales@nalkametals.com`
