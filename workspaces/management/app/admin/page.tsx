@@ -33,6 +33,8 @@ import {
   Server
 } from 'lucide-react';
 
+import { getAuthSession } from '@/shared/auth';
+
 const getApiUrl = () => {
   if (process.env.NEXT_PUBLIC_API_URL) return process.env.NEXT_PUBLIC_API_URL;
   if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
@@ -114,7 +116,8 @@ export default function CentralAdminPage() {
 
   const ensureAdminSession = async (forceLogin = false): Promise<string> => {
     const apiUrl = getApiUrl();
-    let token = typeof window !== 'undefined' ? localStorage.getItem('access_token') || '' : '';
+    const session = getAuthSession();
+    let token = session?.token || '';
 
     if (token && !forceLogin) {
       try {
@@ -123,7 +126,6 @@ export default function CentralAdminPage() {
         });
         if (!checkRes.ok) {
           token = '';
-          if (typeof window !== 'undefined') localStorage.removeItem('access_token');
         }
       } catch (err) {
         token = '';
@@ -141,7 +143,6 @@ export default function CentralAdminPage() {
           const data = await res.json();
           if (data.access_token) {
             token = data.access_token;
-            if (typeof window !== 'undefined') localStorage.setItem('access_token', token);
           }
         }
       } catch (err) {
@@ -158,6 +159,7 @@ export default function CentralAdminPage() {
       'Authorization': `Bearer ${token}`
     };
   };
+
 
   const fetchAdminOverview = async () => {
     setLoading(true);
