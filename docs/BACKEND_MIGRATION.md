@@ -136,8 +136,10 @@ Migration is executed strictly domain-by-domain starting with low-risk read oper
 | **4a. Orders (Reads & History)** | `GET /api/orders`, `GET /api/orders/{id}` | Sales, Operations, Management | Medium | **`CENTRALIZED`** (Phase 6A) |
 | **4b. Orders (Editing)** | `POST /api/orders/{id}/update` | Operations, Sales | High | **`CENTRALIZED`** (Phase 6B) |
 | **4c. Orders (Cancellation & Rejection)** | `POST /api/orders/{id}/cancel`, `POST /api/orders/{id}/reject`, `POST /api/orders/{id}/reopen` | Operations, Sales | High | **`CENTRALIZED`** (Phase 6B) |
-| **5. Returns (Restocking)** | `GET /api/returns`, `POST /api/returns` | Operations, Management | Medium | **`CENTRALIZED`** (Phase 5C.6) |
-| **6. Analytics** | `GET /api/analytics/*`, `GET /api/dashboard/*` | Management | Low | **`LEGACY`** |
+| **6a. Analytics (Dashboard KPIs & BI)** | `GET /api/dashboard/stats`, `GET /api/analytics/bi`, `GET /api/analytics/summary` | Management | Low | **`CENTRALIZED`** (Phase 7A) |
+| **6b. Analytics (Salesman Performance)** | `GET /api/sales/salesmen/performance`, `GET /api/sales/salesmen/summary` | Management, Sales | Low | **`CENTRALIZED`** (Phase 7A) |
+| **6c. Analytics (Geographic Intelligence)** | `GET /api/geography/summary`, `GET /api/geography/states/{state}`, `GET /api/geography/customers/{id}` | Management | Low | **`CENTRALIZED`** (Phase 7A) |
+| **6d. Analytics (Product Inventory Analytics)** | `GET /api/analytics/products` | Management, Operations | Low | **`CENTRALIZED`** (Phase 7A) |
 | **7. Tally ERP** | Express Server `/api/tally/*` (Port 9000) | Operations | High | **`LEGACY / EXISTING SERVICE`** |
 
 ---
