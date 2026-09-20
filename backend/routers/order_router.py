@@ -98,13 +98,99 @@ def list_orders(
         logger.error(f"Error listing orders: {exc}")
         raise HTTPException(status_code=500, detail=str(exc))
 
+@router.get("/history")
+def get_order_history():
+    try:
+        return OrderService.get_order_history()
+    except Exception as exc:
+        logger.error(f"Error fetching order history: {exc}")
+        return {"success": False, "orders": [], "items": [], "error": str(exc)}
+
 @router.get("/pending")
 def pending_orders():
     try:
-        return OrderService.pending_orders()
+        res = OrderService.get_pending_order_previews()
+        return res.get("orders", [])
     except Exception as exc:
-        logger.error(f"Error listing pending orders: {exc}")
+        logger.error(f"Error listing pending order previews: {exc}")
         return []
+
+@router.post("/sync-now")
+def sync_orders_now():
+    try:
+        res = OrderService.get_pending_order_previews()
+        return {
+            "success": True,
+            "connected": res.get("isLiveConnected", False),
+            "pendingCount": res.get("count", 0),
+            "message": f"Successfully synchronized {res.get('count', 0)} live orders."
+        }
+    except Exception as exc:
+        logger.error(f"Error syncing orders: {exc}")
+        return {"success": False, "connected": False, "pendingCount": 0, "message": str(exc)}
+
+@router.post("/confirm")
+def confirm_order_preview(payload: dict):
+    order_id = payload.get("orderId")
+    resolved_items = payload.get("resolvedItems")
+    metadata = payload.get("metadata")
+    if not order_id:
+        raise HTTPException(status_code=400, detail="Missing orderId")
+    try:
+        return OrderService.confirm_order_preview(order_id, resolved_items, metadata)
+    except Exception as exc:
+        logger.error(f"Error confirming order '{order_id}': {exc}")
+        raise HTTPException(status_code=500, detail=str(exc))
+
+@router.post("/reject")
+def reject_order_preview(payload: dict):
+    order_id = payload.get("orderId")
+    reason = payload.get("reason")
+    if not order_id:
+        raise HTTPException(status_code=400, detail="Missing orderId")
+    try:
+        return OrderService.reject_order_preview(order_id, reason)
+    except Exception as exc:
+        logger.error(f"Error rejecting order '{order_id}': {exc}")
+        raise HTTPException(status_code=500, detail=str(exc))
+
+@router.post("/reopen")
+def reopen_order_preview(payload: dict):
+    order_id = payload.get("orderId")
+    if not order_id:
+        raise HTTPException(status_code=400, detail="Missing orderId")
+    try:
+        return OrderService.reopen_order_preview(order_id)
+    except Exception as exc:
+        logger.error(f"Error reopening order '{order_id}': {exc}")
+        raise HTTPException(status_code=500, detail=str(exc))
+
+@router.post("/rollback-reject")
+def rollback_reject_preview(payload: dict):
+    order_id = payload.get("orderId")
+    reason = payload.get("reason")
+    if not order_id:
+        raise HTTPException(status_code=400, detail="Missing orderId")
+    try:
+        res = OrderService.reject_order_preview(order_id, reason)
+        return {"success": True, "affectedProducts": []}
+    except Exception as exc:
+        logger.error(f"Error rolling back order '{order_id}': {exc}")
+        raise HTTPException(status_code=500, detail=str(exc))
+
+@router.post("/update")
+def update_pending_preview(payload: dict):
+    order_id = payload.get("orderId")
+    items = payload.get("items") or []
+    metadata = payload.get("metadata")
+    if not order_id:
+        raise HTTPException(status_code=400, detail="Missing orderId")
+    try:
+        res = OrderService.update_order(order_id, payload, current_user={"role": "admin"})
+        return {"success": True, "updatedOrder": res}
+    except Exception as exc:
+        logger.error(f"Error updating order '{order_id}': {exc}")
+        raise HTTPException(status_code=500, detail=str(exc))
 
 @router.get(
     "/{order_id}",

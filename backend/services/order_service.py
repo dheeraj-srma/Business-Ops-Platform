@@ -60,6 +60,249 @@ class OrderService:
         return [o for o in all_orders if str(o.get("Status")).lower() in ("pending", "pending_approval")]
 
     @staticmethod
+    def get_order_history() -> Dict[str, Any]:
+        from supabase_client import get_supabase_client
+        client = get_supabase_client()
+        orders = []
+        items = []
+        if client:
+            try:
+                res = (
+                    client.table("pending_orders")
+                    .select("*")
+                    .neq("status", "Pending")
+                    .order("created_at", desc=True)
+                    .limit(500)
+                    .execute()
+                )
+                raw_orders = res.data or []
+                order_ids = [o["order_id"] for o in raw_orders if o.get("order_id")]
+                
+                raw_items = []
+                if order_ids:
+                    for chunk_start in range(0, len(order_ids), 100):
+                        chunk_ids = order_ids[chunk_start:chunk_start + 100]
+                        i_res = (
+                            client.table("pending_order_items")
+                            .select("*")
+                            .in_("order_id", chunk_ids)
+                            .execute()
+                        )
+                        if i_res.data:
+                            raw_items.extend(i_res.data)
+
+                item_map: Dict[str, List[Dict[str, Any]]] = {}
+                for it in raw_items:
+                    oid = it.get("order_id")
+                    if oid not in item_map:
+                        item_map[oid] = []
+                    item_map[oid].append(it)
+                    items.append({
+                        "id": str(it.get("id")),
+                        "order_id": oid,
+                        "sku": it.get("sku") or it.get("item_name"),
+                        "item_name": it.get("item_name") or it.get("sku"),
+                        "category": it.get("category") or "General",
+                        "quantity": float(it.get("quantity") or 0.0),
+                        "price": float(it.get("price") or 0.0),
+                        "total_price": float(it.get("total_price") or (float(it.get("price") or 0.0) * float(it.get("quantity") or 0.0))),
+                        "matched": True,
+                        "stock_deducted": float(it.get("quantity") or 0.0),
+                        "created_at": it.get("created_at") or "",
+                    })
+
+                for o in raw_orders:
+                    oid = o.get("order_id")
+                    st = str(o.get("status", "")).upper()
+                    is_confirmed = st in ("APPROVED", "CONFIRMED", "DISPATCHED", "DELIVERED", "COMPLETED", "PROCESSED")
+                    o_items = item_map.get(oid, [])
+                    orders.append({
+                        "id": str(o.get("id") or oid),
+                        "order_id": oid,
+                        "salesman_id": o.get("salesman_id"),
+                        "salesman_name": o.get("salesman_name") or "Sales Representative",
+                        "shop_name": o.get("shop_name") or "Customer Store",
+                        "city": o.get("city"),
+                        "state": o.get("state"),
+                        "location_id": o.get("location_id"),
+                        "total_amount": float(o.get("total_amount") or 0.0),
+                        "source": "supabase",
+                        "status": "CONFIRMED" if is_confirmed else "REJECTED",
+                        "processed_at": o.get("updated_at") or o.get("created_at") or datetime.now().isoformat(),
+                        "processed_by_name": "Ops Manager",
+                        "items_count": int(o.get("item_count") or len(o_items)),
+                        "notes": o.get("notes"),
+                        "rejection_reason": o.get("notes") if not is_confirmed else None,
+                        "created_at": o.get("created_at") or datetime.now().isoformat(),
+                        "updated_at": o.get("updated_at") or o.get("created_at") or datetime.now().isoformat(),
+                    })
+            except Exception as exc:
+                logger.error(f"Error fetching order history from Supabase: {exc}")
+
+        return {
+            "success": True,
+            "orders": orders,
+            "items": items
+        }
+
+    @staticmethod
+    def get_pending_order_previews() -> Dict[str, Any]:
+        from supabase_client import get_supabase_client
+        client = get_supabase_client()
+        orders = []
+        if client:
+            try:
+                res = (
+                    client.table("pending_orders")
+                    .select("*")
+                    .eq("status", "Pending")
+                    .order("created_at", desc=True)
+                    .limit(200)
+                    .execute()
+                )
+                raw_orders = res.data or []
+                order_ids = [o["order_id"] for o in raw_orders if o.get("order_id")]
+                
+                raw_items = []
+                if order_ids:
+                    for chunk_start in range(0, len(order_ids), 100):
+                        chunk_ids = order_ids[chunk_start:chunk_start + 100]
+                        i_res = (
+                            client.table("pending_order_items")
+                            .select("*")
+                            .in_("order_id", chunk_ids)
+                            .execute()
+                        )
+                        if i_res.data:
+                            raw_items.extend(i_res.data)
+
+                item_map: Dict[str, List[Dict[str, Any]]] = {}
+                for it in raw_items:
+                    oid = it.get("order_id")
+                    if oid not in item_map:
+                        item_map[oid] = []
+                    item_map[oid].append(it)
+
+                for o in raw_orders:
+                    oid = o.get("order_id")
+                    o_items = item_map.get(oid, [])
+                    preview_items = []
+                    for it in o_items:
+                        preview_items.append({
+                            "id": str(it.get("id")),
+                            "item_name": it.get("item_name") or it.get("sku") or "Product",
+                            "category": it.get("category") or "General",
+                            "quantity": float(it.get("quantity") or 0.0),
+                            "price": float(it.get("price") or 0.0),
+                            "total_price": float(it.get("total_price") or 0.0),
+                            "matched": True,
+                            "matchType": "EXACT",
+                            "matchedProductId": it.get("sku"),
+                            "matchedProductSku": it.get("sku"),
+                            "matchedProductName": it.get("item_name"),
+                            "currentStock": 100.0,
+                            "unit": "NOS",
+                            "hasSufficientStock": True,
+                        })
+
+                    orders.append({
+                        "order_id": oid,
+                        "salesman_id": o.get("salesman_id"),
+                        "salesman_name": o.get("salesman_name") or "Sales Representative",
+                        "shop_name": o.get("shop_name") or "Customer Store",
+                        "city": o.get("city"),
+                        "state": o.get("state"),
+                        "location_id": o.get("location_id"),
+                        "total_amount": float(o.get("total_amount") or 0.0),
+                        "created_at": o.get("created_at") or datetime.now().isoformat(),
+                        "source": "supabase",
+                        "status": "PENDING",
+                        "isDuplicate": False,
+                        "hasUnmatchedItems": False,
+                        "hasStockExceeded": False,
+                        "items": preview_items,
+                    })
+            except Exception as exc:
+                logger.error(f"Error fetching pending order previews from Supabase: {exc}")
+
+        return {
+            "success": True,
+            "orders": orders,
+            "isLiveConnected": client is not None,
+            "count": len(orders)
+        }
+
+    @staticmethod
+    def confirm_order_preview(order_id: str, resolved_items: Optional[List[dict]] = None, metadata: Optional[dict] = None) -> Dict[str, Any]:
+        from supabase_client import get_supabase_client
+        client = get_supabase_client()
+        now_str = datetime.now().isoformat()
+        if client:
+            try:
+                client.table("pending_orders").update({
+                    "status": "Approved",
+                    "notes": "Confirmed by Operations Manager",
+                    "updated_at": now_str
+                }).eq("order_id", order_id).execute()
+            except Exception as exc:
+                logger.warning(f"Error updating confirmed order in Supabase: {exc}")
+
+        return {
+            "success": True,
+            "processedOrder": {
+                "id": order_id,
+                "order_id": order_id,
+                "status": "CONFIRMED",
+                "processed_at": now_str,
+                "source": "supabase"
+            },
+            "affectedProducts": []
+        }
+
+    @staticmethod
+    def reject_order_preview(order_id: str, reason: Optional[str] = None) -> Dict[str, Any]:
+        from supabase_client import get_supabase_client
+        client = get_supabase_client()
+        now_str = datetime.now().isoformat()
+        if client:
+            try:
+                client.table("pending_orders").update({
+                    "status": "REJECTED",
+                    "notes": f"Rejected: {reason or 'Rejected by operations manager'}",
+                    "updated_at": now_str
+                }).eq("order_id", order_id).execute()
+            except Exception as exc:
+                logger.warning(f"Error updating rejected order in Supabase: {exc}")
+
+        return {"success": True}
+
+    @staticmethod
+    def reopen_order_preview(order_id: str) -> Dict[str, Any]:
+        from supabase_client import get_supabase_client
+        client = get_supabase_client()
+        now_str = datetime.now().isoformat()
+        if client:
+            try:
+                client.table("pending_orders").update({
+                    "status": "Pending",
+                    "notes": "Reopened: Reopened by Operations Manager",
+                    "updated_at": now_str
+                }).eq("order_id", order_id).execute()
+            except Exception as exc:
+                logger.warning(f"Error reopening order in Supabase: {exc}")
+
+        return {
+            "success": True,
+            "reopenedOrder": {
+                "order_id": order_id,
+                "status": "PENDING",
+                "source": "supabase"
+            },
+            "affectedProducts": []
+        }
+
+
+    @staticmethod
     def create_single_order(order: OrderCreateSchema, current_user: dict) -> Dict[str, Any]:
         order_uuid = str(uuid.uuid4())
         order_code = f"ORD-{datetime.now().strftime('%Y%m%d')}-{uuid.uuid4().hex[:6].upper()}"
@@ -110,9 +353,9 @@ class OrderService:
         allow_negative = False
         if client:
             try:
-                set_res = client.table("system_settings").select("setting_value, value").eq("setting_key", "allow_negative_orders").limit(1).execute()
+                set_res = client.table("system_settings").select("setting_value").eq("setting_key", "allow_negative_orders").limit(1).execute()
                 if set_res.data:
-                    val = set_res.data[0].get("setting_value") or set_res.data[0].get("value")
+                    val = set_res.data[0].get("setting_value")
                     allow_negative = str(val).lower() in ("true", "1", "yes")
             except Exception:
                 pass
@@ -272,9 +515,9 @@ class OrderService:
         allow_negative = False
         if client:
             try:
-                set_res = client.table("system_settings").select("setting_value, value").eq("setting_key", "allow_negative_orders").limit(1).execute()
+                set_res = client.table("system_settings").select("setting_value").eq("setting_key", "allow_negative_orders").limit(1).execute()
                 if set_res.data:
-                    val = set_res.data[0].get("setting_value") or set_res.data[0].get("value")
+                    val = set_res.data[0].get("setting_value")
                     allow_negative = str(val).lower() in ("true", "1", "yes")
             except Exception:
                 pass
@@ -405,9 +648,9 @@ class OrderService:
         allow_negative = False
         if client:
             try:
-                set_res = client.table("system_settings").select("setting_value, value").eq("setting_key", "allow_negative_orders").limit(1).execute()
+                set_res = client.table("system_settings").select("setting_value").eq("setting_key", "allow_negative_orders").limit(1).execute()
                 if set_res.data:
-                    val = set_res.data[0].get("setting_value") or set_res.data[0].get("value")
+                    val = set_res.data[0].get("setting_value")
                     allow_negative = str(val).lower() in ("true", "1", "yes")
             except Exception:
                 pass
@@ -671,9 +914,9 @@ class OrderService:
         allow_negative = False
         if client:
             try:
-                set_res = client.table("system_settings").select("setting_value, value").eq("setting_key", "allow_negative_orders").limit(1).execute()
+                set_res = client.table("system_settings").select("setting_value").eq("setting_key", "allow_negative_orders").limit(1).execute()
                 if set_res.data:
-                    val = set_res.data[0].get("setting_value") or set_res.data[0].get("value")
+                    val = set_res.data[0].get("setting_value")
                     allow_negative = str(val).lower() in ("true", "1", "yes")
             except Exception:
                 pass

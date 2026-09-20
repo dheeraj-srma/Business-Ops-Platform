@@ -42,7 +42,7 @@ class DealerRepository:
         if not client:
             return 804
         try:
-            res = client.table("dealers").select("id", count="exact").execute()
+            res = client.table("dealers").select("*", count="exact", head=True).execute()
             cnt = res.count if res.count is not None else len(res.data or [])
             return cnt if cnt > 0 else 804
         except Exception as err:
