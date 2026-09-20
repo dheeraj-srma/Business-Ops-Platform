@@ -18,6 +18,7 @@ import {
   AlertTriangle,
   Info,
   HelpCircle,
+  Zap,
 } from 'lucide-react';
 import { AppSettings, UserRole, Product, Category } from '../../types';
 import { api } from '../../lib/api';
@@ -50,7 +51,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   onGoBack,
   onOpenProductDetail,
 }) => {
-  const isManager = role === 'manager';
+  const isManager = role === 'manager' || (role as string) === 'stock_manager' || (role as string) === 'admin';
   const { theme, setTheme } = useTheme();
   const { showWarning, showInfo, showConfirm, showSuccess, showError } = useDialog();
 
@@ -61,6 +62,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [defaultMinStock, setDefaultMinStock] = useState<string>('15');
   const [defaultCritStock, setDefaultCritStock] = useState<string>('5');
   const [tallyGuidPrefix, setTallyGuidPrefix] = useState<string>('STOCK-MGT-');
+  const [allowNegativeOrders, setAllowNegativeOrders] = useState<boolean>(false);
 
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [isResetting, setIsResetting] = useState<boolean>(false);
@@ -74,6 +76,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       setDefaultMinStock((settings.defaultMinimumStock ?? (settings as any).default_minimum_stock ?? 15).toString());
       setDefaultCritStock((settings.defaultCriticalStock ?? (settings as any).default_critical_stock ?? 5).toString());
       setTallyGuidPrefix(settings.tallyXmlGuidPrefix || (settings as any).tally_xml_guid_prefix || 'STOCK-MGT-');
+      setAllowNegativeOrders(Boolean(settings.allow_negative_orders ?? (settings as any).allowNegativeOrders ?? false));
     }
   }, [settings]);
 
@@ -90,9 +93,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         defaultMinimumStock: parseInt(defaultMinStock) || 15,
         defaultCriticalStock: parseInt(defaultCritStock) || 5,
         tallyXmlGuidPrefix: tallyGuidPrefix.trim() || 'STOCK-MGT-',
+        allow_negative_orders: allowNegativeOrders,
+        allowNegativeOrders: allowNegativeOrders,
       });
+      await api.setStockOverride(allowNegativeOrders);
 
-      setSuccessMsg('Application and Tally integration settings updated successfully.');
+      setSuccessMsg('Application and stock override settings updated successfully.');
       onRefresh();
       showSuccess({
         title: 'Settings Saved',
@@ -405,6 +411,43 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               <p className="text-[10px] text-slate-400 mt-1">
                 Used in generated GUID tags to prevent stock item duplicate collisions in Tally.
               </p>
+            </div>
+          </div>
+
+          {/* Stock Override Policy */}
+          <div className="pt-4 border-t border-slate-100 dark:border-slate-700 space-y-3">
+            <h3 className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider flex items-center gap-1.5">
+              <Zap className="w-4 h-4 text-amber-500" />
+              <span>Stock Override & Order Policy</span>
+            </h3>
+
+            <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-200 dark:border-slate-700">
+              <div className="space-y-0.5 max-w-lg">
+                <span className="text-xs font-bold text-slate-900 dark:text-slate-100 block">
+                  Allow Sales Orders with Zero / Negative Stock
+                </span>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                  When enabled, salesmen are permitted to submit customer orders even when physical stock is zero or insufficient.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                id="btn-settings-stock-override-toggle"
+                disabled={!isManager}
+                onClick={() => setAllowNegativeOrders(!allowNegativeOrders)}
+                className={cn(
+                  'relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden focus:ring-2 focus:ring-amber-400 disabled:opacity-50',
+                  allowNegativeOrders ? 'bg-amber-500' : 'bg-slate-300 dark:bg-slate-700'
+                )}
+              >
+                <span
+                  className={cn(
+                    'pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out',
+                    allowNegativeOrders ? 'translate-x-5' : 'translate-x-0'
+                  )}
+                />
+              </button>
             </div>
           </div>
 

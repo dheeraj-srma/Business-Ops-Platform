@@ -218,9 +218,20 @@ export const GlobalTooltipProvider: React.FC<{ children?: ReactNode }> = ({ chil
   const tooltipElementRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
+    const findClosestElement = (target: EventTarget | null, selector: string): HTMLElement | null => {
+      if (!target) return null;
+      if (typeof (target as any).closest === 'function') {
+        return (target as HTMLElement).closest(selector);
+      }
+      if ((target as any).parentElement && typeof (target as any).parentElement.closest === 'function') {
+        return (target as any).parentElement.closest(selector);
+      }
+      return null;
+    };
+
     const handlePointerEnter = (e: PointerEvent) => {
-      // Find element with data-tooltip or title
-      const target = (e.target as HTMLElement)?.closest('[data-tooltip], [title]') as HTMLElement | null;
+      // Find element with data-tooltip or title safely
+      const target = findClosestElement(e.target, '[data-tooltip], [title]');
       if (!target) return;
 
       // Gracefully upgrade native title to data-tooltip to suppress browser native tooltip
@@ -265,7 +276,7 @@ export const GlobalTooltipProvider: React.FC<{ children?: ReactNode }> = ({ chil
     };
 
     const handlePointerLeave = (e: PointerEvent) => {
-      const target = (e.target as HTMLElement)?.closest('[data-tooltip], [data-tooltip-original-title]') as HTMLElement | null;
+      const target = findClosestElement(e.target, '[data-tooltip], [data-tooltip-original-title]');
       if (target && target.hasAttribute('data-tooltip-original-title')) {
         const orig = target.getAttribute('data-tooltip-original-title');
         if (orig) target.setAttribute('title', orig);
