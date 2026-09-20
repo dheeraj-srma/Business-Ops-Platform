@@ -67,9 +67,24 @@ class TestAnalyticsReads(unittest.TestCase):
         self.assertEqual(res.status_code, 200)
         data = res.json()
         
+        # BI & Executive reads
         self.assertIn("core_kpis", data)
         self.assertIn("executive_summary", data)
         self.assertIn("inventory_intelligence", data)
+
+        # Operational dashboard reads
+        self.assertIn("totalProducts", data)
+        self.assertIn("healthyCount", data)
+        self.assertIn("lowStockCount", data)
+        self.assertIn("criticalStockCount", data)
+        self.assertIn("outOfStockCount", data)
+        self.assertIn("lowStockItems", data)
+        self.assertIn("recentMovements", data)
+        self.assertIn("trend", data)
+        self.assertIn("categoryBreakdown", data)
+        self.assertIsInstance(data["lowStockItems"], list)
+        self.assertIsInstance(data["recentMovements"], list)
+        self.assertIsInstance(data["trend"], list)
 
     @patch('repositories.inventory_repo.InventoryRepository.fetch_all_products_with_inventory', return_value=MOCK_INVENTORY_ANALYTICS)
     def test_paginated_product_analytics(self, mock_inv):
