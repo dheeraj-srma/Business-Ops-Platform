@@ -52,3 +52,19 @@ class StockMutationResponse(BaseModel):
     transaction_id: Optional[str] = Field(None, description="Generated stock transaction ID")
     message: Optional[str] = Field(None, description="Status detail message")
     timestamp: str = Field(..., description="ISO timestamp of operation")
+
+class StockOutItemSchema(BaseModel):
+    product_id: Optional[str] = Field(None, description="Product ID")
+    productId: Optional[str] = Field(None, description="CamelCase product ID alias")
+    sku: Optional[str] = Field(None, description="Product SKU")
+    quantity: float = Field(..., gt=0.0, description="Quantity to dispatch")
+
+class StockOutRequest(BaseModel):
+    items: Optional[List[StockOutItemSchema]] = Field(None, description="Batch line items list")
+    product_id: Optional[str] = Field(None, description="Single product ID to stock out")
+    quantity: Optional[float] = Field(None, gt=0.0, description="Single product quantity")
+    reason: Optional[str] = Field("Order Fulfillment", description="Dispatch or stock-out reason")
+    recipient: Optional[str] = Field("Direct Consignee", description="Recipient or customer name")
+    reference_number: Optional[str] = Field(None, description="Order ID or delivery reference")
+    notes: Optional[str] = Field(None, description="Movement notes")
+    idempotency_key: Optional[str] = Field(None, description="Idempotency key")

@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { OrderPayload } from '../types';
+import { reserveOrder } from '@/shared/api/orders';
 
 export interface QueuedOrder {
   order_id: string;
@@ -102,7 +103,7 @@ export function onOfflineQueueChange(callback: (queue: QueuedOrder[]) => void): 
 }
 
 /**
- * Sync all queued offline orders to Supabase via the authoritative submit_order RPC.
+ * Sync all queued offline orders via central FastAPI reserveOrder endpoint.
  */
 export async function syncOfflineQueue(supabase: SupabaseClient): Promise<{
   synced: number;
@@ -124,46 +125,49 @@ export async function syncOfflineQueue(supabase: SupabaseClient): Promise<{
       const order = item.payload.order;
       const items = item.payload.items;
 
-      let rpcSuccess = false;
+      let reserveSuccess = false;
       try {
-        const { data: rpcData, error: rpcError } = await supabase.rpc('submit_order', {
-          p_order_id: order.order_id,
-          p_salesman_id: order.salesman_id,
-          p_salesman_name: order.salesman_name,
-          p_shop_name: order.shop_name,
-          p_city: order.city,
-          p_state: order.state,
-          p_location_id: order.location_id,
-          p_items: items.map(i => ({
+        const reserveRes = await reserveOrder({
+          order_id: order.order_id,
+          client_reference: order.order_id,
+          salesman_id: order.salesman_id,
+          salesman_name: order.salesman_name,
+          shop_name: order.shop_name,
+          city: order.city,
+          state: order.state,
+          location_id: order.location_id,
+          notes: '',
+          items: items.map(i => ({
             item_name: i.item_name,
             quantity: i.quantity,
             sku: i.sku,
-            category: i.category
+            category: i.category,
+            price: i.price
           }))
         });
 
-        if (!rpcError && rpcData && rpcData.success !== false) {
-          rpcSuccess = true;
+        if (reserveRes && (reserveRes.status === 'created' || reserveRes.status === 'already_processed')) {
+          reserveSuccess = true;
           synced++;
-        } else if (rpcData && rpcData.success === false) {
+        }
+      } catch (err: any) {
+        if (err && err.status_code === 409) {
           failed++;
           errors.push({
             orderId: order.order_id,
-            error: rpcData.message || 'Validation failed on server',
-            rejected_items: rpcData.rejected_items
+            error: err.message || 'Validation failed on server (insufficient stock)'
           });
           remainingQueue.push({
             ...item,
             retry_count: item.retry_count + 1,
-            last_error: rpcData.message || 'Server stock limit exceeded'
+            last_error: err.message || 'Server stock limit exceeded'
           });
           continue;
         }
-      } catch (e) {
-        // Fall back to direct table insertion
+        console.warn('Centralized reserveOrder call failed during offline queue sync, attempting fallback:', err);
       }
 
-      if (!rpcSuccess) {
+      if (!reserveSuccess) {
         const { error: headerErr } = await supabase.from('pending_orders').insert({
           order_id: order.order_id,
           salesman_id: order.salesman_id,

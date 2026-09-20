@@ -242,6 +242,37 @@ def record_stock_inward(
         logger.error(f"Error recording stock inward: {exc}")
         raise HTTPException(status_code=400, detail=str(exc))
 
+@router.post("/inventory/stock-out", summary="Record stock-out dispatch", description="Records stock-out consignment dispatch, deducts physical stock, and releases reservation.")
+def record_stock_outward(
+    payload: StockOutRequest,
+    current_user: dict = Depends(require_permission("orders.process"))
+):
+    try:
+        raw_items = payload.items or []
+        if not raw_items and payload.product_id and payload.quantity:
+            raw_items = [StockOutItemSchema(product_id=payload.product_id, quantity=payload.quantity)]
+            
+        items_list = [
+            {
+                "product_id": it.product_id or it.productId,
+                "sku": it.sku,
+                "quantity": it.quantity
+            }
+            for it in raw_items
+        ]
+        res = InventoryService.record_stock_out(
+            items=items_list,
+            recipient=payload.recipient,
+            reference_number=payload.reference_number,
+            reason=payload.reason,
+            notes=payload.notes,
+            actor=current_user
+        )
+        return res
+    except Exception as exc:
+        logger.error(f"Error recording stock outward: {exc}")
+        raise HTTPException(status_code=400, detail=str(exc))
+
 @router.get("/inventory/reconcile")
 def audit_inventory_reconciliation(
     current_user: dict = Depends(require_role(["admin", "stock_manager"]))

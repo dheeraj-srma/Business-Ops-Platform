@@ -93,3 +93,22 @@ export async function recordStockIn(payload: StockInPayload): Promise<any> {
     body: JSON.stringify(payload),
   });
 }
+
+export interface StockOutPayload {
+  items?: Array<{ productId?: string; product_id?: string; sku?: string; quantity: number }>;
+  product_id?: string;
+  quantity?: number;
+  recipient?: string;
+  reason?: string;
+  referenceNumber?: string;
+  reference_number?: string;
+  notes?: string;
+  idempotencyKey?: string;
+}
+
+export async function recordStockOut(payload: StockOutPayload): Promise<any> {
+  return apiClient<any>('/api/inventory/stock-out', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}

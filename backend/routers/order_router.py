@@ -2,12 +2,47 @@
 import logging
 from typing import List, Dict, Any
 from fastapi import APIRouter, HTTPException, Depends
-from schemas.orders import OrderCreateSchema, BulkOrderCreateSchema
+from schemas.orders import (
+    OrderCreateSchema,
+    BulkOrderCreateSchema,
+    OrderReservationRequest,
+    OrderReservationResponse
+)
 from services.order_service import OrderService
-from auth import require_role
+from auth import require_role, require_permission
 
 logger = logging.getLogger("order_router")
 router = APIRouter(prefix="/api/orders", tags=["Orders"])
+
+@router.post(
+    "/reserve",
+    response_model=OrderReservationResponse,
+    summary="Reserve order items and create order header",
+    description="Atomically validates stock availability, reserves line items, and creates order header inside a single PostgreSQL transaction."
+)
+def reserve_order(
+    payload: OrderReservationRequest,
+    current_user: dict = Depends(require_permission("orders.create"))
+):
+    try:
+        res = OrderService.reserve_order(payload, current_user)
+        return OrderReservationResponse(
+            status=res["status"],
+            order_id=res["order_id"],
+            client_reference=res.get("client_reference"),
+            items_count=res["items_count"],
+            total_amount=res["total_amount"],
+            idempotent=res.get("idempotent", False),
+            timestamp=res["timestamp"]
+        )
+    except ValueError as val_err:
+        err_msg = str(val_err)
+        if "INSUFFICIENT_STOCK" in err_msg:
+            raise HTTPException(status_code=409, detail=err_msg)
+        raise HTTPException(status_code=400, detail=err_msg)
+    except Exception as exc:
+        logger.error(f"Error executing order reservation: {exc}")
+        raise HTTPException(status_code=500, detail=str(exc))
 
 @router.get("")
 def list_orders():
@@ -70,16 +105,76 @@ def reject_order(
         raise HTTPException(status_code=400, detail=str(exc))
 
 
-@router.patch("/{order_id}/dispatch")
-def dispatch_order(
+from schemas.orders import (
+    OrderCreateSchema,
+    BulkOrderCreateSchema,
+    OrderReservationRequest,
+    OrderReservationResponse,
+    OrderProcessRequest,
+    OrderProcessResponse
+)
+
+@router.post(
+    "/{order_id}/process",
+    response_model=OrderProcessResponse,
+    summary="Process order fulfillment and execute stock-out",
+    description="Atomically validates stock availability, deducts physical stock, releases reservation, and transitions order status to Dispatched."
+)
+def process_order(
     order_id: str,
-    current_user: dict = Depends(require_role(["admin", "order_manager", "stock_manager"]))
+    payload: Optional[OrderProcessRequest] = None,
+    current_user: dict = Depends(require_permission("orders.process"))
 ):
     try:
-        return OrderService.dispatch_order(order_id)
+        res = OrderService.process_order(order_id, payload, current_user)
+        return OrderProcessResponse(
+            status=res["status"],
+            order_id=res["order_id"],
+            previous_status=res["previous_status"],
+            new_status=res["new_status"],
+            items_processed=res["items_processed"],
+            stock_transactions=res.get("stock_transactions", []),
+            idempotent=res.get("idempotent", False),
+            timestamp=res["timestamp"]
+        )
+    except ValueError as val_err:
+        err_msg = str(val_err)
+        if "INSUFFICIENT_PHYSICAL_STOCK" in err_msg or "Cannot process" in err_msg:
+            raise HTTPException(status_code=409, detail=err_msg)
+        if "not found" in err_msg.lower():
+            raise HTTPException(status_code=404, detail=err_msg)
+        raise HTTPException(status_code=400, detail=err_msg)
+    except Exception as exc:
+        logger.error(f"Error processing order {order_id}: {exc}")
+        raise HTTPException(status_code=500, detail=str(exc))
+
+@router.patch("/{order_id}/dispatch", response_model=OrderProcessResponse)
+def dispatch_order(
+    order_id: str,
+    current_user: dict = Depends(require_permission("orders.process"))
+):
+    try:
+        res = OrderService.process_order(order_id, current_user=current_user)
+        return OrderProcessResponse(
+            status=res["status"],
+            order_id=res["order_id"],
+            previous_status=res["previous_status"],
+            new_status=res["new_status"],
+            items_processed=res["items_processed"],
+            stock_transactions=res.get("stock_transactions", []),
+            idempotent=res.get("idempotent", False),
+            timestamp=res["timestamp"]
+        )
+    except ValueError as val_err:
+        err_msg = str(val_err)
+        if "INSUFFICIENT_PHYSICAL_STOCK" in err_msg or "Cannot process" in err_msg:
+            raise HTTPException(status_code=409, detail=err_msg)
+        if "not found" in err_msg.lower():
+            raise HTTPException(status_code=404, detail=err_msg)
+        raise HTTPException(status_code=400, detail=err_msg)
     except Exception as exc:
         logger.error(f"Error dispatching order: {exc}")
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(status_code=500, detail=str(exc))
 
 @router.patch("/{order_id}/status")
 def transition_order_status(

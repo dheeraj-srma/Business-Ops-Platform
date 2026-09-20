@@ -44,6 +44,7 @@ import type {
 } from '../types';
 
 import { supabase } from '../lib/supabaseClient';
+import { reserveOrder } from '@/shared/api/orders';
 import { buildOrderPayload, downloadOrderAsJSON } from '../utils/buildOrder';
 import { generateOrderPDF } from '../utils/pdfGenerator';
 import InfoModal from './InfoModal';
@@ -1612,21 +1613,21 @@ export default function SalesmanPortal() {
         return;
       }
 
-      // Live Supabase submission — Try submit_order RPC first, fallback to direct pending_orders & pending_order_items table inserts
+      // Central Backend Order Reservation & Header Creation
       let rpcData: any = null;
       let rpcSuccess = false;
 
       try {
-        const { data, error: rpcError } = await supabase.rpc('submit_order', {
-          p_order_id: payload.order.order_id,
-          p_salesman_id: salesmanIdVal,
-          p_salesman_name: selectedSalesman,
-          p_shop_name: selectedShop,
-          p_city: cityVal,
-          p_state: stateVal,
-          p_location_id: matchedLocationId,
-          p_notes: '',
-          p_items: payload.items.map(item => ({
+        const reserveRes = await reserveOrder({
+          order_id: payload.order.order_id,
+          salesman_id: salesmanIdVal,
+          salesman_name: selectedSalesman,
+          shop_name: selectedShop,
+          city: cityVal,
+          state: stateVal,
+          location_id: matchedLocationId,
+          notes: '',
+          items: payload.items.map(item => ({
             item_name: item.item_name,
             quantity: item.quantity,
             sku: item.sku,
@@ -1634,34 +1635,20 @@ export default function SalesmanPortal() {
           }))
         });
 
-        if (!rpcError && data && data.success !== false) {
-          rpcData = data;
+        if (reserveRes && (reserveRes.status === 'created' || reserveRes.status === 'already_processed')) {
+          rpcData = reserveRes;
           rpcSuccess = true;
-        } else if (data && data.success === false) {
-          if (data.error === 'INSUFFICIENT_STOCK' && data.rejected_items?.length > 0) {
-            showModal({
-              type: 'warning',
-              title: 'Insufficient Available Stock',
-              message: 'One or more items exceed live warehouse stock. Transaction was rolled back.',
-              details: data.rejected_items.map((r: any) => ({
-                label: r.item_name || 'Item',
-                value: `Requested: ${r.requested_quantity || '?'}, Available: ${r.available_stock ?? 0}`,
-                highlight: true
-              }))
-            });
-            return;
-          }
+        }
+      } catch (err: any) {
+        if (err && err.status_code === 409) {
           showModal({
-            type: 'error',
-            title: 'Order Validation Failed',
-            message: data.message || 'Server rejected order submission.'
+            type: 'warning',
+            title: 'Insufficient Available Stock',
+            message: err.message || 'One or more items exceed live warehouse stock. Transaction was rolled back.'
           });
           return;
-        } else if (rpcError) {
-          console.warn('RPC submit_order call returned error, falling back to direct database table insert:', rpcError);
         }
-      } catch (err) {
-        console.warn('RPC submit_order exception, falling back to direct database table insert:', err);
+        console.warn('Centralized reserveOrder call failed, attempting database fallback:', err);
       }
 
       // Direct Table Insert Fallback if RPC is missing or schema cache is not updated

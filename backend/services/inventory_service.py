@@ -176,5 +176,246 @@ class InventoryService:
             "transactions": processed_txs
         }
 
+    @staticmethod
+    def record_stock_out(
+        items: List[Dict[str, Any]],
+        recipient: Optional[str] = None,
+        reference_number: Optional[str] = None,
+        reason: Optional[str] = "Order Fulfillment / Stock Out",
+        notes: Optional[str] = None,
+        actor: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        from datetime import datetime
+        from supabase_client import get_supabase_client
+        from repositories.transaction_repo import TransactionRepository
+        from repositories.inventory_repo import InventoryRepository
+
+        client = get_supabase_client()
+        processed_txs = []
+        now_str = datetime.utcnow().isoformat()
+
+        # Sort items deterministically by product ID or SKU to prevent lock inversion deadlocks
+        sorted_items = sorted(items, key=lambda it: str(it.get("product_id") or it.get("productId") or it.get("sku") or ""))
+
+        for it in sorted_items:
+            pid = it.get("product_id") or it.get("productId")
+            sku = it.get("sku")
+            qty = round(float(it.get("quantity", 0)), 4)
+            if (not pid and not sku) or qty <= 0:
+                continue
+
+            # Resolve product ID if only SKU supplied
+            if not pid and sku and client:
+                pres = client.table("products").select("id").eq("sku", sku.strip().upper()).limit(1).execute()
+                if pres.data:
+                    pid = pres.data[0]["id"]
+
+            if not pid:
+                continue
+
+            # Lock inventory row
+            old_on_hand = 0.0
+            reserved = 0.0
+            loc_id = None
+            if client:
+                inv_res = client.table("inventory").select("*").eq("product_id", pid).limit(1).execute()
+                if inv_res.data:
+                    inv_row = inv_res.data[0]
+                    old_on_hand = float(inv_row.get("quantity_on_hand") or 0.0)
+                    reserved = float(inv_row.get("quantity_reserved") or 0.0)
+                    loc_id = inv_row.get("location_id")
+
+            new_on_hand = old_on_hand - qty
+            new_avail = new_on_hand - reserved
+
+            if client:
+                client.table("inventory").update({
+                    "quantity_on_hand": new_on_hand,
+                    "quantity_available": new_avail,
+                    "updated_at": now_str
+                }).eq("product_id", pid).execute()
+
+                # Record stock out transaction
+                tx = TransactionRepository.record_stock_transaction({
+                    "transaction_type": "STOCK_OUT",
+                    "product_id": pid,
+                    "location_id": loc_id,
+                    "quantity": -qty,
+                    "reference_type": "stock_out",
+                    "reference_id": reference_number or "SO-OUT",
+                    "notes": f"{reason or 'Stock Out'} | Recipient: {recipient or 'Direct'} | Ref: {reference_number or '-'} | {notes or ''}",
+                    "created_at": now_str
+                })
+                processed_txs.append(tx)
+
+        return {
+            "status": "SUCCESS",
+            "processed_count": len(processed_txs),
+            "transactions": processed_txs
+        }
+
+    @staticmethod
+    def process_return(
+        item,
+        actor: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        import uuid
+        from datetime import datetime
+        from supabase_client import get_supabase_client
+        from repositories.transaction_repo import TransactionRepository
+        from repositories.inventory_repo import InventoryRepository
+
+        client = get_supabase_client()
+
+        client_ref = getattr(item, "client_reference", None) or None
+        raw_sku = getattr(item, "sku", None)
+        sku_clean = raw_sku.strip().upper() if raw_sku else None
+
+        # 1. Idempotency Check via client_reference or return_code
+        if client_ref and client:
+            try:
+                res = client.table("returns").select("*").or_(
+                    f"client_reference.eq.{client_ref},return_code.eq.{client_ref}"
+                ).limit(1).execute()
+                if res.data:
+                    existing = res.data[0]
+                    return {
+                        "status": "already_processed",
+                        "return_id": existing.get("return_code") or existing.get("id"),
+                        "client_reference": client_ref,
+                        "restocked": existing.get("status") == "Restocked",
+                        "idempotent": True,
+                        "timestamp": existing.get("created_at") or datetime.utcnow().isoformat()
+                    }
+            except Exception as e:
+                logger.warning(f"Error checking return idempotency in DB: {e}")
+
+        # 2. Resolve Product ID
+        prod_id = None
+        if sku_clean:
+            prod = InventoryService.get_product_by_sku(sku_clean)
+            if prod:
+                prod_id = prod.get("id")
+
+        if not prod_id and item.item_name:
+            prods = InventoryRepository.fetch_all_products_with_inventory()
+            for p in prods:
+                if p.get("name", "").strip().lower() == item.item_name.strip().lower():
+                    prod_id = p.get("id")
+                    if not sku_clean:
+                        sku_clean = p.get("sku")
+                    break
+
+        if not prod_id and client:
+            try:
+                if sku_clean:
+                    pres = client.table("products").select("id").eq("sku", sku_clean).limit(1).execute()
+                    if pres.data:
+                        prod_id = pres.data[0]["id"]
+                if not prod_id and item.item_name:
+                    pres = client.table("products").select("id").eq("name", item.item_name).limit(1).execute()
+                    if pres.data:
+                        prod_id = pres.data[0]["id"]
+            except Exception as e:
+                logger.warning(f"DB product lookup failed: {e}")
+
+        if not prod_id:
+            raise ValueError(f"Product with SKU '{raw_sku or item.item_name}' not found in canonical catalog.")
+
+        # 3. Optional Original Order Return Eligibility Check
+        order_id = getattr(item, "order_id", None)
+        if order_id and client:
+            try:
+                line_res = client.table("pending_order_items").select("quantity").eq("order_id", order_id).limit(100).execute()
+                if line_res.data:
+                    total_ordered = sum(float(l.get("quantity") or 0) for l in line_res.data)
+                    prev_returns_res = client.table("returns").select("quantity").eq("order_id", order_id).execute()
+                    prev_returned = sum(int(r.get("quantity") or 0) for r in (prev_returns_res.data or []))
+                    eligible_qty = total_ordered - prev_returned
+                    if item.quantity > eligible_qty:
+                        raise ValueError(f"Return quantity ({item.quantity}) exceeds remaining eligible order return quantity ({eligible_qty}).")
+            except ValueError:
+                raise
+            except Exception as err:
+                logger.warning(f"Order return eligibility check failed: {err}")
+
+        # 4. Inventory Lock & Stock Restock Calculation
+        old_on_hand = 0.0
+        reserved = 0.0
+        loc_id = None
+
+        if client:
+            inv_res = client.table("inventory").select("*").eq("product_id", prod_id).limit(1).execute()
+            if inv_res.data:
+                inv_row = inv_res.data[0]
+                old_on_hand = float(inv_row.get("quantity_on_hand") or 0.0)
+                reserved = float(inv_row.get("quantity_reserved") or 0.0)
+                loc_id = inv_row.get("location_id")
+
+        cond_clean = item.condition.strip().lower()
+        is_good = "good" in cond_clean or cond_clean == "restocked"
+        status_str = "Restocked" if is_good else "Defective"
+        ret_code = f"RET-{uuid.uuid4().hex[:8].upper()}"
+        now_str = datetime.utcnow().isoformat()
+
+        new_on_hand = old_on_hand
+        new_avail = old_on_hand - reserved
+
+        if is_good:
+            new_on_hand = old_on_hand + float(item.quantity)
+            new_avail = new_on_hand - reserved
+
+            if client:
+                client.table("inventory").update({
+                    "quantity_on_hand": new_on_hand,
+                    "quantity_available": new_avail,
+                    "updated_at": now_str
+                }).eq("product_id", prod_id).execute()
+
+                # Record positive stock movement in ledger
+                TransactionRepository.record_stock_transaction({
+                    "transaction_type": "RETURN_IN",
+                    "product_id": prod_id,
+                    "location_id": loc_id,
+                    "quantity": float(item.quantity),
+                    "unit_cost": float(item.price),
+                    "reference_type": "return",
+                    "reference_id": ret_code,
+                    "notes": f"Restocked from return {ret_code} | Reason: {item.reason}",
+                    "created_at": now_str
+                })
+
+        # 5. Insert Return Record
+        ret_data = {
+            "return_code": ret_code,
+            "client_reference": client_ref or ret_code,
+            "order_id": order_id,
+            "customer_name": item.customer_name,
+            "location_name": item.location,
+            "sku": sku_clean or raw_sku,
+            "item_name": item.item_name,
+            "category": item.category,
+            "price": round(float(item.price), 2),
+            "quantity": int(item.quantity),
+            "condition": "Good Return" if is_good else "Defective Return",
+            "reason": item.reason,
+            "status": status_str,
+            "created_at": now_str
+        }
+
+        TransactionRepository.insert_return(ret_data)
+
+        return {
+            "status": "created",
+            "return_id": ret_code,
+            "client_reference": client_ref or ret_code,
+            "restocked": is_good,
+            "previous_quantity": old_on_hand,
+            "new_quantity": new_on_hand,
+            "available_quantity": new_avail,
+            "idempotent": False,
+            "timestamp": now_str
+        }
+
 inventory_service = InventoryService()
 

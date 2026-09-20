@@ -52,12 +52,15 @@ $$\text{status} = \begin{cases}
   4. If `allow_negative_orders` system setting is `false` and requested quantity exceeds `v_available_stock`, rolls back atomically with `INSUFFICIENT_STOCK`.
   5. Inserts header into `pending_orders` (`status = 'Pending'`) and line items into `pending_order_items`.
 
-### B. Order Processing & Fulfillment
-- **Trigger**: Operations Manager approves/processes a pending order.
+### B. Order Processing & Fulfillment (`POST /api/orders/{id}/process` — Phase 5C.7 Centralized)
+- **Trigger**: Operations Manager fulfills a reserved pending order via `POST /api/orders/{id}/process` or `POST /api/inventory/stock-out`.
+- **Authorization**: Guarded by server-side permission check `@require_permission("orders.process")`.
 - **Mechanism**:
-  1. Deducts item quantities from physical stock (`quantity_on_hand`).
-  2. Releases reserved stock by transitioning order header status from `Pending` to `Processed`.
-  3. Inserts negative stock movement into `stock_transactions` (`transaction_type = 'STOCK_OUT'`).
+  1. Validates order status is active (`Pending` or `Approved`) and locks affected inventory rows (`FOR UPDATE` sorted by SKU).
+  2. Deducts item quantities from physical stock: $N_{\text{new}} = N_{\text{existing}} - Q_{\text{order}}$.
+  3. Transitions order status to `Dispatched`, releasing reservation $Q_{\text{order}}$: $R_{\text{new}} = R_{\text{existing}} - Q_{\text{order}}$.
+  4. Recalculates available stock: $A_{\text{new}} = N_{\text{new}} - R_{\text{new}} = (N - Q) - (R - Q) = N - R$ (consistent with pre-fulfillment available level).
+  5. Logs stock-out transaction in `inventory_transactions` (`transaction_type = 'STOCK_OUT'`).
 
 ### C. Manual Stock Adjustment & Admin Re-Stock
 - **Trigger**: Operations Admin manually adjusts stock via `/api/admin/inventory/adjust` or `/api/inventory/reconcile/fix`.
@@ -66,11 +69,20 @@ $$\text{status} = \begin{cases}
   2. Updates `quantity_on_hand` to `new_quantity` and `quantity_available` to `new_quantity - quantity_reserved`.
   3. Writes audit log event to `system_audit_logs`.
 
-### D. Returns & Restocking (`create_return`)
-- **Trigger**: Customer return processed via `/api/returns`.
+### D. Returns & Restocking (`POST /api/returns` — Phase 5C.6 Centralized)
+- **Trigger**: Customer return processed via central FastAPI backend (`POST /api/returns`).
+- **Authorization**: Guarded by server-side permission check `@require_permission("returns.manage")`.
 - **Mechanism**:
-  1. Creates return voucher record in `returns` table (`return_code = 'RET-XXXXXX'`).
-  2. If return condition is `Good Return`, records positive movement in `stock_transactions` (`transaction_type = 'return_in'`), restoring physical stock balance.
+  1. Validates caller authorization and checks idempotency via `client_reference` / `return_code`.
+  2. Acquires row lock (`FOR UPDATE`) on `public.inventory` by product ID / SKU.
+  3. If condition is `Good Return` / `Restocked`:
+     - Physical stock incremented: $N_{\text{new}} = N_{\text{existing}} + Q_{\text{returned}}$.
+     - Available stock recalculated: $A_{\text{new}} = N_{\text{new}} - R_{\text{existing}}$.
+     - Reserved stock ($R_{\text{existing}}$) remains unchanged.
+     - Positive movement logged in `stock_transactions` (`transaction_type = 'RETURN_IN'`).
+  4. If condition is `Damaged Return` / `Defective`:
+     - Physical stock and available stock remain unchanged ($0$ stock addition).
+  5. Inserts immutable return voucher record in `public.returns` (`return_code = 'RET-XXXXXX'`).
 
 ### E. Tally ERP Synchronization (`tally_service.py` / Node port 9000)
 - **Trigger**: Background batch sync or webhook event from Tally ERP 9 / Prime.
@@ -81,11 +93,11 @@ $$\text{status} = \begin{cases}
 
 ---
 
-## 4. Reservation Model & Lifecycle
+## 4. Reservation Model & Lifecycle (Phase 5C.5 Formalization)
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Pending: Order Created (submit_order)
+    [*] --> Pending: Order Created (submit_order / POST /api/orders/reserve)
     Pending --> Processed: Warehouse Fulfillment (stock_out)
     Pending --> Cancelled: Order Cancelled (release reservation)
     Pending --> Rejected: Rejected due to Credit/Stock
@@ -95,9 +107,15 @@ stateDiagram-v2
     SyncedTally --> [*]
 ```
 
-- **Order Created (`Pending`)**: Reserves stock by adding items to `pending_order_items`.
-- **Order Processed (`Processed`)**: Converts reservation to physical stock deduction (`STOCK_OUT`).
-- **Order Cancelled / Rejected**: Deletes/updates `pending_orders` status, automatically releasing reserved quantity for future orders.
+1. **Reservation Eligibility Statuses**:
+   - Stock is reserved when linked orders are in any of: `{"pending", "processing", "reserved", "approved"}`.
+   - Statuses releasing reservations: `{"cancelled", "rejected", "delivered"}`.
+
+2. **Deterministic Deadlock Prevention Lock Order**:
+   - Multi-item order reservations must sort line items by `sku` alphabetically before acquiring row locks (`SELECT FOR UPDATE`), guaranteeing zero database deadlocks across concurrent multi-product orders.
+
+3. **Atomic Multi-Product Order Boundary**:
+   - Every multi-item order placement executes inside a single, indivisible PostgreSQL transaction. If any single line item exceeds available stock (with negative override disabled), the entire order (header + all line items) is rolled back. No partial order reservations are created.
 
 ---
 

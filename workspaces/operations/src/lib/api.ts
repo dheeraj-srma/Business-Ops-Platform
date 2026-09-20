@@ -1,3 +1,4 @@
+import { recordStockOut as sharedRecordStockOut } from '@/shared/api/inventory';
 import {
   DashboardStats,
   Product,
@@ -200,13 +201,7 @@ export const api = {
       totalQuantity: number;
     };
   }> {
-    const res = await fetch('/api/inventory/stock-out', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
-    const result = await res.json();
-    if (!res.ok) throw new Error(result.error || 'Failed to issue stock');
+    const result = await sharedRecordStockOut(data);
     return result;
   },
 

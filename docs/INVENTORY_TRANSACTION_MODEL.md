@@ -46,15 +46,21 @@ CREATE TABLE IF NOT EXISTS public.stock_transactions (
 
 ## 3. Atomic Transaction Boundaries for Phase 5C
 
-### Order Processing Atomic Transaction Boundary
-```
+### Order Processing Atomic Transaction Boundary (Phase 5C.7)
+```sql
 BEGIN TRANSACTION (PostgreSQL Isolation Level: READ COMMITTED / SERIALIZABLE)
-  1. SELECT * FROM public.inventory WHERE product_id = ... FOR UPDATE;
-  2. Verify physical_stock >= requested_quantity (or allow_negative_orders == true).
-  3. UPDATE public.inventory SET quantity_on_hand = quantity_on_hand - qty, updated_at = NOW();
-  4. UPDATE public.pending_orders SET status = 'Processed' WHERE id = order_id;
-  5. INSERT INTO public.stock_transactions (transaction_type, product_id, quantity, reference_id, ...)
-  6. INSERT INTO public.system_audit_logs (...)
+  1. SELECT * FROM public.pending_orders WHERE id = order_id FOR UPDATE;
+  2. If status IN ('PROCESSED', 'DISPATCHED', 'DELIVERED', 'COMPLETED'), return idempotent response (0 additional stock-out).
+  3. Fetch order items for order_id.
+  4. Collect distinct product IDs (or SKUs) and SORT THEM DETERMINISTICALLY (e.g. ORDER BY sku).
+  5. Acquire row-level locks on inventory rows in sorted order:
+     SELECT * FROM public.inventory WHERE sku IN (...) FOR UPDATE;
+  6. For each item in order:
+     - Deduct physical_stock: physical_stock = physical_stock - qty
+     - Release reserved_stock: reserved_stock = max(0, reserved_stock - qty)
+     - Record transaction in public.inventory_transactions (type: 'STOCK_OUT')
+  7. Update order status: UPDATE public.pending_orders SET status = 'Dispatched', dispatch_date = NOW();
+  8. Write system audit log entry.
 COMMIT;
 ```
 

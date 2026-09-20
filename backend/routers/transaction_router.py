@@ -2,10 +2,11 @@
 import logging
 from typing import List, Dict, Any
 from fastapi import APIRouter, HTTPException, Depends, Query
-from schemas.returns import ReturnCreateSchema
+from schemas.returns import ReturnCreateSchema, ReturnResponseSchema
 from repositories.transaction_repo import TransactionRepository
 from repositories.order_repo import OrderRepository
-from auth import require_role
+from services.inventory_service import InventoryService
+from auth import require_permission
 from supabase_client import get_supabase_client
 
 logger = logging.getLogger("transaction_router")
@@ -90,53 +91,21 @@ def list_returns():
         logger.error(f"Error listing returns: {exc}")
         return []
 
-@router.post("/returns")
+@router.post("/returns", response_model=ReturnResponseSchema)
 def create_return(
     item: ReturnCreateSchema,
-    current_user: dict = Depends(require_role(["admin", "stock_manager", "order_manager"]))
+    current_user: dict = Depends(require_permission("returns.manage"))
 ):
     try:
-        client = get_supabase_client()
-        import uuid
-        is_good = "good" in item.condition.strip().lower()
-        status = "Restocked" if is_good else "Defective"
-        ret_code = f"RET-{uuid.uuid4().hex[:8].upper()}"
-
-        ret_data = {
-            "return_code": ret_code,
-            "customer_name": item.customer_name,
-            "location_name": item.location,
-            "sku": item.sku,
-            "item_name": item.item_name,
-            "category": item.category,
-            "price": round(float(item.price), 2),
-            "quantity": int(item.quantity),
-            "condition": "Good Return" if is_good else "Defective Return",
-            "reason": item.reason,
-            "status": status,
-        }
-        TransactionRepository.insert_return(ret_data)
-
-        # If Good return, record stock_in transaction to drive atomic stock ledger
-        if is_good and item.sku:
-            p_res = client.table("products").select("id").eq("sku", item.sku).limit(1).execute()
-            if p_res.data:
-                prod_id = p_res.data[0]["id"]
-                inv_res = client.table("inventory").select("location_id").eq("product_id", prod_id).limit(1).execute()
-                loc_id = inv_res.data[0]["location_id"] if inv_res.data else None
-
-                # Atomic stock movement insert -> triggers DB balance update
-                TransactionRepository.record_stock_transaction({
-                    "transaction_type": "return_in",
-                    "product_id": prod_id,
-                    "location_id": loc_id,
-                    "quantity": float(item.quantity),
-                    "unit_cost": float(item.price),
-                    "reference_type": "return",
-                    "notes": f"Restocked from return {ret_code}",
-                })
-
-        return {"status": "success", "return_id": ret_code, "restocked": is_good}
+        res = InventoryService.process_return(item, current_user)
+        return res
+    except ValueError as val_err:
+        err_msg = str(val_err)
+        if "not found" in err_msg.lower():
+            raise HTTPException(status_code=404, detail=err_msg)
+        if "exceeds" in err_msg.lower() or "eligible" in err_msg.lower():
+            raise HTTPException(status_code=409, detail=err_msg)
+        raise HTTPException(status_code=422, detail=err_msg)
     except Exception as exc:
         logger.error(f"Error creating return: {exc}")
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(status_code=500, detail=str(exc))

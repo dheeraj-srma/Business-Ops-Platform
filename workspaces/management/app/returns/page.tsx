@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useLoading } from '../components/LoadingContext';
 import { createPortal } from 'react-dom';
 import { useSearchParams } from 'next/navigation';
+import { createReturn, getReturns } from '@/shared/api/returns';
 import {
   RotateCcw,
   Plus,
@@ -170,11 +171,12 @@ function ReturnsContent() {
 
   const fetchReturns = useCallback(() => {
     setLoading(true);
-    fetch(`${API}/api/returns`)
-      .then(r => r.ok ? r.json() : [])
-      .catch(() => [])
+    getReturns()
       .then(data => setReturns(Array.isArray(data) ? data : []))
-      .catch(err => console.warn('Failed to fetch returns:', err))
+      .catch(err => {
+        console.warn('Failed to fetch returns:', err);
+        setReturns([]);
+      })
       .finally(() => {
         setLoading(false);
         resolveLoadingKey('returns_dashboard');
@@ -415,18 +417,7 @@ function ReturnsContent() {
         sku: sku.trim()
       };
 
-      const res = await fetch(`${API}/api/returns`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.detail || 'Failed to process customer return');
-      }
-
-      const result = await res.json();
+      const result = await createReturn(payload);
       setToastMessage(
         condition === 'Good'
           ? `Return ${result.return_id} logged & restocked (+${quantity} units to inventory)!`
