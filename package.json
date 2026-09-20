@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "next dev --webpack -p 3000",
-    "dev:backend": "cd backend && uvicorn main:app --reload --port 8000",
+    "dev:backend": "cd backend && python -m uvicorn main:app --reload --port 8000",
     "dev:tally": "tsx server.ts",
     "build": "next build",
     "start": "next start -p 3000",
