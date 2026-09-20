@@ -67,18 +67,18 @@ interface NavGroup {
 }
 
 const TAB_ROUTES: Record<NavigationTab, string> = {
-  'dashboard': '/',
-  'sales': '/sales',
-  'dealers': '/dealers',
-  'inventory-velocity': '/inventory-velocity',
-  'procurement': '/procurement',
-  'quality-returns': '/quality-returns',
-  'geography': '/geography',
-  'demand-forecast': '/demand-forecast',
-  'financial': '/financial-valuation',
-  'explorer': '/explorer',
-  'inventory': '/inventory',
-  'admin': '/admin',
+  'dashboard': '/management',
+  'sales': '/management/sales',
+  'dealers': '/management/dealers',
+  'inventory-velocity': '/management/inventory-velocity',
+  'procurement': '/management/procurement',
+  'quality-returns': '/management/quality-returns',
+  'geography': '/management/geography',
+  'demand-forecast': '/management/demand-forecast',
+  'financial': '/management/financial-valuation',
+  'explorer': '/management/explorer',
+  'inventory': '/management/inventory',
+  'admin': '/management/admin',
 };
 
 const NAV_GROUPS: NavGroup[] = [

@@ -93,7 +93,7 @@ export default function DashboardPage() {
         ],
         recommendation:
           'Sales are 14.2% ahead of last quarter targets. Restocking Tier-2 dealers is expected to increase sales next month.',
-        actionUrl: '/sales',
+        actionUrl: '/management/sales',
         actionLabel: 'View Sales',
       },
       inventory: {
@@ -121,7 +121,7 @@ export default function DashboardPage() {
         ],
         recommendation:
           '75.2% of stock is healthy. Reorder the 14 low-stock items before peak demand.',
-        actionUrl: '/inventory',
+        actionUrl: '/management/inventory',
         actionLabel: 'View Inventory',
       },
       purchase: {
@@ -149,7 +149,7 @@ export default function DashboardPage() {
         ],
         recommendation:
           'Purchases are spread across 211 suppliers. Volume discounts saved ₹2.4L last month.',
-        actionUrl: '/suppliers',
+        actionUrl: '/management/procurement',
         actionLabel: 'View Suppliers',
       },
       customers: {
@@ -177,7 +177,7 @@ export default function DashboardPage() {
         ],
         recommendation:
           'Top 10% of customers bring in 58% of sales. Dealer reorders grew 18% this month.',
-        actionUrl: '/dealers',
+        actionUrl: '/management/dealers',
         actionLabel: 'View Customers',
       },
       margin: {
@@ -205,7 +205,7 @@ export default function DashboardPage() {
         ],
         recommendation:
           'Shifting dealer demand towards branded brass collections (Vermora & HAHN) has contributed an extra 340 bps of gross margin expansion. Maintaining this product mix protects operational profitability against raw metal price volatility.',
-        actionUrl: '/sales',
+        actionUrl: '/management/sales',
         actionLabel: 'Review Profitability Data',
       },
       aov: {
@@ -233,7 +233,7 @@ export default function DashboardPage() {
         ],
         recommendation:
           'Bundled fixture offerings and minimum freight exemption thresholds have successfully elevated average order size by 11.6% over the last two quarters.',
-        actionUrl: '/sales',
+        actionUrl: '/management/sales',
         actionLabel: 'Inspect Order Book',
       },
       turnover: {
@@ -261,7 +261,7 @@ export default function DashboardPage() {
         ],
         recommendation:
           'A turnover velocity of 4.1x places the business in the top quartile of regional plumbing and hardware distributors. Maintaining agile reorder levels ensures optimal working capital liquidity.',
-        actionUrl: '/inventory',
+        actionUrl: '/management/inventory-velocity',
         actionLabel: 'Review Stock Turnover',
       },
       fulfillment: {
@@ -289,7 +289,7 @@ export default function DashboardPage() {
         ],
         recommendation:
           'Fulfillment SLA continues to outperform the 95% target threshold. Integrated digital dispatch receipts have reduced customer inquiries regarding order status by 64%.',
-        actionUrl: '/procurement',
+        actionUrl: '/management/procurement',
         actionLabel: 'View Logistics SLA',
       },
     };
@@ -320,14 +320,14 @@ export default function DashboardPage() {
 
           <div className="flex items-center gap-3 shrink-0">
             <Link
-              href="/sales"
+              href="/management/sales"
               className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 dark:bg-indigo-500 hover:bg-indigo-500 text-slate-950 font-bold text-xs shadow-lg shadow-indigo-500/20 transition-all cursor-pointer"
             >
               <span>View Sales</span>
               <ArrowUpRight className="w-3.5 h-3.5" />
             </Link>
             <Link
-              href="/dealers"
+              href="/management/dealers"
               className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs border border-slate-700 transition-all cursor-pointer"
             >
               <span>View Customers</span>
@@ -532,7 +532,7 @@ export default function DashboardPage() {
 
           <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between text-xs">
             <span className="text-slate-400">Need deeper SKU-level demand projection?</span>
-            <Link href="/demand-forecast" className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:text-indigo-300 font-semibold flex items-center gap-1">
+            <Link href="/management/demand-forecast" className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:text-indigo-300 font-semibold flex items-center gap-1">
               <span>View AI Demand Forecast</span>
               <ArrowUpRight size={14} />
             </Link>
@@ -547,7 +547,7 @@ export default function DashboardPage() {
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           <Link
-            href="/sales"
+            href="/management/sales"
             className="p-4 bg-slate-900/60 hover:bg-slate-800/80 border border-slate-800 hover:border-indigo-300 dark:border-indigo-700/60 rounded-xl transition-all group cursor-pointer"
           >
             <TrendingUp className="w-5 h-5 text-sky-400 mb-2 group-hover:scale-110 transition-transform" />
@@ -556,7 +556,7 @@ export default function DashboardPage() {
           </Link>
 
           <Link
-            href="/dealers"
+            href="/management/dealers"
             className="p-4 bg-slate-900/60 hover:bg-slate-800/80 border border-slate-800 hover:border-indigo-300 dark:border-indigo-700/60 rounded-xl transition-all group cursor-pointer"
           >
             <Store className="w-5 h-5 text-purple-400 mb-2 group-hover:scale-110 transition-transform" />
@@ -565,7 +565,7 @@ export default function DashboardPage() {
           </Link>
 
           <Link
-            href="/inventory-velocity"
+            href="/management/inventory-velocity"
             className="p-4 bg-slate-900/60 hover:bg-slate-800/80 border border-slate-800 hover:border-indigo-300 dark:border-indigo-700/60 rounded-xl transition-all group cursor-pointer"
           >
             <Activity className="w-5 h-5 text-indigo-600 dark:text-indigo-400 mb-2 group-hover:scale-110 transition-transform" />
@@ -574,7 +574,7 @@ export default function DashboardPage() {
           </Link>
 
           <Link
-            href="/procurement"
+            href="/management/procurement"
             className="p-4 bg-slate-900/60 hover:bg-slate-800/80 border border-slate-800 hover:border-indigo-300 dark:border-indigo-700/60 rounded-xl transition-all group cursor-pointer"
           >
             <Truck className="w-5 h-5 text-amber-400 mb-2 group-hover:scale-110 transition-transform" />
@@ -583,7 +583,7 @@ export default function DashboardPage() {
           </Link>
 
           <Link
-            href="/geography"
+            href="/management/geography"
             className="p-4 bg-slate-900/60 hover:bg-slate-800/80 border border-slate-800 hover:border-indigo-300 dark:border-indigo-700/60 rounded-xl transition-all group cursor-pointer"
           >
             <Compass className="w-5 h-5 text-indigo-600 dark:text-indigo-400 mb-2 group-hover:scale-110 transition-transform" />
@@ -592,7 +592,7 @@ export default function DashboardPage() {
           </Link>
 
           <Link
-            href="/explorer"
+            href="/management/explorer"
             className="p-4 bg-slate-900/60 hover:bg-slate-800/80 border border-slate-800 hover:border-indigo-300 dark:border-indigo-700/60 rounded-xl transition-all group cursor-pointer"
           >
             <Search className="w-5 h-5 text-rose-400 mb-2 group-hover:scale-110 transition-transform" />

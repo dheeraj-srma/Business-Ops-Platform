@@ -6,9 +6,11 @@ import {
   Sun,
   Moon,
   Database,
+  LogOut,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useTheme } from '../../context/ThemeContext';
+import { clearAuthSession } from '@/shared/auth';
 
 interface HeaderProps {
   currentTabTitle?: string;
@@ -37,6 +39,15 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenMobileMenu,
 }) => {
   const { isDark, toggleTheme } = useTheme();
+
+  const handleLogout = async () => {
+    try {
+      await clearAuthSession();
+    } catch (err) {
+      console.warn('Logout error:', err);
+    }
+    window.location.href = '/login';
+  };
 
   return (
     <header
@@ -99,6 +110,17 @@ export const Header: React.FC<HeaderProps> = ({
           className="p-2 text-slate-400 hover:text-indigo-600 dark:text-indigo-400 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
         >
           <RefreshCw className={cn('w-4 h-4', isRefreshing && 'animate-spin text-indigo-600 dark:text-indigo-400')} />
+        </button>
+
+        {/* Logout button */}
+        <button
+          id="btn-header-logout"
+          onClick={handleLogout}
+          title="Sign out of Admin Management Workspace"
+          className="p-1.5 sm:px-2.5 sm:py-1.5 rounded-lg bg-slate-800/80 hover:bg-rose-950/50 border border-slate-700/60 hover:border-rose-800/60 text-xs font-semibold text-slate-300 hover:text-rose-400 transition-all flex items-center gap-1.5 cursor-pointer ml-1"
+        >
+          <LogOut className="w-3.5 h-3.5 text-rose-500" />
+          <span className="hidden sm:inline text-xs">Logout</span>
         </button>
       </div>
     </header>
