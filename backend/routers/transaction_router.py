@@ -1,6 +1,6 @@
 # backend/routers/transaction_router.py
 import logging
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from fastapi import APIRouter, HTTPException, Depends, Query
 from schemas.returns import ReturnCreateSchema, ReturnResponseSchema
 from repositories.transaction_repo import TransactionRepository
@@ -13,9 +13,13 @@ logger = logging.getLogger("transaction_router")
 router = APIRouter(prefix="/api", tags=["Stock Movements & Transactions"])
 
 @router.get("/transactions")
-def list_transactions(limit: int = Query(default=1000)):
+def list_transactions(
+    limit: int = Query(default=1000),
+    dateFrom: Optional[str] = Query(None),
+    dateTo: Optional[str] = Query(None),
+):
     try:
-        txns = TransactionRepository.get_transactions(limit=limit)
+        txns = TransactionRepository.get_transactions(limit=limit, start_date=dateFrom, end_date=dateTo)
         records = []
         for t in txns:
             prod = t.get("products") or {}

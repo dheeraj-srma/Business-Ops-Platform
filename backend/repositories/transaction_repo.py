@@ -10,17 +10,19 @@ _IN_MEMORY_TRANSACTIONS: List[Dict[str, Any]] = []
 class TransactionRepository:
 
     @staticmethod
-    def get_transactions(limit: int = 1000) -> List[Dict[str, Any]]:
+    def get_transactions(limit: int = 1000, start_date: str = None, end_date: str = None) -> List[Dict[str, Any]]:
         client = get_supabase_client()
         if client:
             try:
-                res = (
+                query = (
                     client.table("inventory_transactions")
                     .select("id, transaction_type, quantity, unit_cost, reference_type, transaction_date, notes, created_at, products(sku, name, brand)")
-                    .order("transaction_date", desc=True)
-                    .limit(limit)
-                    .execute()
                 )
+                if start_date:
+                    query = query.gte("transaction_date", f"{start_date}T00:00:00+00:00")
+                if end_date:
+                    query = query.lte("transaction_date", f"{end_date}T23:59:59+00:00")
+                res = query.order("transaction_date", desc=True).limit(limit).execute()
                 if res.data is not None:
                     return res.data
             except Exception:
