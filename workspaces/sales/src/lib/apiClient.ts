@@ -1,5 +1,19 @@
 // Order App API Client Adapter for Central FastAPI Backend
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
+const getEnvVar = (key: string): string => {
+  if (typeof process !== 'undefined' && process.env && process.env[key]) {
+    return process.env[key] as string;
+  }
+  try {
+    if (typeof import.meta !== 'undefined' && (import.meta as any)?.env?.[key]) {
+      return (import.meta as any).env[key];
+    }
+  } catch {
+    // import.meta unavailable in Next.js Edge / Webpack context
+  }
+  return '';
+};
+
+const API_BASE_URL = getEnvVar('NEXT_PUBLIC_API_URL') || getEnvVar('VITE_API_BASE_URL') || '/api';
 
 export interface OrderItemPayload {
   sku: string;

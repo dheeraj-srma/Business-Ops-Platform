@@ -1,7 +1,8 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabaseClient';
 import type { UserProfile } from '../types';
+import { getAuthSession, clearAuthSession } from '@/shared/auth';
 
 export const VALID_SALESMEN_SEED = [
   { id: 'TLY-SLM-001', name: 'ANKIT', email: 'ankit@nalkametals.com' },
@@ -35,6 +36,51 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Synchronize state with central platform session (nalka_terminal_session / nalka_token)
+  const syncPlatformAuth = useCallback(() => {
+    try {
+      const platformSession = getAuthSession();
+      if (platformSession && platformSession.user) {
+        const u = platformSession.user;
+        const p: UserProfile = {
+          id: u.id,
+          email: u.email,
+          role: (u.role || 'salesman') as any,
+          salesman_id: u.salesman_id || 'DIRECT',
+          salesman_name: u.full_name || u.email,
+          is_active: u.is_active ?? true,
+        };
+
+        const synthUser: any = {
+          id: u.id,
+          email: u.email,
+          aud: 'authenticated',
+          role: u.role,
+          user_metadata: {
+            salesman_id: u.salesman_id || 'DIRECT',
+            salesman_name: u.full_name || u.email,
+            role: u.role,
+          },
+        };
+
+        const synthSession: any = {
+          access_token: platformSession.token,
+          token_type: 'bearer',
+          user: synthUser,
+        };
+
+        setSession(synthSession);
+        setUser(synthUser);
+        setProfile(p);
+        setLoading(false);
+        return true;
+      }
+    } catch (e) {
+      console.warn('Failed syncing platform auth session:', e);
+    }
+    return false;
+  }, []);
 
   // Clean up legacy localStorage authority keys immediately
   useEffect(() => {
@@ -89,13 +135,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         };
       }
 
+      const derivedRole = userEmail?.includes('admin')
+        ? 'admin'
+        : userEmail?.includes('stock') || userEmail?.includes('mgr') || userEmail?.includes('manager')
+        ? 'stock_manager'
+        : 'salesman';
+
       // Default fallback profile for authenticated user
       return {
         id: userId,
         email: userEmail || 'user@nalkametals.com',
-        role: 'salesman',
-        salesman_id: 'DIRECT',
-        salesman_name: 'Direct / House Account',
+        role: derivedRole as any,
+        salesman_id: derivedRole === 'salesman' ? 'TLY-SLM-003' : undefined,
+        salesman_name: derivedRole === 'salesman' ? 'Sales Representative' : (userEmail?.split('@')[0].toUpperCase() || 'User'),
         is_active: true,
       };
     } catch (err) {
@@ -114,7 +166,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       localStorage.setItem(
         'nalka_terminal_session',
-        JSON.stringify({ session: sess, user: usr, profile: prof })
+        JSON.stringify({ session: sess, user: usr, profile: prof, token: sess?.access_token })
       );
     } catch (e) {}
   };
@@ -124,8 +176,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const saved = localStorage.getItem('nalka_terminal_session');
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (parsed?.session && parsed?.user && parsed?.profile) {
-          return parsed;
+        if (parsed?.user && parsed?.profile) {
+          return {
+            session: parsed.session || { access_token: parsed.token || 'terminal-token' },
+            user: parsed.user,
+            profile: parsed.profile,
+          };
         }
       }
     } catch (e) {}
@@ -145,6 +201,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let mounted = true;
 
     async function initAuth() {
+      // 1. Try central platform session first
+      const hasPlatformSession = syncPlatformAuth();
+      if (hasPlatformSession && mounted) {
+        setLoading(false);
+        return;
+      }
+
+      // 2. Supabase fallback check
       try {
         const { data, error: sessionErr } = await supabase.auth.getSession();
         if (sessionErr) throw sessionErr;
@@ -182,8 +246,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     initAuth();
 
+    // Event listeners for platform auth state change
+    const handleAuthChange = () => {
+      syncPlatformAuth();
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('nalka_auth_change', handleAuthChange);
+      window.addEventListener('storage', handleAuthChange);
+    }
+
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (_event, currentSession) => {
+        if (syncPlatformAuth()) return;
+
         if (currentSession?.user) {
           setSession(currentSession);
           setUser(currentSession.user);
@@ -208,9 +284,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     return () => {
       mounted = false;
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('nalka_auth_change', handleAuthChange);
+        window.removeEventListener('storage', handleAuthChange);
+      }
       authListener?.subscription.unsubscribe();
     };
-  }, []);
+  }, [syncPlatformAuth]);
+
 
   const signInWithEmail = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
     setError(null);
@@ -341,6 +422,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(null);
       setProfile(null);
       setError(null);
+      clearAuthSession();
+      if (typeof window !== 'undefined') {
+        window.location.href = '/login';
+      }
     }
   };
 
