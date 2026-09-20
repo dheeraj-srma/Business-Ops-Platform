@@ -1,12 +1,16 @@
 /**
  * Shared Authentication & Authorization Helper
  * Manages JWT session tokens, user profiles, role permissions, and workspace access checks.
+ *
+ * AUTHORITY RULE:
+ * The `nalka_token` cookie is the authoritative authentication mechanism.
+ * Do NOT use localStorage to store or validate JWTs, passwords, session tokens, or authentication credentials.
  */
 
 export interface UserProfile {
   id: string;
   email: string;
-  role: 'admin' | 'stock_manager' | 'order_manager' | 'salesman' | 'customer' | 'viewer' | string;
+  role: 'admin' | 'stock_manager' | 'order_manager' | 'manager' | 'salesman' | 'customer' | 'viewer' | string;
   full_name: string;
   salesman_id?: string;
   is_active?: boolean;
@@ -17,65 +21,119 @@ export interface AuthSession {
   user: UserProfile;
 }
 
-const SESSION_KEY = 'nalka_terminal_session';
-const TOKEN_KEY = 'nalka_auth_token';
-
 /**
- * Stores authenticated JWT session and user profile in browser storage.
+ * Helper to extract specific cookie value from document.cookie safely.
  */
-export function setAuthSession(token: string, user: UserProfile): void {
-  try {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(TOKEN_KEY, token);
-      localStorage.setItem(
-        SESSION_KEY,
-        JSON.stringify({
-          token,
-          user,
-          profile: user,
-        })
-      );
-      // Set secure auth cookie for server-side checks if needed
-      document.cookie = `nalka_token=${token}; path=/; max-age=86400; SameSite=Lax`;
+function getCookie(name: string): string | null {
+  if (typeof window === 'undefined') return null;
+  const cookies = document.cookie.split(';');
+  for (let c of cookies) {
+    c = c.trim();
+    if (c.startsWith(`${name}=`)) {
+      return c.substring(name.length + 1);
     }
-  } catch (e) {
-    console.warn('Failed to persist auth session:', e);
-  }
-}
-
-/**
- * Retrieves current active authentication session.
- */
-export function getAuthSession(): AuthSession | null {
-  try {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem(SESSION_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        const token = parsed.token || localStorage.getItem(TOKEN_KEY);
-        const user = parsed.profile || parsed.user;
-        if (token && user) {
-          return { token, user };
-        }
-      }
-    }
-  } catch (e) {
-    console.warn('Error reading auth session:', e);
   }
   return null;
 }
 
 /**
- * Clears authentication session upon logout.
+ * Sets authenticated JWT session cookie in browser.
+ */
+export function setAuthSession(token: string, user: UserProfile, isDevClientToken = false): void {
+  try {
+    if (typeof window !== 'undefined') {
+      // Set client auth cookies for Edge middleware and client-side UI inspection.
+      // Only set nalka_token via document.cookie if it's a dev client-generated token (not set by backend HttpOnly Set-Cookie)
+      if (isDevClientToken) {
+        document.cookie = `nalka_token=${token}; path=/; max-age=86400; SameSite=Lax`;
+      }
+      document.cookie = `nalka_user=${encodeURIComponent(JSON.stringify(user))}; path=/; max-age=86400; SameSite=Lax`;
+      window.dispatchEvent(new Event('nalka_auth_change'));
+    }
+  } catch (e) {
+    console.warn('Failed to set auth cookie:', e);
+  }
+}
+
+/**
+ * Retrieves current active authentication session from authoritative nalka_token or nalka_user cookie.
+ */
+export function getAuthSession(): AuthSession | null {
+  try {
+    if (typeof window !== 'undefined') {
+      const userCookieStr = getCookie('nalka_user');
+      let userFromCookie: UserProfile | null = null;
+      if (userCookieStr) {
+        try {
+          userFromCookie = JSON.parse(decodeURIComponent(userCookieStr));
+        } catch {
+          // ignore
+        }
+      }
+
+      // If user profile cookie is present, it reflects the authoritative active profile
+      if (userFromCookie && userFromCookie.role) {
+        const token = getCookie('nalka_token') || 'httponly-session-token';
+        return {
+          token,
+          user: userFromCookie,
+        };
+      }
+
+      // Fallback: decode token payload if nalka_user cookie wasn't set
+      const token = getCookie('nalka_token');
+      if (token) {
+        const parts = token.split('.');
+        if (parts.length === 3) {
+          const base64Url = parts[1];
+          const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+          let jsonPayload = '';
+          try {
+            jsonPayload = decodeURIComponent(
+              atob(base64)
+                .split('')
+                .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+                .join('')
+            );
+          } catch {
+            jsonPayload = atob(base64);
+          }
+          const payload = JSON.parse(jsonPayload);
+
+          if (payload && payload.exp && payload.exp * 1000 > Date.now()) {
+            const user: UserProfile = {
+              id: payload.user_id || payload.sub || 'usr-001',
+              email: payload.email || '',
+              role: (payload.role || 'viewer').toLowerCase(),
+              full_name: payload.full_name || payload.email || 'User',
+              salesman_id: payload.salesman_id || undefined,
+            };
+            return { token, user };
+          }
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('Error reading auth session from cookie:', e);
+  }
+  return null;
+}
+
+/**
+ * Clears authentication session and cookie upon logout.
  */
 export function clearAuthSession(): void {
   try {
     if (typeof window !== 'undefined') {
-      localStorage.removeItem(SESSION_KEY);
-      localStorage.removeItem(TOKEN_KEY);
+      document.cookie = 'nalka_token=; path=/; max-age=0';
+      document.cookie = 'nalka_user=; path=/; max-age=0';
+      localStorage.removeItem('nalka_terminal_session');
+      localStorage.removeItem('nalka_auth_token');
       localStorage.removeItem('app_auth');
       localStorage.removeItem('app_role');
-      document.cookie = 'nalka_token=; path=/; max-age=0';
+      localStorage.removeItem('app_salesman');
+      fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {});
+      window.dispatchEvent(new Event('nalka_auth_change'));
     }
   } catch (e) {
     console.warn('Failed to clear session:', e);
@@ -83,7 +141,7 @@ export function clearAuthSession(): void {
 }
 
 /**
- * Checks if user is authenticated.
+ * Checks if user is authenticated via valid cookie.
  */
 export function isAuthenticated(): boolean {
   const session = getAuthSession();
@@ -91,7 +149,8 @@ export function isAuthenticated(): boolean {
 }
 
 /**
- * Verified Permission Matrix checking if a user role is authorized to access a workspace.
+ * UX/Pre-navigation guard checking if a user role is authorized to access a workspace.
+ * Note: Authoritative workspace authorization is enforced on the server by Edge middleware.
  */
 export function hasWorkspaceAccess(
   workspace: 'sales' | 'operations' | 'management',
@@ -103,9 +162,9 @@ export function hasWorkspaceAccess(
 
   switch (workspace) {
     case 'sales':
-      return ['salesman', 'stock_manager', 'order_manager', 'admin', 'customer', 'viewer'].includes(normalizedRole);
+      return ['salesman', 'stock_manager', 'order_manager', 'manager', 'admin', 'customer', 'viewer'].includes(normalizedRole);
     case 'operations':
-      return ['stock_manager', 'order_manager', 'admin'].includes(normalizedRole);
+      return ['stock_manager', 'order_manager', 'manager', 'admin'].includes(normalizedRole);
     case 'management':
       return ['admin'].includes(normalizedRole);
     default:
@@ -119,6 +178,7 @@ export function hasWorkspaceAccess(
 export function getDefaultWorkspace(role?: string): string {
   const normalizedRole = (role || '').toLowerCase();
   if (normalizedRole === 'admin') return '/management';
-  if (['stock_manager', 'order_manager'].includes(normalizedRole)) return '/operations';
+  if (['stock_manager', 'order_manager', 'manager'].includes(normalizedRole)) return '/operations';
   return '/sales';
 }
+

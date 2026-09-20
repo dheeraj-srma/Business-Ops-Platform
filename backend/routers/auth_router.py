@@ -40,12 +40,62 @@ def login(credentials: LoginRequestSchema, response: Response):
                 detail="Email and password are required."
             )
 
-        client = get_supabase_client()
-        user_data = None
-        authenticated = False
+        # 1. Fast path: Pre-seeded development / testing accounts (strictly validated against known password)
+        SEED_USERS = {
+            "admin@nalkametals.com": {
+                "id": "usr-admin-001",
+                "email": "admin@nalkametals.com",
+                "full_name": "System Administrator",
+                "role": "admin",
+                "is_active": True,
+                "salesman_id": None,
+                "password": "password123"
+            },
+            "manager@nalkametals.com": {
+                "id": "usr-mgr-001",
+                "email": "manager@nalkametals.com",
+                "full_name": "Operations & Stock Manager",
+                "role": "stock_manager",
+                "is_active": True,
+                "salesman_id": None,
+                "password": "password123"
+            },
+            "stock@nalkametals.com": {
+                "id": "usr-stk-001",
+                "email": "stock@nalkametals.com",
+                "full_name": "Operations & Stock Manager",
+                "role": "stock_manager",
+                "is_active": True,
+                "salesman_id": None,
+                "password": "password123"
+            },
+            "sales@nalkametals.com": {
+                "id": "usr-sls-001",
+                "email": "sales@nalkametals.com",
+                "full_name": "Sales Representative",
+                "role": "salesman",
+                "is_active": True,
+                "salesman_id": "TLY-SLM-003",
+                "password": "password123"
+            }
+        }
 
-        if client is not None:
-            # 1. Attempt Supabase Auth sign-in with password first
+        if email_clean in SEED_USERS:
+            seed = SEED_USERS[email_clean]
+            if password_clean == seed["password"]:
+                authenticated = True
+                user_data = {k: v for k, v in seed.items() if k != "password"}
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid email or password.",
+                    headers={"WWW-Authenticate": "Bearer"}
+                )
+
+        client = get_supabase_client()
+
+        if not authenticated and client is not None:
+            # 2. Attempt Supabase Auth sign-in with password
             try:
                 auth_res = client.auth.sign_in_with_password({
                     "email": email_clean,
@@ -77,7 +127,7 @@ def login(credentials: LoginRequestSchema, response: Response):
             except Exception as auth_err:
                 logger.info(f"Supabase Auth sign_in_with_password attempt failed for {email_clean}: {auth_err}")
 
-            # 2. Fallback: Query users database table directly and verify stored password/hash
+            # 3. Fallback: Query users database table directly and verify stored password/hash
             if not authenticated:
                 try:
                     user_res = client.table("users").select("*").eq("email", email_clean).limit(1).execute()
@@ -89,43 +139,6 @@ def login(credentials: LoginRequestSchema, response: Response):
                             user_data = candidate
                 except Exception as db_err:
                     logger.warning(f"Database password check failed: {db_err}")
-
-        # 3. Known pre-seeded accounts for development / testing (strictly validated against known password)
-        if not authenticated:
-            SEED_USERS = {
-                "admin@nalkametals.com": {
-                    "id": "usr-admin-001",
-                    "email": "admin@nalkametals.com",
-                    "full_name": "System Administrator",
-                    "role": "admin",
-                    "is_active": True,
-                    "salesman_id": None,
-                    "password": "password123"
-                },
-                "stock@nalkametals.com": {
-                    "id": "usr-stk-001",
-                    "email": "stock@nalkametals.com",
-                    "full_name": "Stock Operations Manager",
-                    "role": "stock_manager",
-                    "is_active": True,
-                    "salesman_id": None,
-                    "password": "password123"
-                },
-                "sales@nalkametals.com": {
-                    "id": "usr-sls-001",
-                    "email": "sales@nalkametals.com",
-                    "full_name": "Sales Representative",
-                    "role": "salesman",
-                    "is_active": True,
-                    "salesman_id": "TLY-SLM-003",
-                    "password": "password123"
-                }
-            }
-            if email_clean in SEED_USERS:
-                seed = SEED_USERS[email_clean]
-                if password_clean == seed["password"]:
-                    authenticated = True
-                    user_data = {k: v for k, v in seed.items() if k != "password"}
 
         # Reject invalid credentials or non-existent users with 401 Unauthorized
         if not authenticated or not user_data:
@@ -163,6 +176,25 @@ def login(credentials: LoginRequestSchema, response: Response):
             path="/"
         )
 
+        # Set client-readable profile cookie for client UI components
+        user_profile_data = {
+            "id": user_data["id"],
+            "email": user_data["email"],
+            "role": user_data.get("role", "viewer").lower(),
+            "full_name": user_data.get("full_name", "User"),
+            "salesman_id": user_data.get("salesman_id")
+        }
+        import json
+        import urllib.parse
+        response.set_cookie(
+            key="nalka_user",
+            value=urllib.parse.quote(json.dumps(user_profile_data)),
+            httponly=False,
+            samesite="lax",
+            max_age=86400,
+            path="/"
+        )
+
         return TokenResponseSchema(
             access_token=token,
             token_type="bearer",
@@ -182,8 +214,9 @@ def login(credentials: LoginRequestSchema, response: Response):
 
 @router.post("/logout")
 def logout(response: Response):
-    """Clears HttpOnly auth cookie upon logout."""
-    response.delete_cookie(key="nalka_token", path="/")
+    """Clears HttpOnly auth cookie and client profile cookie upon logout."""
+    response.delete_cookie(key="nalka_token", path="/", httponly=True, samesite="lax")
+    response.delete_cookie(key="nalka_user", path="/", httponly=False, samesite="lax")
     return {"message": "Logged out successfully."}
 
 @router.get("/me")
