@@ -152,15 +152,21 @@ export const PendingOrdersView: React.FC<PendingOrdersViewProps> = ({
     if (!silent) setIsLoading(true);
     try {
       const [pendingRes, historyRes] = await Promise.all([
-        api.getPendingOrders(),
-        api.getOrderHistory(),
+        api.getPendingOrders().catch((e) => {
+          console.warn('Pending orders fetch notice:', e);
+          return { success: false, orders: [], isLiveConnected: false, count: 0 };
+        }),
+        api.getOrderHistory().catch((e) => {
+          console.warn('Order history fetch notice:', e);
+          return { success: false, orders: [], items: [] };
+        }),
       ]);
-      setPendingOrders(pendingRes.orders || []);
-      setIsLiveConnected(pendingRes.isLiveConnected);
-      setOrderHistory(historyRes.orders || []);
-      setHistoryItems(historyRes.items || []);
+      setPendingOrders(pendingRes?.orders || []);
+      setIsLiveConnected(Boolean(pendingRes?.isLiveConnected));
+      setOrderHistory(historyRes?.orders || []);
+      setHistoryItems(historyRes?.items || []);
     } catch (err: any) {
-      console.error('Error loading orders:', err);
+      console.warn('Error loading orders:', err);
     } finally {
       if (!silent) setIsLoading(false);
     }
