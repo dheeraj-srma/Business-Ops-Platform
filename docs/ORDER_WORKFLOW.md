@@ -20,7 +20,9 @@ The order lifecycle adheres to the following explicit state machine and mutation
                               ├──► REJECT ORDER (Manager / Admin)
                               └──► FULFILL / DISPATCH (Manager)
 
-[REJECTED / CANCELLED]       ───► REOPEN ORDER / ROLLBACK (Manager) ──► [PENDING]
+[REJECTED]                  ───► REOPEN ORDER / ROLLBACK (Manager) ──► [PENDING]
+
+[CANCELLED]                 ───► TERMINAL CANCELLATION (No Reopen)
 
 [DISPATCHED / COMPLETED]     ───► LOCKED (Physical Stock Out Executed)
 ```
@@ -34,8 +36,8 @@ The order lifecycle adheres to the following explicit state machine and mutation
 | **Pending** | YES (Grace window or Admin) | YES (Grace window or Admin) | YES (Manager) | NO | YES |
 | **Approved / Confirmed** | YES (Manager/Admin) | YES (Manager/Admin) | YES (Manager) | NO | YES |
 | **Dispatched / Processed** | NO | NO | NO | NO | NO (Already processed) |
-| **Rejected** | NO | NO | NO | YES (Manager) | NO |
-| **Cancelled** | NO | NO | NO | YES (Manager) | NO |
+| **Rejected** | YES (Reopen to Pending by Manager) | NO | NO | YES (Manager) | NO |
+| **Cancelled** | NO (Terminal state) | NO | NO | NO (Terminal state) | NO |
 
 ---
 
@@ -49,14 +51,19 @@ $$\text{Physical Stock} = N, \quad \text{Reserved Stock} = R, \quad \text{Availa
 - **$\Delta Q > 0$**: Reservation increases by $\Delta Q$. Backend validates that $N - R \ge \Delta Q$ (unless system setting `allow_negative_orders` is enabled).
 - **$\Delta Q < 0$**: Reservation decreases by $|\Delta Q|$, increasing available stock by $|\Delta Q|$.
 - Physical stock $N$ is NOT modified during edits.
+- Historical unit prices on existing order lines are strictly preserved when editing quantities.
 
-### B. Order Cancellation / Rejection ($Q_{\text{lines}}$)
-- Outstanding line reservations are released: $R_{\text{new}} = \max(0, R - Q_{\text{lines}})$.
-- Available stock increases: $A_{\text{new}} = N - R_{\text{new}}$.
-- Physical stock $N$ remains unchanged.
+### B. Exact Reservation Release Invariant (Cancellation & Rejection)
+- When an order is cancelled or rejected, outstanding line reservations are recalculated exactly from active orders:
+  $$R_{\text{new}} = \sum_{o \in \text{Active Orders}} Q_{\text{order}, o}$$
+- **NO Silent Clamping**: There is NO silent clamping of reservation values using `max(0, R - Q)`.
+- **Mismatch Detection**: If the expected order reservation cannot be reconciled with current inventory reservation (or if reservation state is inconsistent), the server rolls back the transaction and returns HTTP `409 Conflict`.
+- Available stock updates to $A_{\text{new}} = N - R_{\text{new}}$. Physical stock $N$ remains unchanged.
 - Order header status updated to `'Cancelled'` or `'Rejected'`.
 
 ### C. Order Reopen / Rollback Rejection
+- Reopen is strictly supported for **`Rejected`** orders (restoring them to `Pending`).
+- **`Cancelled`** orders are terminal salesman cancellations and cannot be reopened.
 - Line reservations are re-established ($R_{\text{new}} = R + Q_{\text{lines}}$).
 - Available stock checked against negative-stock setting policy.
 - Order header status transitions back to `'Pending'`.

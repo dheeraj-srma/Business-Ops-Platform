@@ -187,6 +187,15 @@ class TestOrderWorkflowMutations(unittest.TestCase):
         order_dict = OrderRepository.get_order_by_id_with_items("ORD-MUT-001")
         self.assertEqual(order_dict["status"], "Pending")
 
+    def test_reopen_cancelled_order_rejected(self):
+        user = {"id": "mgr-1", "role": "order_manager", "permissions": ["orders.manage"]}
+        self.test_order["status"] = "Cancelled"
+        
+        with self.assertRaises(ValueError) as ctx:
+            OrderService.reopen_order("ORD-MUT-001", OrderReopenRequest(reason="Test"), user)
+        self.assertIn("cannot be reopened", str(ctx.exception))
+        self.assertIn("ONLY for Rejected orders", str(ctx.exception))
+
     def test_reopen_dispatched_order_rejected(self):
         user = {"id": "mgr-1", "role": "order_manager", "permissions": ["orders.manage"]}
         self.test_order["status"] = "Dispatched"
@@ -195,5 +204,67 @@ class TestOrderWorkflowMutations(unittest.TestCase):
             OrderService.reopen_order("ORD-MUT-001", OrderReopenRequest(reason="Test"), user)
         self.assertIn("cannot be reopened", str(ctx.exception))
 
+    @patch.object(OrderRepository, 'get_order_by_id_with_items', return_value={"order_id": "ORD-MUT-001", "status": "Pending", "items": [{"sku": "SKU-A", "quantity": 10}], "reservation_mismatch": True})
+    def test_reservation_mismatch_detection(self, mock_order):
+        user = {"id": "admin-1", "role": "admin", "permissions": ["orders.cancel"]}
+        
+        with self.assertRaises(ValueError) as ctx:
+            OrderService.cancel_order("ORD-MUT-001", OrderCancelRequest(reason="Mismatch test"), user)
+        self.assertIn("RESERVATION_MISMATCH", str(ctx.exception))
+
+    @patch.object(InventoryRepository, 'fetch_all_products_with_inventory', return_value=MOCK_INVENTORY)
+    def test_historical_price_preservation(self, mock_inv):
+        user = {"id": "admin-1", "role": "admin", "permissions": ["orders.edit"]}
+        # Product catalog price for SKU-A in MOCK_INVENTORY is 50.0.
+        # Set historical price on test_order line 1 to 40.0.
+        self.test_order["items"][0]["price"] = 40.0
+        self.test_order["items"][0]["total_price"] = 400.0
+        
+        # Edit order quantity for SKU-A from 10 to 15 without specifying price
+        payload = OrderEditRequest(
+            items=[
+                OrderEditItemSchema(sku="SKU-A", quantity=15.0), # price omitted (0.0)
+                OrderEditItemSchema(sku="SKU-B", quantity=5.0)
+            ]
+        )
+        
+        res = OrderService.update_order("ORD-MUT-001", payload, user)
+        self.assertEqual(res["status"], "updated")
+        # Total amount must preserve 40.0 historical price for SKU-A: (15 * 40.0) + (5 * 100.0) = 600 + 500 = 1100.0
+        self.assertEqual(res["total_amount"], 1100.0)
+
+    @patch.object(InventoryRepository, 'fetch_all_products_with_inventory', return_value=MOCK_INVENTORY)
+    @patch.object(OrderRepository, 'get_order_by_id_with_items', return_value={"order_id": "ORD-MUT-001", "status": "Cancelled", "items": [{"sku": "SKU-A", "quantity": 10}]})
+    def test_concurrent_edit_vs_cancel(self, mock_order, mock_inv):
+        user = {"id": "admin-1", "role": "admin", "permissions": ["orders.cancel", "orders.edit"]}
+        payload = OrderEditRequest(
+            items=[OrderEditItemSchema(sku="SKU-A", quantity=20.0, price=50.0)]
+        )
+        with self.assertRaises(ValueError) as ctx:
+            OrderService.update_order("ORD-MUT-001", payload, user)
+        self.assertIn("cannot be edited", str(ctx.exception))
+
+    def test_concurrent_edit_vs_process(self):
+        user = {"id": "admin-1", "role": "admin", "permissions": ["orders.process", "orders.edit"]}
+        # Simulate order already processed (status = Dispatched)
+        self.test_order["status"] = "Dispatched"
+        
+        payload = OrderEditRequest(
+            items=[OrderEditItemSchema(sku="SKU-A", quantity=20.0, price=50.0)]
+        )
+        with self.assertRaises(ValueError) as ctx:
+            OrderService.update_order("ORD-MUT-001", payload, user)
+        self.assertIn("cannot be edited", str(ctx.exception))
+
+    def test_concurrent_cancel_vs_process(self):
+        user = {"id": "admin-1", "role": "admin", "permissions": ["orders.cancel", "orders.process"]}
+        # Simulate order already processed (status = Dispatched)
+        self.test_order["status"] = "Dispatched"
+        
+        with self.assertRaises(ValueError) as ctx:
+            OrderService.cancel_order("ORD-MUT-001", OrderCancelRequest(reason="Late cancel"), user)
+        self.assertIn("cannot be cancelled", str(ctx.exception))
+
 if __name__ == "__main__":
     unittest.main()
+

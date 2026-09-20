@@ -365,7 +365,7 @@ class OrderService:
             raise ValueError(f"Order '{order_id}' not found.")
 
         current_status = str(order_dict.get("status", "Pending")).strip()
-        if current_status.upper() in ("DISPATCHED", "PROCESSED", "DELIVERED", "COMPLETED", "FULFILLED"):
+        if current_status.upper() in ("CANCELLED", "REJECTED", "DISPATCHED", "PROCESSED", "DELIVERED", "COMPLETED", "FULFILLED"):
             raise ValueError(f"Order '{order_id}' is in '{current_status}' state and cannot be edited.")
 
         # Grace period check for restricted salesman
@@ -415,6 +415,12 @@ class OrderService:
         inv_catalog = InventoryRepository.fetch_all_products_with_inventory()
         inv_map = {str(item.get("sku")).strip().upper(): item for item in inv_catalog if item.get("sku")}
 
+        existing_item_prices = {
+            str(it.get("sku", "")).strip().upper(): float(it.get("price") or 0.0)
+            for it in order_dict.get("items", [])
+            if it.get("sku")
+        }
+
         total_amount = 0.0
         validated_lines = []
         new_sku_qty: Dict[str, float] = {}
@@ -426,8 +432,17 @@ class OrderService:
                 raise ValueError(f"Product SKU '{sku_clean}' not recognized in inventory catalog.")
 
             req_qty = float(item.quantity)
-            # Price authority: validate price against catalog
-            unit_price = float(item.price) if item.price and float(item.price) > 0 else float(prod_info.get("Price", prod_info.get("cost_price", 0.0)))
+            # Historical price preservation rule:
+            # Re-use existing historical price for this SKU if present, unless explicitly overridden.
+            if item.price and float(item.price) > 0 and (sku_clean not in existing_item_prices or float(item.price) == existing_item_prices[sku_clean]):
+                unit_price = float(item.price)
+            elif sku_clean in existing_item_prices and existing_item_prices[sku_clean] > 0:
+                unit_price = existing_item_prices[sku_clean]
+            elif item.price and float(item.price) > 0:
+                unit_price = float(item.price)
+            else:
+                unit_price = float(prod_info.get("Price", prod_info.get("cost_price", 0.0)))
+
             line_total = round(unit_price * req_qty, 2)
             total_amount += line_total
             new_sku_qty[sku_clean] = new_sku_qty.get(sku_clean, 0.0) + req_qty
@@ -540,6 +555,10 @@ class OrderService:
                 except Exception:
                     pass
 
+        # Check reservation mismatch invariant
+        if order_dict.get("reservation_mismatch"):
+            raise ValueError(f"RESERVATION_MISMATCH: Order '{order_id}' reservation state cannot be reconciled with expected inventory reservation.")
+
         reason = getattr(payload, "reason", None) or "Cancelled by user"
         affected = OrderRepository.update_order_status(order_id, "Cancelled")
 
@@ -590,6 +609,10 @@ class OrderService:
         if current_status.upper() in ("DISPATCHED", "PROCESSED", "DELIVERED", "COMPLETED", "FULFILLED"):
             raise ValueError(f"Order '{order_id}' is in '{current_status}' state and cannot be rejected.")
 
+        # Check reservation mismatch invariant
+        if order_dict.get("reservation_mismatch"):
+            raise ValueError(f"RESERVATION_MISMATCH: Order '{order_id}' reservation state cannot be reconciled with expected inventory reservation.")
+
         reason = getattr(payload, "reason", None) or "Rejected by Manager"
         OrderRepository.update_order_status(order_id, "Rejected")
 
@@ -638,8 +661,12 @@ class OrderService:
                 "timestamp": now_str
             }
 
-        if current_status.upper() not in ("REJECTED", "CANCELLED"):
-            raise ValueError(f"Order '{order_id}' is in '{current_status}' state and cannot be reopened. Reopen is strictly supported for Rejected or Cancelled orders.")
+        # Restrict Reopen strictly to REJECTED orders per legacy workflow audit
+        if current_status.upper() == "CANCELLED":
+            raise ValueError(f"Order '{order_id}' is in 'CANCELLED' state and cannot be reopened. Legacy workflow supports reopening ONLY for Rejected orders.")
+
+        if current_status.upper() != "REJECTED":
+            raise ValueError(f"Order '{order_id}' is in '{current_status}' state and cannot be reopened. Reopen is strictly supported for Rejected orders.")
 
         allow_negative = False
         if client:
