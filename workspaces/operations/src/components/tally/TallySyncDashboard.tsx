@@ -87,11 +87,11 @@ export const TallySyncDashboard: React.FC<TallySyncDashboardProps> = ({
         api.getVoucherRules(),
       ]);
 
-      setStatusData(statusRes);
-      setEvents(eventsRes.events);
-      setReservations(resvRes.reservations);
-      setMappings(mapRes.mappings);
-      setVoucherRules(rulesRes.rules);
+      if (statusRes) setStatusData(statusRes);
+      setEvents(eventsRes?.events || []);
+      setReservations(resvRes?.reservations || []);
+      setMappings(mapRes?.mappings || []);
+      setVoucherRules(rulesRes?.rules || []);
     } catch (err: any) {
       console.error('Failed to load Tally sync data:', err);
     } finally {

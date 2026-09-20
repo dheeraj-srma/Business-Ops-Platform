@@ -70,7 +70,44 @@ export const api = {
     const res = await fetch(`/api/inventory?${query.toString()}`);
     if (!res.ok) throw new Error('Failed to load inventory products');
     const data = await res.json();
-    return { products: Array.isArray(data) ? data : (data.products || []) };
+    const rawList: any[] = Array.isArray(data)
+      ? data
+      : (Array.isArray(data?.products) ? data.products : (Array.isArray(data?.items) ? data.items : []));
+
+    const products: Product[] = rawList.map((p: any) => {
+      const stock = Number(p.currentStock ?? p.current_stock ?? p.physical_stock ?? p.physicalStock ?? p.stock ?? 0);
+      const resStock = Number(p.reservedStock ?? p.reserved_stock ?? 0);
+      const availStock = Number(p.availableStock ?? p.available_stock ?? (stock - resStock));
+      const minStock = Number(p.minimumStock ?? p.minimum_stock ?? p.min_stock ?? 15);
+      const critStock = Number(p.criticalStock ?? p.critical_stock ?? 5);
+      const cost = Number(p.unitCost ?? p.unit_cost ?? p.cost_price ?? 0);
+      const cat = p.categoryId || p.category_id || p.category || p.brand || 'General';
+      const catName = p.categoryName || p.category || p.brand || cat;
+
+      return {
+        ...p,
+        id: String(p.id || p.sku || ''),
+        sku: String(p.sku || ''),
+        name: String(p.name || p.Item_Name || p.sku || ''),
+        categoryId: String(cat),
+        categoryName: String(catName),
+        description: p.description || `${catName} | Unit: ${p.unit || 'NOS'}`,
+        unit: p.unit || p.unit_of_measure || 'NOS',
+        currentStock: stock,
+        physicalStock: stock,
+        reservedStock: resStock,
+        availableStock: availStock,
+        minimumStock: minStock,
+        criticalStock: critStock,
+        unitCost: cost,
+        isActive: p.isActive !== undefined ? Boolean(p.isActive) : (p.is_active !== undefined ? Boolean(p.is_active) : true),
+        status: p.status || (stock <= 0 ? (stock < 0 ? 'NEGATIVE' : 'OUT_OF_STOCK') : (stock <= critStock ? 'CRITICAL' : (stock <= minStock ? 'LOW' : 'HEALTHY'))),
+        createdAt: p.createdAt || p.created_at || new Date().toISOString(),
+        updatedAt: p.updatedAt || p.updated_at || new Date().toISOString(),
+      };
+    });
+
+    return { products };
   },
 
   async getProductDetails(id: string): Promise<{
@@ -329,6 +366,7 @@ export const api = {
     categoryId?: string;
     dateFrom?: string;
     dateTo?: string;
+    limit?: number;
   }): Promise<{ transactions: StockTransaction[] }> {
     const query = new URLSearchParams();
     if (params?.productId) query.set('productId', params.productId);
@@ -337,10 +375,34 @@ export const api = {
     if (params?.categoryId) query.set('categoryId', params.categoryId);
     if (params?.dateFrom) query.set('dateFrom', params.dateFrom);
     if (params?.dateTo) query.set('dateTo', params.dateTo);
+    if (params?.limit) query.set('limit', String(params.limit));
 
     const res = await fetch(`/api/transactions?${query.toString()}`);
     if (!res.ok) throw new Error('Failed to load transaction audit history');
-    return res.json();
+    const data = await res.json();
+    const rawList: any[] = Array.isArray(data)
+      ? data
+      : (Array.isArray(data?.transactions) ? data.transactions : []);
+
+    const transactions: StockTransaction[] = rawList.map((t: any) => ({
+      ...t,
+      id: String(t.id || t['Txn ID'] || ''),
+      productId: String(t.productId || t.product_id || t.SKU || ''),
+      productName: String(t.productName || t.product_name || t['Item Name'] || ''),
+      productSku: String(t.productSku || t.product_sku || t.SKU || ''),
+      categoryName: String(t.categoryName || t.category || t.Category || 'General'),
+      unit: String(t.unit || 'NOS'),
+      transactionType: (t.transactionType || t.transaction_type || t.Type || 'ADJUSTMENT').toUpperCase(),
+      quantity: Number(t.quantity ?? t.Quantity ?? 0),
+      previousStock: Number(t.previousStock ?? t.previous_stock ?? 0),
+      newStock: Number(t.newStock ?? t.new_stock ?? 0),
+      reason: String(t.reason || t.notes || t.Reference || ''),
+      supplierOrRecipient: t.supplierOrRecipient || t.supplier_or_recipient || t['supplierOrRecipient'] || '',
+      referenceNumber: t.referenceNumber || t.reference_number || t.Reference || '',
+      createdAt: t.createdAt || t.created_at || t.Timestamp || new Date().toISOString(),
+    }));
+
+    return { transactions };
   },
 
   // Categories
@@ -348,7 +410,20 @@ export const api = {
     const res = await fetch('/api/categories');
     if (!res.ok) throw new Error('Failed to load categories');
     const data = await res.json();
-    return { categories: Array.isArray(data) ? data : (data.categories || []) };
+    const rawList: any[] = Array.isArray(data)
+      ? data
+      : (Array.isArray(data?.categories) ? data.categories : []);
+
+    const categories: Category[] = rawList.map((c: any) => ({
+      id: String(c.id || c.name || ''),
+      name: String(c.name || c.id || ''),
+      description: String(c.description || `${c.name || c.id} catalog category`),
+      isActive: c.isActive !== undefined ? Boolean(c.isActive) : (c.is_active !== undefined ? Boolean(c.is_active) : true),
+      createdAt: c.createdAt || c.created_at || new Date().toISOString(),
+      updatedAt: c.updatedAt || c.updated_at || new Date().toISOString(),
+    }));
+
+    return { categories };
   },
 
   async createCategory(data: { name: string; description?: string }): Promise<{ success: boolean; category: Category }> {

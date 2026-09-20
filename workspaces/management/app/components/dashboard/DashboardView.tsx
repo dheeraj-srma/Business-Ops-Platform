@@ -105,10 +105,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       }
 
       // Query transactions within date range
-      const { transactions } = await api.getTransactions({
+      const txRes = await api.getTransactions({
         dateFrom: startDateStr,
         dateTo: endDateStr,
       });
+      const transactions = Array.isArray(txRes) ? txRes : (txRes?.transactions || []);
 
       // Build daily buckets
       const start = new Date(startDateStr);
@@ -125,15 +126,29 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         let stockIn = 0;
         let stockOut = 0;
 
-        for (const tx of transactions) {
-          const rawDate = tx.createdAt || (tx as any).created_at || '';
+        for (const tx of (transactions || [])) {
+          const rawDate = tx.createdAt || (tx as any).created_at || (tx as any).transaction_date || (tx as any).transactionDate || '';
           const txDate = rawDate ? toLocalDateStr(new Date(rawDate)) : '';
           if (txDate === dayIso) {
-            const type = tx.transactionType || (tx as any).transaction_type;
-            if (type === 'STOCK_IN' || type === 'INITIAL_STOCK') {
-              stockIn += tx.quantity;
-            } else if (type === 'STOCK_OUT') {
-              stockOut += tx.quantity;
+            const rawType = (tx.transactionType || (tx as any).transaction_type || '').toUpperCase();
+            const notes = ((tx as any).notes || (tx as any).reason || '').toLowerCase();
+            const qty = Math.abs(Number(tx.quantity) || 0);
+
+            // Exclude opening inventory import from daily movement trend
+            if (notes.includes('opening quantity') || notes.includes('initial stock')) {
+              continue;
+            }
+
+            if (['INWARD', 'STOCK_IN', 'CUSTOMER_RETURN', 'RETURN_IN', 'ADJUSTMENT_INCREASE'].includes(rawType)) {
+              stockIn += qty;
+            } else if (['SALE', 'SALES', 'STOCK_OUT', 'DISPATCH', 'ADJUSTMENT_DECREASE'].includes(rawType)) {
+              stockOut += qty;
+            } else if (rawType === 'ADJUSTMENT') {
+              if (Number(tx.quantity) >= 0) {
+                stockIn += qty;
+              } else {
+                stockOut += qty;
+              }
             }
           }
         }
@@ -208,12 +223,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     );
   }
 
-  const totalSKUs = stats.totalActiveSkus || stats.totalProducts || 0;
-  const negativeCount = stats.negativeStockCount || 0;
-  const healthyPercent = totalSKUs > 0 ? Math.round((stats.healthyCount / totalSKUs) * 100) : 0;
-  const lowPercent = totalSKUs > 0 ? Math.round((stats.lowStockCount / totalSKUs) * 100) : 0;
-  const critPercent = totalSKUs > 0 ? Math.round((stats.criticalStockCount / totalSKUs) * 100) : 0;
-  const outPercent = totalSKUs > 0 ? Math.round((stats.outOfStockCount / totalSKUs) * 100) : 0;
+  const totalSKUs = stats?.totalActiveSkus || stats?.totalProducts || 0;
+  const negativeCount = stats?.negativeStockCount || 0;
+  const healthyCount = stats?.healthyCount || 0;
+  const lowStockCount = stats?.lowStockCount || 0;
+  const criticalStockCount = stats?.criticalStockCount || 0;
+  const outOfStockCount = stats?.outOfStockCount || 0;
+  const lowStockItems = Array.isArray(stats?.lowStockItems) ? stats.lowStockItems : [];
+  const recentMovements = Array.isArray(stats?.recentMovements) ? stats.recentMovements : [];
+  const healthyPercent = totalSKUs > 0 ? Math.round((healthyCount / totalSKUs) * 100) : 0;
+  const lowPercent = totalSKUs > 0 ? Math.round((lowStockCount / totalSKUs) * 100) : 0;
+  const critPercent = totalSKUs > 0 ? Math.round((criticalStockCount / totalSKUs) * 100) : 0;
+  const outPercent = totalSKUs > 0 ? Math.round((outOfStockCount / totalSKUs) * 100) : 0;
   const negPercent = totalSKUs > 0 ? Math.round((negativeCount / totalSKUs) * 100) : 0;
 
   return (
@@ -229,7 +250,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             Total Inventory
           </div>
           <div className="text-xl sm:text-2xl font-bold mt-1 text-slate-900 dark:text-slate-100">
-            {formatNumber(stats.totalProducts)} Items
+            {formatNumber(stats?.totalProducts || 0)} Items
           </div>
           <div className="text-xs text-slate-500 dark:text-slate-400 mt-2">
             Across active categories
@@ -242,9 +263,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             Stock Volume
           </div>
           <div className="text-xl sm:text-2xl font-bold mt-1 text-slate-900 dark:text-slate-100 font-mono">
-            {formatNumber(stats.totalUnitsInStock)}
+            {formatNumber(stats?.totalUnitsInStock || 0)}
           </div>
-          <div className="text-xs text-cyan-600 dark:text-indigo-600 dark:text-indigo-400 font-medium mt-2 flex items-center gap-1">
+          <div className="text-xs text-emerald-600 dark:text-emerald-400 font-medium mt-2 flex items-center gap-1">
             <TrendingUp className="w-3.5 h-3.5" />
             <span>Active physical units</span>
           </div>
@@ -259,10 +280,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             Low Stock Alerts
           </div>
           <div className="text-xl sm:text-2xl font-bold mt-1 text-amber-600 dark:text-amber-400">
-            {stats.lowStockCount} Items
+            {lowStockCount} Items
           </div>
           <div className="text-xs text-amber-700/90 dark:text-amber-300/90 font-medium mt-2">
-            {stats.criticalStockCount > 0 ? `${stats.criticalStockCount} critical items` : 'Requires restocking'}
+            {criticalStockCount > 0 ? `${criticalStockCount} critical items` : 'Requires restocking'}
           </div>
         </div>
 
@@ -275,7 +296,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             Out of Stock
           </div>
           <div className="text-xl sm:text-2xl font-bold mt-1 text-red-600 dark:text-red-400">
-            {stats.outOfStockCount} Items
+            {outOfStockCount} Items
           </div>
           <div className="text-xs text-slate-500 dark:text-slate-400 mt-2">
             Zero current balance
@@ -295,29 +316,29 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               onClick={() => onNavigateToInventory('HEALTHY')}
               className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-transparent dark:border-emerald-900/50 hover:bg-emerald-100 dark:hover:bg-emerald-900/80 transition-colors cursor-pointer"
             >
-              <div className="w-2 h-2 rounded-full bg-emerald-600 dark:bg-emerald-500" />
-              <span className="font-semibold text-[11px]">Healthy ({stats.healthyCount})</span>
+              <div className="w-2 h-2 rounded-full bg-emerald-500" />
+              <span className="font-semibold text-[11px]">Healthy ({healthyCount})</span>
             </button>
             <button
               onClick={() => onNavigateToInventory('LOW')}
               className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-transparent dark:border-amber-900/50 hover:bg-amber-100 dark:hover:bg-amber-900/80 transition-colors cursor-pointer"
             >
               <div className="w-2 h-2 rounded-full bg-amber-500" />
-              <span className="font-semibold text-[11px]">Low ({stats.lowStockCount})</span>
+              <span className="font-semibold text-[11px]">Low ({lowStockCount})</span>
             </button>
             <button
               onClick={() => onNavigateToInventory('CRITICAL')}
               className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-orange-50 dark:bg-orange-950/60 text-orange-800 dark:text-orange-300 border border-transparent dark:border-orange-900/50 hover:bg-orange-100 dark:hover:bg-orange-900/80 transition-colors cursor-pointer"
             >
               <div className="w-2 h-2 rounded-full bg-orange-500" />
-              <span className="font-semibold text-[11px]">Critical ({stats.criticalStockCount})</span>
+              <span className="font-semibold text-[11px]">Critical ({criticalStockCount})</span>
             </button>
             <button
               onClick={() => onNavigateToInventory('OUT_OF_STOCK')}
               className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-red-50 dark:bg-red-950/60 text-red-800 dark:text-red-300 border border-transparent dark:border-red-900/50 hover:bg-red-100 dark:hover:bg-red-900/80 transition-colors cursor-pointer"
             >
               <div className="w-2 h-2 rounded-full bg-red-600" />
-              <span className="font-semibold text-[11px]">Out ({stats.outOfStockCount})</span>
+              <span className="font-semibold text-[11px]">Out ({outOfStockCount})</span>
             </button>
             {negativeCount > 0 && (
               <button
@@ -407,7 +428,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
 
           <div className="p-3 sm:p-4 flex-1 overflow-y-auto space-y-2.5 max-h-[360px]">
-            {stats.lowStockItems.length === 0 ? (
+            {lowStockItems.length === 0 ? (
               <div className="py-10 text-center">
                 <PackageCheck className="w-8 h-8 text-cyan-500 mx-auto mb-2 opacity-80" />
                 <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">Healthy Inventory Status</p>
@@ -416,7 +437,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 </p>
               </div>
             ) : (
-              stats.lowStockItems.map((prod) => (
+              lowStockItems.map((prod) => (
                 <div
                   key={prod.id}
                   className={cn(
@@ -750,7 +771,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 Recent Inventory Transactions
               </h3>
               <span className="px-2 py-0.5 text-xs font-semibold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 rounded-md border border-indigo-100 dark:border-indigo-800">
-                {stats.recentMovements.length} {stats.recentMovements.length === 1 ? 'record' : 'records'}
+                {recentMovements.length} {recentMovements.length === 1 ? 'record' : 'records'}
               </span>
               {isFullScreen && (
                 <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-indigo-50 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 rounded border border-indigo-200 dark:border-indigo-800 flex items-center gap-1">
@@ -813,14 +834,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50 text-sm">
-              {stats.recentMovements.length === 0 ? (
+              {recentMovements.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="py-8 text-center text-slate-400 dark:text-slate-500 text-xs">
                     No stock movements recorded yet.
                   </td>
                 </tr>
               ) : (
-                stats.recentMovements.map((tx) => (
+                recentMovements.map((tx) => (
                   <tr key={tx.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-700/40 transition-colors">
                     <td className="py-3 px-4 sm:px-5 text-slate-500 dark:text-slate-400 text-xs whitespace-nowrap">
                       {formatDate(tx.createdAt || (tx as any).created_at)}

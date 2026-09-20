@@ -70,8 +70,47 @@ export const api = {
 
     const res = await fetch(`/api/products?${query.toString()}`);
     if (!res.ok) throw new Error('Failed to load inventory products');
-    return res.json();
+    const data = await res.json();
+    const rawList: any[] = Array.isArray(data)
+      ? data
+      : (Array.isArray(data?.products) ? data.products : (Array.isArray(data?.items) ? data.items : []));
+
+    const products: Product[] = rawList.map((p: any) => {
+      const stock = Number(p.currentStock ?? p.current_stock ?? p.physical_stock ?? p.physicalStock ?? p.stock ?? 0);
+      const resStock = Number(p.reservedStock ?? p.reserved_stock ?? 0);
+      const availStock = Number(p.availableStock ?? p.available_stock ?? (stock - resStock));
+      const minStock = Number(p.minimumStock ?? p.minimum_stock ?? p.min_stock ?? 15);
+      const critStock = Number(p.criticalStock ?? p.critical_stock ?? 5);
+      const cost = Number(p.unitCost ?? p.unit_cost ?? p.cost_price ?? 0);
+      const cat = p.categoryId || p.category_id || p.category || p.brand || 'General';
+      const catName = p.categoryName || p.category || p.brand || cat;
+
+      return {
+        ...p,
+        id: String(p.id || p.sku || ''),
+        sku: String(p.sku || ''),
+        name: String(p.name || p.Item_Name || p.sku || ''),
+        categoryId: String(cat),
+        categoryName: String(catName),
+        description: p.description || `${catName} | Unit: ${p.unit || 'NOS'}`,
+        unit: p.unit || p.unit_of_measure || 'NOS',
+        currentStock: stock,
+        physicalStock: stock,
+        reservedStock: resStock,
+        availableStock: availStock,
+        minimumStock: minStock,
+        criticalStock: critStock,
+        unitCost: cost,
+        isActive: p.isActive !== undefined ? Boolean(p.isActive) : (p.is_active !== undefined ? Boolean(p.is_active) : true),
+        status: p.status || (stock <= 0 ? (stock < 0 ? 'NEGATIVE' : 'OUT_OF_STOCK') : (stock <= critStock ? 'CRITICAL' : (stock <= minStock ? 'LOW' : 'HEALTHY'))),
+        createdAt: p.createdAt || p.created_at || new Date().toISOString(),
+        updatedAt: p.updatedAt || p.updated_at || new Date().toISOString(),
+      };
+    });
+
+    return { products };
   },
+
 
   async getProductDetails(id: string): Promise<{
     product: Product;
@@ -303,6 +342,7 @@ export const api = {
     categoryId?: string;
     dateFrom?: string;
     dateTo?: string;
+    limit?: number;
   }): Promise<{ transactions: StockTransaction[] }> {
     const query = new URLSearchParams();
     if (params?.productId) query.set('productId', params.productId);
@@ -311,17 +351,55 @@ export const api = {
     if (params?.categoryId) query.set('categoryId', params.categoryId);
     if (params?.dateFrom) query.set('dateFrom', params.dateFrom);
     if (params?.dateTo) query.set('dateTo', params.dateTo);
+    if (params?.limit) query.set('limit', String(params.limit));
 
     const res = await fetch(`/api/transactions?${query.toString()}`);
     if (!res.ok) throw new Error('Failed to load transaction audit history');
-    return res.json();
+    const data = await res.json();
+    const rawList: any[] = Array.isArray(data)
+      ? data
+      : (Array.isArray(data?.transactions) ? data.transactions : []);
+
+    const transactions: StockTransaction[] = rawList.map((t: any) => ({
+      ...t,
+      id: String(t.id || t['Txn ID'] || ''),
+      productId: String(t.productId || t.product_id || t.SKU || ''),
+      productName: String(t.productName || t.product_name || t['Item Name'] || ''),
+      productSku: String(t.productSku || t.product_sku || t.SKU || ''),
+      categoryName: String(t.categoryName || t.category || t.Category || 'General'),
+      unit: String(t.unit || 'NOS'),
+      transactionType: (t.transactionType || t.transaction_type || t.Type || 'ADJUSTMENT').toUpperCase(),
+      quantity: Number(t.quantity ?? t.Quantity ?? 0),
+      previousStock: Number(t.previousStock ?? t.previous_stock ?? 0),
+      newStock: Number(t.newStock ?? t.new_stock ?? 0),
+      reason: String(t.reason || t.notes || t.Reference || ''),
+      supplierOrRecipient: t.supplierOrRecipient || t.supplier_or_recipient || t['supplierOrRecipient'] || '',
+      referenceNumber: t.referenceNumber || t.reference_number || t.Reference || '',
+      createdAt: t.createdAt || t.created_at || t.Timestamp || new Date().toISOString(),
+    }));
+
+    return { transactions };
   },
 
   // Categories
   async getCategories(): Promise<{ categories: Category[] }> {
     const res = await fetch('/api/categories');
     if (!res.ok) throw new Error('Failed to load categories');
-    return res.json();
+    const data = await res.json();
+    const rawList: any[] = Array.isArray(data)
+      ? data
+      : (Array.isArray(data?.categories) ? data.categories : []);
+
+    const categories: Category[] = rawList.map((c: any) => ({
+      id: String(c.id || c.name || ''),
+      name: String(c.name || c.id || ''),
+      description: String(c.description || `${c.name || c.id} catalog category`),
+      isActive: c.isActive !== undefined ? Boolean(c.isActive) : (c.is_active !== undefined ? Boolean(c.is_active) : true),
+      createdAt: c.createdAt || c.created_at || new Date().toISOString(),
+      updatedAt: c.updatedAt || c.updated_at || new Date().toISOString(),
+    }));
+
+    return { categories };
   },
 
   async createCategory(data: { name: string; description?: string }): Promise<{ success: boolean; category: Category }> {
@@ -490,9 +568,18 @@ export const api = {
     if (params?.status) query.set('status', params.status);
     if (params?.search) query.set('search', params.search);
 
-    const res = await fetch(`/api/tally/sync/reservations?${query.toString()}`);
-    if (!res.ok) throw new Error('Failed to load reservations');
-    return res.json();
+    try {
+      const res = await fetch(`/api/tally/sync/reservations?${query.toString()}`);
+      if (!res.ok) {
+        console.warn('Failed to load reservations:', res.status, res.statusText);
+        return { reservations: [] };
+      }
+      const data = await res.json();
+      return { reservations: Array.isArray(data?.reservations) ? data.reservations : [] };
+    } catch (err) {
+      console.warn('Error in getStockReservations:', err);
+      return { reservations: [] };
+    }
   },
 
   async releaseStockReservation(id: string): Promise<{ success: boolean; reservation: StockReservation }> {
@@ -702,9 +789,33 @@ export const api = {
 
   // Settings
   async getSettings(): Promise<{ settings: AppSettings }> {
-    const res = await fetch('/api/settings');
-    if (!res.ok) throw new Error('Failed to load settings');
-    return res.json();
+    try {
+      const res = await fetch('/api/settings');
+      if (!res.ok) throw new Error('Failed to load settings');
+      return await res.json();
+    } catch (err) {
+      console.warn('api.getSettings fallback:', err);
+      return {
+        settings: {
+          companyName: 'Nalka Metals Pvt Ltd',
+          company_name: 'Nalka Metals Pvt Ltd',
+          tallyCompanyName: 'Nalka Metals (2026-27)',
+          tally_company_name: 'Nalka Metals (2026-27)',
+          defaultCriticalThreshold: 5,
+          default_critical_threshold: 5,
+          defaultMinimumThreshold: 20,
+          default_minimum_threshold: 20,
+          defaultCriticalStock: 5,
+          defaultMinimumStock: 20,
+          tallyXmlGuidPrefix: 'NALKA-STOCK-',
+          tally_xml_guid_prefix: 'NALKA-STOCK-',
+          allow_negative_orders: false,
+          allowNegativeOrders: false,
+          lastExportCheckpoint: new Date().toISOString(),
+          last_export_checkpoint: new Date().toISOString(),
+        } as AppSettings,
+      };
+    }
   },
 
   async updateSettings(data: Partial<AppSettings>): Promise<{ success: boolean; settings: AppSettings }> {
@@ -730,8 +841,13 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ enabled }),
     });
-    const result = await res.json();
-    if (!res.ok) throw new Error(result.error || 'Failed to update stock override');
+    let result: any = null;
+    try {
+      result = await res.json();
+    } catch {
+      result = {};
+    }
+    if (!res.ok) throw new Error(result?.error || result?.detail || 'Failed to update stock override');
     return result;
   },
 
@@ -806,7 +922,16 @@ export const api = {
   }> {
     const res = await fetch('/api/orders/pending');
     if (!res.ok) throw new Error('Failed to load pending orders queue');
-    return res.json();
+    const data = await res.json();
+    if (Array.isArray(data)) {
+      return {
+        success: true,
+        orders: data,
+        isLiveConnected: true,
+        count: data.length,
+      };
+    }
+    return data;
   },
 
   async importOrderJson(
