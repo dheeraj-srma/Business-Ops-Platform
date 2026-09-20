@@ -6,24 +6,23 @@
 
 ---
 
-## 1. Authoritative Stock Semantics & Column Resolution (Phase 5C Formalization)
+## 1. Authoritative Stock Semantics & Column Resolution (Critical Precondition Audit)
 
-The platform formally resolves stock semantics across PostgreSQL / Supabase database tables as follows:
+Following an exhaustive codebase and database audit of legacy mutation functions (`admin_service.py`, `submit_order` RPC, `routes.ts`, and `inventory_repo.py`), the stock semantics are formally established as follows:
 
-1. **Authoritative Database Columns**:
-   - **`physical_stock` (`public.inventory.quantity_on_hand`)**: Materialized stored balance of physical stock.
-   - **`reserved_stock` (`public.inventory.quantity_reserved`)**: Materialized stored reserved quantity (and dynamically verified against open items in `public.pending_order_items` where order status is `Pending`).
-   - **`available_stock` (`public.inventory.quantity_available`)**: Materialized stored available quantity for new customer orders.
+1. **Legacy Mutation Mechanics**:
+   - **`quantity_available` Nature**: `quantity_available` is a **materialized database column** in `public.inventory` maintained directly by **application service logic** upon every stock mutation. There are NO database triggers or automatic column formulas operating silently in PostgreSQL.
+   - **Stored vs. Derived**: `quantity_on_hand`, `quantity_reserved`, and `quantity_available` are all stored columns. Application services explicitly compute and set `quantity_available = quantity_on_hand - quantity_reserved` during writes.
+   - **Priority Reads**: Queries read `public.inventory.quantity_available` directly. If `quantity_available` is `NULL`, the calculation $\text{quantity\_on\_hand} - \text{quantity\_reserved}$ is used as fallback.
 
-2. **Stored vs. Calculated Rules**:
-   - **Stored Values**: `quantity_on_hand`, `quantity_reserved`, and `quantity_available` are all materialized columns in `public.inventory`.
-   - **Calculation Rule**: Whenever physical or reserved stock mutates, available stock is updated as:
-     $$\text{quantity\_available} = \text{quantity\_on\_hand} - \text{quantity\_reserved}$$
-   - **Priority Resolution**: Reads query `public.inventory.quantity_available` directly. If `quantity_available` is `NULL`, the calculation $\text{quantity\_on\_hand} - \text{quantity\_reserved}$ is applied.
+2. **Legacy Adjustment Behavior on Columns**:
+   - **`quantity_on_hand`**: Set directly to the new physical count $N$.
+   - **`quantity_reserved`**: Remains unchanged ($R_{\text{existing}}$) as it reflects active pending orders.
+   - **`quantity_available`**: Set to $N - R_{\text{existing}}$.
 
-3. **Negative Stock Rules & Override Controls**:
-   - **Default Mode (`allow_negative_orders = false`)**: Reservations or mutations attempting to drop `quantity_available` below zero are blocked immediately with `409 INSUFFICIENT_STOCK`.
-   - **Override Mode (`allow_negative_orders = true`)**: System setting in `public.system_settings` permits negative available/physical stock, assigning stock health status = `NEGATIVE`.
+3. **Negative Stock Override Mechanics**:
+   - Default Mode (`allow_negative_orders = false`): Mutations attempting to drop `quantity_available` below zero are blocked with `409 INSUFFICIENT_STOCK`.
+   - Override Mode (`allow_negative_orders = true`): Permitted when enabled in `public.system_settings`, marking stock health status as `NEGATIVE`.
 
 ---
 
