@@ -26,3 +26,29 @@ class InventoryListResponse(BaseModel):
     page: int = Field(1, description="Current page number (1-indexed)")
     page_size: int = Field(50, description="Page size limit")
     total_pages: int = Field(1, description="Total available pages")
+
+class StockAdjustmentRequest(BaseModel):
+    product_id: str = Field(..., description="Product ID to adjust")
+    new_quantity: float = Field(..., ge=0.0, description="New physical stock quantity")
+    reason: str = Field(..., min_length=2, description="Audit reason for manual stock adjustment")
+    location_id: Optional[str] = Field(None, description="Warehouse/Location ID")
+    idempotency_key: Optional[str] = Field(None, description="Unique request idempotency key")
+
+class StockInRequest(BaseModel):
+    product_id: str = Field(..., description="Product ID for stock inward")
+    quantity: float = Field(..., gt=0.0, description="Inward stock quantity to add")
+    unit_cost: Optional[float] = Field(0.0, ge=0.0, description="Unit cost price")
+    supplier_name: Optional[str] = Field("Direct Supplier", description="Supplier or vendor name")
+    reference_number: Optional[str] = Field("REC-IN", description="Purchase order or delivery note reference")
+    notes: Optional[str] = Field(None, description="Additional movement notes")
+    idempotency_key: Optional[str] = Field(None, description="Unique request idempotency key")
+
+class StockMutationResponse(BaseModel):
+    status: str = Field("success", description="Mutation result status")
+    product_id: str = Field(..., description="Target product ID")
+    previous_quantity: float = Field(..., description="Previous physical quantity")
+    new_quantity: float = Field(..., description="Updated physical quantity")
+    available_quantity: float = Field(..., description="Updated available quantity")
+    transaction_id: Optional[str] = Field(None, description="Generated stock transaction ID")
+    message: Optional[str] = Field(None, description="Status detail message")
+    timestamp: str = Field(..., description="ISO timestamp of operation")

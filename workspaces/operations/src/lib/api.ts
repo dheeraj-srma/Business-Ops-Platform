@@ -250,13 +250,20 @@ export const api = {
     notes?: string;
     referenceNumber?: string;
   }): Promise<{ success: boolean; product: Product; transaction: StockTransaction; variance: number }> {
+    const payload = {
+      product_id: data.productId,
+      new_quantity: data.actualStock,
+      reason: data.reason || 'Manual count adjustment',
+      notes: data.notes,
+      idempotency_key: data.referenceNumber,
+    };
     const res = await fetch('/api/inventory/adjust', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
+      body: JSON.stringify(payload),
     });
     const result = await res.json();
-    if (!res.ok) throw new Error(result.error || 'Failed to perform stock adjustment');
+    if (!res.ok) throw new Error(result.error || result.detail || 'Failed to perform stock adjustment');
     return result;
   },
 

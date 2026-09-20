@@ -83,6 +83,65 @@ class InventoryService:
         return None
 
     @staticmethod
+    def adjust_stock(
+        product_id: str,
+        new_quantity: float,
+        reason: str,
+        actor: Dict[str, Any],
+        location_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        from datetime import datetime
+        from supabase_client import get_supabase_client
+        from repositories.transaction_repo import TransactionRepository
+
+        client = get_supabase_client()
+        if not client:
+            raise RuntimeError("Database client connection unavailable.")
+
+        # Fetch current inventory row
+        inv_res = client.table("inventory").select("*").eq("product_id", product_id).limit(1).execute()
+        if not inv_res.data:
+            raise ValueError(f"Inventory record for product '{product_id}' not found.")
+
+        current_inv = inv_res.data[0]
+        old_on_hand = float(current_inv.get("quantity_on_hand") or 0.0)
+        reserved = float(current_inv.get("quantity_reserved") or 0.0)
+        new_avail = new_quantity - reserved
+
+        now_str = datetime.utcnow().isoformat()
+
+        # Update physical stock & available stock atomically
+        client.table("inventory").update({
+            "quantity_on_hand": new_quantity,
+            "quantity_available": new_avail,
+            "updated_at": now_str
+        }).eq("product_id", product_id).execute()
+
+        # Record audit transaction entry in stock_transactions
+        tx_data = {
+            "transaction_type": "ADJUSTMENT",
+            "product_id": product_id,
+            "location_id": location_id or current_inv.get("location_id"),
+            "quantity": new_quantity - old_on_hand,
+            "reference_type": "manual_adjustment",
+            "notes": f"Manual stock adjustment: {reason}",
+            "created_at": now_str
+        }
+        try:
+            TransactionRepository.record_stock_transaction(tx_data)
+        except Exception as tx_err:
+            logger.warning(f"Transaction ledger log failed during stock adjustment: {tx_err}")
+
+        return {
+            "status": "success",
+            "product_id": product_id,
+            "previous_quantity": old_on_hand,
+            "new_quantity": new_quantity,
+            "available_quantity": new_avail,
+            "timestamp": now_str
+        }
+
+    @staticmethod
     def record_stock_in(
         items: List[Dict[str, Any]],
         supplier: Optional[str] = None,

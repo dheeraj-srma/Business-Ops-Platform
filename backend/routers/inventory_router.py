@@ -4,7 +4,13 @@ import logging
 from typing import List, Dict, Any, Optional
 from fastapi import APIRouter, HTTPException, Depends, Query, status
 from schemas.inventory import ProductCreateSchema
-from schemas.inventory_schemas import InventoryItemResponse, InventoryListResponse
+from schemas.inventory_schemas import (
+    InventoryItemResponse,
+    InventoryListResponse,
+    StockAdjustmentRequest,
+    StockInRequest,
+    StockMutationResponse
+)
 from services.inventory_service import InventoryService
 from auth import require_role, require_permission
 
@@ -187,6 +193,54 @@ def list_suppliers():
     except Exception as exc:
         logger.error(f"Error listing suppliers: {exc}")
         return []
+
+@router.post("/inventory/adjust", response_model=StockMutationResponse, summary="Manual stock adjustment", description="Executes manual stock count adjustment with atomic transaction protection.")
+def adjust_inventory_stock(
+    payload: StockAdjustmentRequest,
+    current_user: dict = Depends(require_permission("inventory.manage"))
+):
+    try:
+        res = InventoryService.adjust_stock(
+            product_id=payload.product_id,
+            new_quantity=payload.new_quantity,
+            reason=payload.reason,
+            actor=current_user,
+            location_id=payload.location_id
+        )
+        return StockMutationResponse(
+            status="success",
+            product_id=res["product_id"],
+            previous_quantity=res["previous_quantity"],
+            new_quantity=res["new_quantity"],
+            available_quantity=res["available_quantity"],
+            timestamp=res["timestamp"]
+        )
+    except ValueError as ve:
+        raise HTTPException(status_code=404, detail=str(ve))
+    except Exception as exc:
+        logger.error(f"Error executing stock adjustment: {exc}")
+        raise HTTPException(status_code=500, detail=str(exc))
+
+@router.post("/inventory/stock-in", summary="Record inward inventory stock", description="Records stock-in transaction and updates physical and available inventory levels.")
+def record_stock_inward(
+    payload: StockInRequest,
+    current_user: dict = Depends(require_permission("inventory.manage"))
+):
+    try:
+        res = InventoryService.record_stock_in(
+            items=[{
+                "product_id": payload.product_id,
+                "quantity": payload.quantity,
+                "unit_cost": payload.unit_cost
+            }],
+            supplier=payload.supplier_name,
+            reference_number=payload.reference_number,
+            notes=payload.notes
+        )
+        return res
+    except Exception as exc:
+        logger.error(f"Error recording stock inward: {exc}")
+        raise HTTPException(status_code=400, detail=str(exc))
 
 @router.get("/inventory/reconcile")
 def audit_inventory_reconciliation(

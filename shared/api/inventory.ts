@@ -1,6 +1,6 @@
 // shared/api/inventory.ts
 /**
- * Shared Inventory Domain API Module (Read-Only)
+ * Shared Inventory Domain API Module (Read & Write Operations)
  */
 
 import { apiClient } from './client';
@@ -30,6 +30,35 @@ export interface InventoryListResponse {
   total_pages: number;
 }
 
+export interface StockAdjustmentPayload {
+  product_id: string;
+  new_quantity: number;
+  reason: string;
+  location_id?: string;
+  idempotency_key?: string;
+}
+
+export interface StockInPayload {
+  product_id: string;
+  quantity: number;
+  unit_cost?: number;
+  supplier_name?: string;
+  reference_number?: string;
+  notes?: string;
+  idempotency_key?: string;
+}
+
+export interface StockMutationResponse {
+  status: string;
+  product_id: string;
+  previous_quantity: number;
+  new_quantity: number;
+  available_quantity: number;
+  transaction_id?: string;
+  message?: string;
+  timestamp: string;
+}
+
 export async function fetchInventoryList(params?: {
   page?: number;
   page_size?: number;
@@ -49,4 +78,18 @@ export async function fetchInventoryList(params?: {
 
 export async function fetchInventoryByProductId(productId: string): Promise<InventoryItem> {
   return apiClient<InventoryItem>(`/api/inventory/${productId}`);
+}
+
+export async function adjustInventoryStock(payload: StockAdjustmentPayload): Promise<StockMutationResponse> {
+  return apiClient<StockMutationResponse>('/api/inventory/adjust', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function recordStockIn(payload: StockInPayload): Promise<any> {
+  return apiClient<any>('/api/inventory/stock-in', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
 }

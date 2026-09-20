@@ -6,18 +6,24 @@
 
 ---
 
-## 1. Stock Terminology & Definitions
+## 1. Authoritative Stock Semantics & Column Resolution (Phase 5C Formalization)
 
-The platform defines three core stock metrics:
+The platform formally resolves stock semantics across PostgreSQL / Supabase database tables as follows:
 
-1. **`physical_stock` (`quantity_on_hand`)**:
-   - The authoritative physical quantity of inventory stored in the database row (`public.inventory.quantity_on_hand` / `public.products.current_stock`).
-2. **`reserved_stock` (`quantity_reserved`)**:
-   - The aggregate quantity of inventory committed to pending, unfulfilled orders (`public.pending_order_items` linked to `pending_orders` with `status = 'Pending'`).
-3. **`available_stock` (`quantity_available`)**:
-   - The quantity available for new customer orders.
-   - **Authoritative Priority**: Consumed directly from `public.inventory.quantity_available`. When unavailable, derived dynamically as:
-     $$\text{available\_stock} = \max(0, \text{physical\_stock} - \text{reserved\_stock})$$
+1. **Authoritative Database Columns**:
+   - **`physical_stock` (`public.inventory.quantity_on_hand`)**: Materialized stored balance of physical stock.
+   - **`reserved_stock` (`public.inventory.quantity_reserved`)**: Materialized stored reserved quantity (and dynamically verified against open items in `public.pending_order_items` where order status is `Pending`).
+   - **`available_stock` (`public.inventory.quantity_available`)**: Materialized stored available quantity for new customer orders.
+
+2. **Stored vs. Calculated Rules**:
+   - **Stored Values**: `quantity_on_hand`, `quantity_reserved`, and `quantity_available` are all materialized columns in `public.inventory`.
+   - **Calculation Rule**: Whenever physical or reserved stock mutates, available stock is updated as:
+     $$\text{quantity\_available} = \text{quantity\_on\_hand} - \text{quantity\_reserved}$$
+   - **Priority Resolution**: Reads query `public.inventory.quantity_available` directly. If `quantity_available` is `NULL`, the calculation $\text{quantity\_on\_hand} - \text{quantity\_reserved}$ is applied.
+
+3. **Negative Stock Rules & Override Controls**:
+   - **Default Mode (`allow_negative_orders = false`)**: Reservations or mutations attempting to drop `quantity_available` below zero are blocked immediately with `409 INSUFFICIENT_STOCK`.
+   - **Override Mode (`allow_negative_orders = true`)**: System setting in `public.system_settings` permits negative available/physical stock, assigning stock health status = `NEGATIVE`.
 
 ---
 
