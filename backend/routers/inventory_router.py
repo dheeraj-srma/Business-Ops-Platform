@@ -18,6 +18,36 @@ logger = logging.getLogger("inventory_router")
 router = APIRouter(prefix="/api", tags=["Inventory & Products"])
 
 @router.get(
+    "/inventory/restock-plan",
+    summary="Compute restock and reorder calculations"
+)
+def get_restock_plan(
+    multiplier: float = Query(2.0, description="Target stock multiplier"),
+    category_id: Optional[str] = Query(None, alias="categoryId", description="Category ID filter"),
+    status: Optional[str] = Query(None, description="Stock status filter"),
+):
+    try:
+        return InventoryService.get_restock_plan(
+            multiplier=multiplier,
+            category_id=category_id,
+            status_filter=status
+        )
+    except Exception as exc:
+        logger.error(f"Error computing restock plan: {exc}")
+        raise HTTPException(status_code=500, detail=str(exc))
+
+@router.post(
+    "/inventory/bulk-restock",
+    summary="Process bulk restock consignment"
+)
+def bulk_restock(payload: dict):
+    try:
+        return InventoryService.bulk_restock(payload)
+    except Exception as exc:
+        logger.error(f"Error processing bulk restock: {exc}")
+        raise HTTPException(status_code=400, detail=str(exc))
+
+@router.get(
     "/inventory",
     response_model=InventoryListResponse,
     summary="List inventory items",
@@ -25,7 +55,7 @@ router = APIRouter(prefix="/api", tags=["Inventory & Products"])
 )
 def list_inventory(
     page: int = Query(1, ge=1, description="Page number"),
-    page_size: int = Query(50, ge=1, le=500, description="Items per page"),
+    page_size: Optional[int] = Query(None, ge=1, le=10000, description="Items per page"),
     search: Optional[str] = Query(None, description="Search term for SKU, name, or category"),
     status_filter: Optional[str] = Query(None, alias="status", description="Stock health status filter"),
     current_user: dict = Depends(require_permission("inventory.view"))
@@ -46,10 +76,12 @@ def list_inventory(
             raw_items = [item for item in raw_items if str(item.get("status", "")).upper() == status_filter.upper()]
 
         total_count = len(raw_items)
-        total_pages = max(1, math.ceil(total_count / page_size)) if total_count > 0 else 1
+        effective_page_size = page_size if page_size is not None else total_count
+        effective_page_size = max(1, effective_page_size) if total_count > 0 else 1
+        total_pages = max(1, math.ceil(total_count / effective_page_size)) if total_count > 0 else 1
 
-        start_idx = (page - 1) * page_size
-        end_idx = start_idx + page_size
+        start_idx = (page - 1) * effective_page_size
+        end_idx = start_idx + effective_page_size
         paged_batch = raw_items[start_idx:end_idx]
 
         mapped_items: List[InventoryItemResponse] = []
@@ -59,12 +91,13 @@ def list_inventory(
             q_avail = float(p.get("available_stock", p.get("Available Stock", p.get("availableStock", q_on_hand - q_reserved))))
             cost_p = float(p.get("Cost Price", p.get("unitCost", p.get("cost_price", 0.0))))
             sale_p = float(p.get("Price", p.get("default_sale_price", cost_p)))
+            c_name = str(p.get("category", p.get("Category", p.get("Brand", "General"))))
 
             mapped_items.append(InventoryItemResponse(
                 id=str(p.get("id", p.get("sku", ""))),
                 sku=str(p.get("sku", p.get("SKU", ""))),
                 name=str(p.get("name", p.get("Item Name", ""))),
-                category=str(p.get("category", p.get("Category", p.get("Brand", "General")))),
+                category=c_name,
                 brand=str(p.get("Brand", "Nalka Metals")),
                 cost_price=round(cost_p, 2),
                 sale_price=round(sale_p, 2),
@@ -75,18 +108,30 @@ def list_inventory(
                 status=str(p.get("status", "HEALTHY")),
                 is_active=bool(p.get("is_active", p.get("isActive", True))),
                 updated_at=str(p.get("Updated At", "")) if p.get("Updated At") else None,
+                currentStock=round(q_on_hand, 4),
+                physicalStock=round(q_on_hand, 4),
+                reservedStock=round(q_reserved, 4),
+                availableStock=round(q_avail, 4),
+                minimumStock=float(p.get("minimumStock", 15.0)),
+                criticalStock=float(p.get("criticalStock", 5.0)),
+                unitCost=round(cost_p, 2),
+                categoryId=c_name,
+                categoryName=c_name,
+                isActive=bool(p.get("is_active", p.get("isActive", True))),
             ))
 
         return InventoryListResponse(
             items=mapped_items,
+            products=mapped_items,
             total_count=total_count,
             page=page,
-            page_size=page_size,
+            page_size=effective_page_size,
             total_pages=total_pages
         )
     except Exception as exc:
         logger.error(f"Error listing inventory: {exc}")
         raise HTTPException(status_code=500, detail="Failed to retrieve inventory items.")
+
 
 @router.get(
     "/inventory/{product_id}",

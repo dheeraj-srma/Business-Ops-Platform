@@ -17,10 +17,23 @@ class ProductResponse(BaseModel):
     status: Optional[str] = Field("ACTIVE", description="Product status (ACTIVE, INACTIVE, ARCHIVED)")
     description: Optional[str] = Field(None, description="Product description")
 
+    # CamelCase compatibility fields for Operations and Management frontends
+    currentStock: Optional[float] = Field(0.0, description="Physical stock alias")
+    physicalStock: Optional[float] = Field(0.0, description="Physical stock alias")
+    reservedStock: Optional[float] = Field(0.0, description="Reserved stock alias")
+    availableStock: Optional[float] = Field(0.0, description="Available stock alias")
+    minimumStock: Optional[float] = Field(15.0, description="Minimum safe stock threshold")
+    criticalStock: Optional[float] = Field(5.0, description="Critical stock threshold")
+    unitCost: Optional[float] = Field(0.0, description="Unit cost alias")
+    categoryId: Optional[str] = Field(None, description="Category identifier alias")
+    categoryName: Optional[str] = Field(None, description="Category name alias")
+    isActive: Optional[bool] = Field(True, description="Active status alias")
+
     model_config = {"from_attributes": True}
 
 class ProductListResponse(BaseModel):
     products: List[ProductResponse] = Field(..., description="List of catalog products")
+    items: Optional[List[ProductResponse]] = Field(None, description="Compatibility alias for items")
     total_count: int = Field(..., description="Total matching product count")
     page: int = Field(1, description="Current page number (1-indexed)")
     page_size: int = Field(50, description="Page size limit")

@@ -18,10 +18,23 @@ class InventoryItemResponse(BaseModel):
     is_active: bool = Field(True, description="Active status flag")
     updated_at: Optional[str] = Field(None, description="Last updated timestamp")
 
+    # CamelCase compatibility fields for Operations and Management frontends
+    currentStock: Optional[float] = Field(0.0, description="Physical stock alias")
+    physicalStock: Optional[float] = Field(0.0, description="Physical stock alias")
+    reservedStock: Optional[float] = Field(0.0, description="Reserved stock alias")
+    availableStock: Optional[float] = Field(0.0, description="Available stock alias")
+    minimumStock: Optional[float] = Field(15.0, description="Minimum safe stock threshold")
+    criticalStock: Optional[float] = Field(5.0, description="Critical stock threshold")
+    unitCost: Optional[float] = Field(0.0, description="Unit cost alias")
+    categoryId: Optional[str] = Field(None, description="Category identifier alias")
+    categoryName: Optional[str] = Field(None, description="Category name alias")
+    isActive: Optional[bool] = Field(True, description="Active status alias")
+
     model_config = {"from_attributes": True}
 
 class InventoryListResponse(BaseModel):
     items: List[InventoryItemResponse] = Field(..., description="Inventory item records")
+    products: Optional[List[InventoryItemResponse]] = Field(None, description="Compatibility alias for products")
     total_count: int = Field(..., description="Total matching inventory items")
     page: int = Field(1, description="Current page number (1-indexed)")
     page_size: int = Field(50, description="Page size limit")

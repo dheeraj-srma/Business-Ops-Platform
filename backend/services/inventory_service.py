@@ -417,5 +417,158 @@ class InventoryService:
             "timestamp": now_str
         }
 
+    @staticmethod
+    def get_restock_plan(
+        multiplier: float = 2.0,
+        category_id: Optional[str] = None,
+        status_filter: Optional[str] = None
+    ) -> Dict[str, Any]:
+        import math
+        prods = InventoryService.list_inventory()
+        target_multiplier = max(1.1, float(multiplier or 2.0))
+
+        items_to_restock = []
+        total_negative_deficit_units = 0.0
+        total_restock_units = 0.0
+        estimated_total_restock_cost = 0.0
+
+        negative_count = 0
+        out_of_stock_count = 0
+        critical_count = 0
+        low_count = 0
+
+        category_breakdown_map: Dict[str, Dict[str, Any]] = {}
+
+        for prod in prods:
+            if not prod.get("is_active", True):
+                continue
+
+            physical_stock = float(prod.get("currentStock", prod.get("physical_stock", 0.0)))
+            reserved_stock = float(prod.get("reservedStock", prod.get("reserved_stock", 0.0)))
+            available_stock = float(prod.get("availableStock", prod.get("available_stock", physical_stock - reserved_stock)))
+            min_stock = float(prod.get("minimumStock", prod.get("min_stock", 15.0)))
+            crit_stock = float(prod.get("criticalStock", prod.get("crit_stock", 5.0)))
+            item_status = str(prod.get("status", "HEALTHY")).upper()
+
+            needs_restock = item_status in ["NEGATIVE", "OUT_OF_STOCK", "CRITICAL", "LOW"]
+            if not needs_restock:
+                continue
+
+            if item_status == "NEGATIVE":
+                negative_count += 1
+                total_negative_deficit_units += abs(physical_stock)
+            elif item_status == "OUT_OF_STOCK":
+                out_of_stock_count += 1
+            elif item_status == "CRITICAL":
+                critical_count += 1
+            elif item_status == "LOW":
+                low_count += 1
+
+            # Target stock formula: Target = max(Min * multiplier, Min + 5)
+            target_stock = math.ceil(max(min_stock * target_multiplier, min_stock + 5.0))
+            reorder_quantity = max(0.0, target_stock - available_stock)
+            unit_cost = float(prod.get("unitCost", prod.get("cost_price", 0.0)))
+            estimated_cost = round(reorder_quantity * unit_cost, 2)
+
+            total_restock_units += reorder_quantity
+            estimated_total_restock_cost += estimated_cost
+
+            if item_status == "NEGATIVE":
+                urgency = "EMERGENCY"
+                reorder_reason = f"Negative physical stock ({physical_stock} {prod.get('unit', 'NOS')}). Immediate replenishment needed to clear deficit."
+            elif item_status == "OUT_OF_STOCK":
+                urgency = "CRITICAL"
+                reorder_reason = f"Zero stock on floor. Requires {reorder_quantity} {prod.get('unit', 'NOS')} to restore safe operating level ({target_stock})."
+            elif item_status == "CRITICAL":
+                urgency = "CRITICAL"
+                reorder_reason = f"Stock ({physical_stock}) is at or below critical threshold ({crit_stock}). Requires {reorder_quantity} {prod.get('unit', 'NOS')}."
+            else:
+                urgency = "MEDIUM"
+                reorder_reason = f"Stock ({physical_stock}) is below minimum safe threshold ({min_stock}). Requires {reorder_quantity} {prod.get('unit', 'NOS')}."
+
+            cat_id = str(prod.get("categoryId") or prod.get("category") or "General")
+            cat_name = str(prod.get("categoryName") or prod.get("Category") or cat_id)
+
+            if cat_id not in category_breakdown_map:
+                category_breakdown_map[cat_id] = {
+                    "name": cat_name,
+                    "count": 0,
+                    "restockUnits": 0.0,
+                    "estimatedCost": 0.0,
+                }
+            category_breakdown_map[cat_id]["count"] += 1
+            category_breakdown_map[cat_id]["restockUnits"] += reorder_quantity
+            category_breakdown_map[cat_id]["estimatedCost"] += estimated_cost
+
+            items_to_restock.append({
+                "id": str(prod.get("id")),
+                "sku": str(prod.get("sku")),
+                "name": str(prod.get("name")),
+                "categoryId": cat_id,
+                "categoryName": cat_name,
+                "unit": str(prod.get("unit", "NOS")),
+                "unitCost": unit_cost,
+                "physicalStock": physical_stock,
+                "reservedStock": reserved_stock,
+                "availableStock": available_stock,
+                "minimumStock": min_stock,
+                "criticalStock": crit_stock,
+                "targetStock": target_stock,
+                "deficit": max(0.0, -physical_stock),
+                "reorderQuantity": reorder_quantity,
+                "estimatedCost": estimated_cost,
+                "status": item_status,
+                "urgency": urgency,
+                "reorderReason": reorder_reason,
+            })
+
+        filtered_items = items_to_restock
+        if category_id and category_id.lower() != "all":
+            filtered_items = [i for i in filtered_items if i["categoryId"] == category_id or i["categoryName"] == category_id]
+        if status_filter and status_filter.lower() != "all":
+            filtered_items = [i for i in filtered_items if i["status"].upper() == status_filter.upper()]
+
+        urgency_weight = {"EMERGENCY": 3, "CRITICAL": 2, "MEDIUM": 1}
+        filtered_items.sort(key=lambda x: (urgency_weight.get(x["urgency"], 0), x["estimatedCost"]), reverse=True)
+
+        return {
+            "summary": {
+                "totalItemsToRestock": len(items_to_restock),
+                "negativeCount": negative_count,
+                "outOfStockCount": out_of_stock_count,
+                "criticalCount": critical_count,
+                "lowCount": low_count,
+                "totalNegativeDeficitUnits": round(total_negative_deficit_units, 2),
+                "totalRestockUnits": round(total_restock_units, 2),
+                "estimatedTotalRestockCost": round(estimated_total_restock_cost, 2),
+                "targetMultiplier": target_multiplier,
+            },
+            "categoryBreakdown": sorted(list(category_breakdown_map.values()), key=lambda x: x["estimatedCost"], reverse=True),
+            "items": filtered_items,
+        }
+
+    @staticmethod
+    def bulk_restock(data: Dict[str, Any], actor: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        import time
+        items = data.get("items", [])
+        supplier = data.get("supplier", "Bulk Consignment Supplier")
+        ref = data.get("referenceNumber", f"PO-{int(time.time())}")
+        notes = data.get("notes", "")
+        reason = data.get("reason", "Bulk Restock Purchase Order")
+
+        res = InventoryService.record_stock_in(
+            items=items,
+            supplier=supplier,
+            reference_number=ref,
+            reason=reason,
+            notes=notes
+        )
+        return {
+            "success": True,
+            "processedCount": len(items),
+            "transactions": res.get("transactions", [])
+        }
+
 inventory_service = InventoryService()
+
 
