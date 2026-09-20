@@ -137,3 +137,75 @@ export async function listOrders(params: ListOrdersParams = {}): Promise<OrderLi
 export async function getOrder(orderId: string): Promise<OrderDetail> {
   return apiClient<OrderDetail>(`/api/orders/${encodeURIComponent(orderId)}`);
 }
+
+// Phase 6B: Order Workflow Mutations
+
+export interface OrderEditPayload {
+  items: Array<{
+    sku: string;
+    item_name?: string;
+    category?: string;
+    quantity: number;
+    price?: number;
+  }>;
+  notes?: string;
+}
+
+export interface OrderEditResponse {
+  status: string;
+  order_id: string;
+  items_count: number;
+  total_amount: number;
+  reservation_delta: number;
+  timestamp: string;
+}
+
+export async function updateOrder(orderId: string, payload: OrderEditPayload): Promise<OrderEditResponse> {
+  return apiClient<OrderEditResponse>(`/api/orders/${encodeURIComponent(orderId)}/update`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export interface OrderCancelResponse {
+  status: string;
+  order_id: string;
+  released_reservation: number;
+  timestamp: string;
+}
+
+export async function cancelOrder(orderId: string, reason?: string): Promise<OrderCancelResponse> {
+  return apiClient<OrderCancelResponse>(`/api/orders/${encodeURIComponent(orderId)}/cancel`, {
+    method: 'POST',
+    body: JSON.stringify({ reason }),
+  });
+}
+
+export interface OrderRejectResponse {
+  status: string;
+  order_id: string;
+  released_reservation: number;
+  timestamp: string;
+}
+
+export async function rejectOrder(orderId: string, reason?: string): Promise<OrderRejectResponse> {
+  return apiClient<OrderRejectResponse>(`/api/orders/${encodeURIComponent(orderId)}/reject`, {
+    method: 'POST',
+    body: JSON.stringify({ reason }),
+  });
+}
+
+export interface OrderReopenResponse {
+  status: string;
+  order_id: string;
+  recreated_reservation: number;
+  timestamp: string;
+}
+
+export async function reopenOrder(orderId: string, reason?: string): Promise<OrderReopenResponse> {
+  return apiClient<OrderReopenResponse>(`/api/orders/${encodeURIComponent(orderId)}/reopen`, {
+    method: 'POST',
+    body: JSON.stringify({ reason }),
+  });
+}
+

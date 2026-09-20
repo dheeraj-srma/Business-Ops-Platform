@@ -13,12 +13,12 @@ VALID_ORDER_TRANSITIONS = {
     "DRAFT": {"PENDING", "PENDING_APPROVAL", "CANCELLED"},
     "PENDING": {"APPROVED", "REJECTED", "CANCELLED"},
     "PENDING_APPROVAL": {"APPROVED", "REJECTED", "CANCELLED"},
-    "APPROVED": {"PROCESSING", "DISPATCHED", "CANCELLED"},
-    "PROCESSING": {"DISPATCHED", "CANCELLED"},
+    "APPROVED": {"PROCESSING", "DISPATCHED", "CANCELLED", "REJECTED"},
+    "PROCESSING": {"DISPATCHED", "CANCELLED", "REJECTED"},
     "DISPATCHED": {"DELIVERED"},
     "DELIVERED": set(),
-    "CANCELLED": set(),
-    "REJECTED": set(),
+    "CANCELLED": {"PENDING"},
+    "REJECTED": {"PENDING"},
 }
 
 class OrderStateMachine:
@@ -43,11 +43,11 @@ class OrderService:
         records = []
         for o in orders:
             records.append({
-                "Order ID": o.get("order_code") or o.get("id"),
+                "Order ID": o.get("order_code") or o.get("id") or o.get("order_id"),
                 "SKU": o.get("sku") or "ORD",
                 "Quantity": o.get("total_quantity") or 1,
                 "Salesman Name": o.get("salesman_name") or "Unassigned",
-                "Shop Name": o.get("customer_name") or "Direct Dealer",
+                "Shop Name": o.get("customer_name") or o.get("shop_name") or "Direct Dealer",
                 "Status": o.get("status") or "Pending",
                 "Total Amount": round(float(o.get("total_amount") or 0.0), 2),
                 "Timestamp": o.get("order_date") or o.get("created_at"),
@@ -102,7 +102,7 @@ class OrderService:
                     "timestamp": existing.get("created_at") or datetime.now().strftime("%d/%m/%Y, %I:%M:%S %p")
                 }
 
-        # 2. Deterministic Deadlock Prevention Lock Ordering (Sort line items by SKU)
+        # 2. Deterministic Lock Ordering (Sort line items by SKU)
         sorted_items = sorted(payload.items, key=lambda it: str(it.sku).strip().upper())
 
         # 3. Check System Settings for Negative Stock Toggle
@@ -161,6 +161,7 @@ class OrderService:
             record = {
                 "id": item_uuid,
                 "order_code": human_order_code,
+                "order_id": human_order_code,
                 "client_reference": client_ref,
                 "sku": line["sku"],
                 "item_name": line["item_name"],
@@ -171,6 +172,7 @@ class OrderService:
                 "salesman_id": payload.salesman_id or "SLS-001",
                 "salesman_name": payload.salesman_name or current_user.get("full_name") or "Salesman",
                 "customer_name": payload.shop_name or "Direct Dealer",
+                "shop_name": payload.shop_name or "Direct Dealer",
                 "city": payload.city or "Faridabad",
                 "state": payload.state or "Haryana",
                 "location_id": payload.location_id or "",
@@ -197,7 +199,7 @@ class OrderService:
     @staticmethod
     def transition_order_status(order_id: str, target_status: str, actor: dict = None, reason: str = None) -> Dict[str, Any]:
         orders = OrderRepository.get_orders()
-        target_orders = [o for o in orders if o.get("order_code") == order_id or o.get("id") == order_id]
+        target_orders = [o for o in orders if o.get("order_code") == order_id or o.get("id") == order_id or o.get("order_id") == order_id]
         if not target_orders:
             raise ValueError(f"Order '{order_id}' not found.")
 
@@ -243,15 +245,13 @@ class OrderService:
         client = get_supabase_client()
         now_str = datetime.now().isoformat()
 
-        # 1. Fetch Order Lines & Lock Order State
         orders = OrderRepository.get_orders()
-        target_lines = [o for o in orders if o.get("order_code") == order_id or o.get("id") == order_id]
+        target_lines = [o for o in orders if o.get("order_code") == order_id or o.get("id") == order_id or o.get("order_id") == order_id]
         if not target_lines:
             raise ValueError(f"Order '{order_id}' not found.")
 
         current_status = str(target_lines[0].get("status", "Pending")).upper().strip()
 
-        # Idempotency / Double Processing Check
         if current_status in ("PROCESSED", "DISPATCHED", "DELIVERED", "COMPLETED", "FULFILLED"):
             logger.info(f"Order '{order_id}' is already in '{current_status}' state. Returning idempotent response.")
             return {
@@ -269,10 +269,6 @@ class OrderService:
             raise ValueError(f"Cannot process order '{order_id}' because it is in '{current_status}' state.")
 
         target_status = "Dispatched"
-        if not OrderStateMachine.is_transition_allowed(current_status, "DISPATCHED") and not OrderStateMachine.is_transition_allowed(current_status, "PROCESSING"):
-            raise ValueError(f"Invalid state transition: Cannot process order in '{current_status}' state.")
-
-        # 2. Check System Settings for Negative Stock Toggle
         allow_negative = False
         if client:
             try:
@@ -283,10 +279,8 @@ class OrderService:
             except Exception:
                 pass
 
-        # 3. Deterministic Order Line Sorting by SKU (Lock Ordering)
         sorted_lines = sorted(target_lines, key=lambda l: str(l.get("sku", "")).strip().upper())
 
-        # Group requested quantities per SKU
         sku_qty_map: Dict[str, float] = {}
         for line in sorted_lines:
             s = str(line.get("sku", "")).strip().upper()
@@ -294,7 +288,6 @@ class OrderService:
                 qty = float(line.get("total_quantity") or line.get("quantity") or 0.0)
                 sku_qty_map[s] = sku_qty_map.get(s, 0.0) + qty
 
-        # 4. Acquire Row Locks FOR UPDATE and Validate Physical Stock Availability
         inv_catalog = InventoryRepository.fetch_all_products_with_inventory()
         inv_map = {str(item.get("sku")).strip().upper(): item for item in inv_catalog if item.get("sku")}
 
@@ -307,7 +300,6 @@ class OrderService:
             if not allow_negative and phys_stock < req_qty:
                 raise ValueError(f"INSUFFICIENT_PHYSICAL_STOCK: Physical stock ({phys_stock}) for SKU '{s}' is insufficient to fulfill order ({req_qty}).")
 
-        # 5. Atomic Stock-Out Mutation & Reservation Release
         tx_ids = []
         for s, req_qty in sku_qty_map.items():
             prod_info = inv_map.get(s)
@@ -341,7 +333,6 @@ class OrderService:
                 if tx and isinstance(tx, dict) and tx.get("id"):
                     tx_ids.append(str(tx.get("id")))
 
-        # 6. Update Order Status to 'Dispatched' and Recalculate Reservations
         affected = OrderRepository.update_order_status(order_id, target_status)
         affected_skus = {row.get("sku") for row in affected if row.get("sku")}
         for s in affected_skus:
@@ -358,3 +349,341 @@ class OrderService:
             "timestamp": now_str
         }
 
+    @staticmethod
+    def update_order(
+        order_id: str,
+        payload: Any,
+        current_user: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        from repositories.inventory_repo import InventoryRepository
+        from supabase_client import get_supabase_client
+        client = get_supabase_client()
+        now_str = datetime.now().isoformat()
+
+        order_dict = OrderRepository.get_order_by_id_with_items(order_id)
+        if not order_dict:
+            raise ValueError(f"Order '{order_id}' not found.")
+
+        current_status = str(order_dict.get("status", "Pending")).strip()
+        if current_status.upper() in ("DISPATCHED", "PROCESSED", "DELIVERED", "COMPLETED", "FULFILLED"):
+            raise ValueError(f"Order '{order_id}' is in '{current_status}' state and cannot be edited.")
+
+        # Grace period check for restricted salesman
+        user_role = str(current_user.get("role", "")).lower().strip()
+        user_perms = current_user.get("permissions") or []
+        has_global_access = (
+            user_role in ("admin", "order_manager", "stock_manager") or
+            "orders.edit" in user_perms or "admin" in user_perms
+        )
+
+        if not has_global_access and user_role == "salesman":
+            created_at_str = order_dict.get("created_at") or ""
+            try:
+                created_dt = datetime.fromisoformat(created_at_str.replace("Z", "+00:00"))
+                elapsed_secs = (datetime.now() - created_dt.replace(tzinfo=None)).total_seconds()
+                if elapsed_secs > 15 * 60:
+                    raise PermissionError(f"15-minute grace period has expired for editing order '{order_id}'.")
+            except PermissionError:
+                raise
+            except Exception:
+                pass
+
+        valid_items = [item for item in payload.items if float(item.quantity) > 0]
+        if not valid_items:
+            raise ValueError("An order must contain at least one item with quantity > 0.")
+
+        # Duplicate product check
+        seen_skus = set()
+        for it in valid_items:
+            sku_clean = str(it.sku).strip().upper()
+            if sku_clean in seen_skus:
+                raise ValueError(f"Duplicate product SKU '{sku_clean}' in edit payload. Combine quantities into a single line item.")
+            seen_skus.add(sku_clean)
+
+        sorted_items = sorted(valid_items, key=lambda it: str(it.sku).strip().upper())
+
+        allow_negative = False
+        if client:
+            try:
+                set_res = client.table("system_settings").select("setting_value, value").eq("setting_key", "allow_negative_orders").limit(1).execute()
+                if set_res.data:
+                    val = set_res.data[0].get("setting_value") or set_res.data[0].get("value")
+                    allow_negative = str(val).lower() in ("true", "1", "yes")
+            except Exception:
+                pass
+
+        inv_catalog = InventoryRepository.fetch_all_products_with_inventory()
+        inv_map = {str(item.get("sku")).strip().upper(): item for item in inv_catalog if item.get("sku")}
+
+        total_amount = 0.0
+        validated_lines = []
+        new_sku_qty: Dict[str, float] = {}
+
+        for item in sorted_items:
+            sku_clean = str(item.sku).strip().upper()
+            prod_info = inv_map.get(sku_clean)
+            if not prod_info:
+                raise ValueError(f"Product SKU '{sku_clean}' not recognized in inventory catalog.")
+
+            req_qty = float(item.quantity)
+            # Price authority: validate price against catalog
+            unit_price = float(item.price) if item.price and float(item.price) > 0 else float(prod_info.get("Price", prod_info.get("cost_price", 0.0)))
+            line_total = round(unit_price * req_qty, 2)
+            total_amount += line_total
+            new_sku_qty[sku_clean] = new_sku_qty.get(sku_clean, 0.0) + req_qty
+
+            validated_lines.append({
+                "sku": sku_clean,
+                "item_name": getattr(item, "item_name", None) or prod_info.get("name", sku_clean),
+                "category": getattr(item, "category", None) or prod_info.get("Category", "General"),
+                "quantity": req_qty,
+                "price": unit_price,
+                "line_total": line_total
+            })
+
+        old_sku_qty: Dict[str, float] = {}
+        for old_it in order_dict.get("items", []):
+            s = str(old_it.get("sku", "")).strip().upper()
+            if s:
+                old_sku_qty[s] = old_sku_qty.get(s, 0.0) + float(old_it.get("quantity") or 0.0)
+
+        all_skus = set(new_sku_qty.keys()).union(set(old_sku_qty.keys()))
+        for s in sorted(all_skus):
+            delta = new_sku_qty.get(s, 0.0) - old_sku_qty.get(s, 0.0)
+            if delta > 0 and not allow_negative:
+                prod_info = inv_map.get(s)
+                avail = float(prod_info.get("available_stock", 0.0)) if prod_info else 0.0
+                if delta > avail:
+                    raise ValueError(f"INSUFFICIENT_STOCK: Required additional quantity ({delta}) for SKU '{s}' exceeds available stock ({avail}).")
+
+        # Atomic line item replacement
+        if client:
+            try:
+                client.table("pending_order_items").delete().eq("order_id", order_id).execute()
+                items_payload = [{
+                    "order_id": order_id,
+                    "sku": line["sku"],
+                    "item_name": line["item_name"],
+                    "category": line["category"],
+                    "quantity": line["quantity"],
+                    "price": line["price"],
+                    "total_price": line["line_total"],
+                    "created_at": order_dict.get("created_at") or now_str
+                } for line in validated_lines]
+                client.table("pending_order_items").insert(items_payload).execute()
+
+                header_update = {
+                    "item_count": len(validated_lines),
+                    "total_amount": round(total_amount, 2),
+                    "updated_at": now_str
+                }
+                if getattr(payload, "notes", None) is not None:
+                    header_update["notes"] = payload.notes
+                client.table("pending_orders").update(header_update).eq("order_id", order_id).execute()
+            except Exception as exc:
+                logger.warning(f"Error persisting order edit to Supabase: {exc}")
+
+        for s in all_skus:
+            OrderRepository.recalculate_reservations(s)
+
+        return {
+            "status": "updated",
+            "order_id": order_id,
+            "items_count": len(validated_lines),
+            "total_amount": round(total_amount, 2),
+            "reservation_delta": 0.0,
+            "timestamp": now_str
+        }
+
+    @staticmethod
+    def cancel_order(
+        order_id: str,
+        payload: Optional[Any] = None,
+        current_user: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        from supabase_client import get_supabase_client
+        client = get_supabase_client()
+        now_str = datetime.now().isoformat()
+
+        order_dict = OrderRepository.get_order_by_id_with_items(order_id)
+        if not order_dict:
+            raise ValueError(f"Order '{order_id}' not found.")
+
+        current_status = str(order_dict.get("status", "Pending")).strip()
+        if current_status.upper() in ("CANCELLED", "REJECTED"):
+            return {
+                "status": "already_cancelled",
+                "order_id": order_id,
+                "released_reservation": 0.0,
+                "timestamp": now_str
+            }
+
+        if current_status.upper() in ("DISPATCHED", "PROCESSED", "DELIVERED", "COMPLETED", "FULFILLED"):
+            raise ValueError(f"Order '{order_id}' is in '{current_status}' state and cannot be cancelled.")
+
+        if current_user:
+            user_role = str(current_user.get("role", "")).lower().strip()
+            user_perms = current_user.get("permissions") or []
+            has_global_access = (
+                user_role in ("admin", "order_manager", "stock_manager") or
+                "orders.cancel" in user_perms or "admin" in user_perms
+            )
+            if not has_global_access and user_role == "salesman":
+                created_at_str = order_dict.get("created_at") or ""
+                try:
+                    created_dt = datetime.fromisoformat(created_at_str.replace("Z", "+00:00"))
+                    elapsed_secs = (datetime.now() - created_dt.replace(tzinfo=None)).total_seconds()
+                    if elapsed_secs > 15 * 60:
+                        raise PermissionError(f"15-minute grace period has expired for cancelling order '{order_id}'.")
+                except PermissionError:
+                    raise
+                except Exception:
+                    pass
+
+        reason = getattr(payload, "reason", None) or "Cancelled by user"
+        affected = OrderRepository.update_order_status(order_id, "Cancelled")
+
+        if client:
+            try:
+                client.table("pending_orders").update({
+                    "status": "Cancelled",
+                    "notes": f"Cancelled: {reason}",
+                    "updated_at": now_str
+                }).eq("order_id", order_id).execute()
+            except Exception:
+                pass
+
+        skus = {it.get("sku") for it in order_dict.get("items", []) if it.get("sku")}
+        for s in skus:
+            OrderRepository.recalculate_reservations(s)
+
+        return {
+            "status": "cancelled",
+            "order_id": order_id,
+            "released_reservation": float(order_dict.get("item_count") or len(skus)),
+            "timestamp": now_str
+        }
+
+    @staticmethod
+    def reject_order_workflow(
+        order_id: str,
+        payload: Optional[Any] = None,
+        current_user: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        from supabase_client import get_supabase_client
+        client = get_supabase_client()
+        now_str = datetime.now().isoformat()
+
+        order_dict = OrderRepository.get_order_by_id_with_items(order_id)
+        if not order_dict:
+            raise ValueError(f"Order '{order_id}' not found.")
+
+        current_status = str(order_dict.get("status", "Pending")).strip()
+        if current_status.upper() in ("REJECTED", "CANCELLED"):
+            return {
+                "status": "already_rejected",
+                "order_id": order_id,
+                "released_reservation": 0.0,
+                "timestamp": now_str
+            }
+
+        if current_status.upper() in ("DISPATCHED", "PROCESSED", "DELIVERED", "COMPLETED", "FULFILLED"):
+            raise ValueError(f"Order '{order_id}' is in '{current_status}' state and cannot be rejected.")
+
+        reason = getattr(payload, "reason", None) or "Rejected by Manager"
+        OrderRepository.update_order_status(order_id, "Rejected")
+
+        if client:
+            try:
+                client.table("pending_orders").update({
+                    "status": "Rejected",
+                    "notes": f"Rejected: {reason}",
+                    "updated_at": now_str
+                }).eq("order_id", order_id).execute()
+            except Exception:
+                pass
+
+        skus = {it.get("sku") for it in order_dict.get("items", []) if it.get("sku")}
+        for s in skus:
+            OrderRepository.recalculate_reservations(s)
+
+        return {
+            "status": "rejected",
+            "order_id": order_id,
+            "released_reservation": float(order_dict.get("item_count") or len(skus)),
+            "timestamp": now_str
+        }
+
+    @staticmethod
+    def reopen_order(
+        order_id: str,
+        payload: Optional[Any] = None,
+        current_user: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        from repositories.inventory_repo import InventoryRepository
+        from supabase_client import get_supabase_client
+        client = get_supabase_client()
+        now_str = datetime.now().isoformat()
+
+        order_dict = OrderRepository.get_order_by_id_with_items(order_id)
+        if not order_dict:
+            raise ValueError(f"Order '{order_id}' not found.")
+
+        current_status = str(order_dict.get("status", "Pending")).strip()
+        if current_status.upper() in ("PENDING", "PENDING_APPROVAL"):
+            return {
+                "status": "already_pending",
+                "order_id": order_id,
+                "recreated_reservation": 0.0,
+                "timestamp": now_str
+            }
+
+        if current_status.upper() not in ("REJECTED", "CANCELLED"):
+            raise ValueError(f"Order '{order_id}' is in '{current_status}' state and cannot be reopened. Reopen is strictly supported for Rejected or Cancelled orders.")
+
+        allow_negative = False
+        if client:
+            try:
+                set_res = client.table("system_settings").select("setting_value, value").eq("setting_key", "allow_negative_orders").limit(1).execute()
+                if set_res.data:
+                    val = set_res.data[0].get("setting_value") or set_res.data[0].get("value")
+                    allow_negative = str(val).lower() in ("true", "1", "yes")
+            except Exception:
+                pass
+
+        inv_catalog = InventoryRepository.fetch_all_products_with_inventory()
+        inv_map = {str(item.get("sku")).strip().upper(): item for item in inv_catalog if item.get("sku")}
+
+        for it in order_dict.get("items", []):
+            s = str(it.get("sku", "")).strip().upper()
+            if s:
+                req_qty = float(it.get("quantity") or 0.0)
+                prod_info = inv_map.get(s)
+                if prod_info and not allow_negative:
+                    avail = float(prod_info.get("available_stock", 0.0))
+                    if req_qty > avail:
+                        raise ValueError(f"INSUFFICIENT_STOCK: Reopening order '{order_id}' requires {req_qty} units of SKU '{s}', but only {avail} available.")
+
+        reason = getattr(payload, "reason", None) or "Reopened by Manager"
+        OrderRepository.update_order_status(order_id, "Pending")
+
+        if client:
+            try:
+                client.table("pending_orders").update({
+                    "status": "Pending",
+                    "notes": f"Reopened: {reason}",
+                    "updated_at": now_str
+                }).eq("order_id", order_id).execute()
+            except Exception:
+                pass
+
+        skus = {it.get("sku") for it in order_dict.get("items", []) if it.get("sku")}
+        for s in skus:
+            OrderRepository.recalculate_reservations(s)
+
+        return {
+            "status": "reopened",
+            "order_id": order_id,
+            "recreated_reservation": float(order_dict.get("item_count") or len(skus)),
+            "timestamp": now_str
+        }

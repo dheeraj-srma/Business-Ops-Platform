@@ -15,6 +15,16 @@ from schemas.order_schemas import (
     OrderDetailSchema,
     OrderListResponseSchema
 )
+from schemas.order_workflow_schemas import (
+    OrderEditRequest,
+    OrderEditResponse,
+    OrderCancelRequest,
+    OrderCancelResponse,
+    OrderRejectRequest,
+    OrderRejectResponse,
+    OrderReopenRequest,
+    OrderReopenResponse
+)
 from services.order_service import OrderService
 from services.order_read_service import OrderReadService
 from auth import require_role, require_permission
@@ -116,6 +126,106 @@ def get_order_by_id(
         logger.error(f"Error retrieving order '{order_id}': {exc}")
         raise HTTPException(status_code=500, detail=str(exc))
 
+@router.post(
+    "/{order_id}/update",
+    response_model=OrderEditResponse,
+    summary="Edit order line items and quantities",
+    description="Atomically updates order header and line items while recalculating reservation deltas. Validates stock availability for quantity increases."
+)
+def update_order(
+    order_id: str,
+    payload: OrderEditRequest,
+    current_user: dict = Depends(require_permission("orders.view"))
+):
+    try:
+        res = OrderService.update_order(order_id, payload, current_user)
+        return OrderEditResponse(**res)
+    except PermissionError as perm_err:
+        raise HTTPException(status_code=403, detail=str(perm_err))
+    except ValueError as val_err:
+        err_msg = str(val_err)
+        if "INSUFFICIENT_STOCK" in err_msg or "RESERVATION_MISMATCH" in err_msg:
+            raise HTTPException(status_code=409, detail=err_msg)
+        if "not found" in err_msg.lower():
+            raise HTTPException(status_code=404, detail=err_msg)
+        raise HTTPException(status_code=400, detail=err_msg)
+    except Exception as exc:
+        logger.error(f"Error updating order '{order_id}': {exc}")
+        raise HTTPException(status_code=500, detail=str(exc))
+
+@router.post(
+    "/{order_id}/cancel",
+    response_model=OrderCancelResponse,
+    summary="Cancel order and release reservations",
+    description="Transitions order status to Cancelled and releases active stock reservations back to available stock."
+)
+def cancel_order(
+    order_id: str,
+    payload: Optional[OrderCancelRequest] = None,
+    current_user: dict = Depends(require_permission("orders.view"))
+):
+    try:
+        res = OrderService.cancel_order(order_id, payload, current_user)
+        return OrderCancelResponse(**res)
+    except PermissionError as perm_err:
+        raise HTTPException(status_code=403, detail=str(perm_err))
+    except ValueError as val_err:
+        err_msg = str(val_err)
+        if "not found" in err_msg.lower():
+            raise HTTPException(status_code=404, detail=err_msg)
+        raise HTTPException(status_code=400, detail=err_msg)
+    except Exception as exc:
+        logger.error(f"Error cancelling order '{order_id}': {exc}")
+        raise HTTPException(status_code=500, detail=str(exc))
+
+@router.post(
+    "/{order_id}/reject",
+    response_model=OrderRejectResponse,
+    summary="Reject order and release reservations",
+    description="Transitions order status to Rejected and releases active line reservations."
+)
+def reject_order(
+    order_id: str,
+    payload: Optional[OrderRejectRequest] = None,
+    current_user: dict = Depends(require_permission("orders.reject"))
+):
+    try:
+        res = OrderService.reject_order_workflow(order_id, payload, current_user)
+        return OrderRejectResponse(**res)
+    except ValueError as val_err:
+        err_msg = str(val_err)
+        if "not found" in err_msg.lower():
+            raise HTTPException(status_code=404, detail=err_msg)
+        raise HTTPException(status_code=400, detail=err_msg)
+    except Exception as exc:
+        logger.error(f"Error rejecting order '{order_id}': {exc}")
+        raise HTTPException(status_code=500, detail=str(exc))
+
+@router.post(
+    "/{order_id}/reopen",
+    response_model=OrderReopenResponse,
+    summary="Reopen rejected/cancelled order back to Pending queue",
+    description="Transitions a Rejected or Cancelled order back to Pending queue and re-establishes stock reservations."
+)
+def reopen_order(
+    order_id: str,
+    payload: Optional[OrderReopenRequest] = None,
+    current_user: dict = Depends(require_permission("orders.reject"))
+):
+    try:
+        res = OrderService.reopen_order(order_id, payload, current_user)
+        return OrderReopenResponse(**res)
+    except ValueError as val_err:
+        err_msg = str(val_err)
+        if "INSUFFICIENT_STOCK" in err_msg:
+            raise HTTPException(status_code=409, detail=err_msg)
+        if "not found" in err_msg.lower():
+            raise HTTPException(status_code=404, detail=err_msg)
+        raise HTTPException(status_code=400, detail=err_msg)
+    except Exception as exc:
+        logger.error(f"Error reopening order '{order_id}': {exc}")
+        raise HTTPException(status_code=500, detail=str(exc))
+
 @router.post("")
 def create_order(
     order: OrderCreateSchema,
@@ -147,17 +257,6 @@ def approve_order(
         return OrderService.approve_order(order_id)
     except Exception as exc:
         logger.error(f"Error approving order: {exc}")
-        raise HTTPException(status_code=400, detail=str(exc))
-
-@router.patch("/{order_id}/reject")
-def reject_order(
-    order_id: str,
-    current_user: dict = Depends(require_role(["admin", "order_manager", "stock_manager"]))
-):
-    try:
-        return OrderService.reject_order(order_id)
-    except Exception as exc:
-        logger.error(f"Error rejecting order: {exc}")
         raise HTTPException(status_code=400, detail=str(exc))
 
 @router.post(

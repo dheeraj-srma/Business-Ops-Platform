@@ -22,7 +22,7 @@ import { supabase } from '../lib/supabaseClient';
 import { generateOrderPDF } from '../utils/pdfGenerator';
 import { downloadOrderAsJSON, type OrderPayload } from '../utils/buildOrder';
 import type { PDFOrderData, PDFOrderItem } from '../types';
-import { listOrders, getOrder } from '../../../../shared/api/orders';
+import { listOrders, getOrder, cancelOrder, updateOrder } from '../../../../shared/api/orders';
 
 interface OrderItemRow {
   id?: number | string;
@@ -289,12 +289,8 @@ export default function SalesmanOrdersPanel({
       secondaryButtonText: 'Keep Order',
       onConfirm: async () => {
         try {
-          // Delete from Supabase pending_order_items and pending_orders
-          await supabase.from('pending_order_items').delete().eq('order_id', order.order_id);
-          const { error } = await supabase.from('pending_orders').delete().eq('order_id', order.order_id);
-
-          if (error) throw error;
-
+          // Central API Call
+          await cancelOrder(order.order_id, 'Cancelled by salesman');
           setOrders((prev) => prev.filter((o) => o.order_id !== order.order_id));
           showModal({
             type: 'success',
@@ -305,7 +301,7 @@ export default function SalesmanOrdersPanel({
           showModal({
             type: 'error',
             title: 'Cancellation Failed',
-            message: err.message || 'Could not cancel order. Please check network connectivity.',
+            message: err.message || 'Could not cancel order.',
           });
         }
       },
@@ -346,41 +342,19 @@ export default function SalesmanOrdersPanel({
         return;
       }
 
-      const newTotalAmount = validItems.reduce(
-        (sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 0),
-        0
-      );
+      // Central API Call
+      const editPayload = {
+        items: validItems.map((item) => ({
+          sku: item.sku || item.item_name,
+          item_name: item.item_name,
+          category: item.category || 'General',
+          quantity: Number(item.quantity),
+          price: Number(item.price || 0),
+        })),
+        notes: editNotes.trim(),
+      };
 
-      // 1. Delete existing line items for order
-      await supabase.from('pending_order_items').delete().eq('order_id', editingOrder.order_id);
-
-      // 2. Insert updated line items
-      const itemsPayload = validItems.map((item) => ({
-        order_id: editingOrder.order_id,
-        sku: item.sku || item.item_name,
-        item_name: item.item_name,
-        category: item.category || 'General',
-        quantity: Number(item.quantity),
-        price: Number(item.price || 0),
-        total_price: Number(item.price || 0) * Number(item.quantity),
-        created_at: editingOrder.created_at,
-      }));
-
-      const { error: insertErr } = await supabase.from('pending_order_items').insert(itemsPayload);
-      if (insertErr) throw insertErr;
-
-      // 3. Update pending_orders master header
-      const { error: updateErr } = await supabase
-        .from('pending_orders')
-        .update({
-          item_count: validItems.length,
-          total_amount: newTotalAmount,
-          notes: editNotes.trim(),
-          updated_at: new Date().toISOString(),
-        })
-        .eq('order_id', editingOrder.order_id);
-
-      if (updateErr) throw updateErr;
+      const res = await updateOrder(editingOrder.order_id, editPayload);
 
       setEditingOrder(null);
       await fetchOrders(true);
@@ -391,8 +365,8 @@ export default function SalesmanOrdersPanel({
         message: `Successfully updated order ${editingOrder.order_id}.`,
         details: [
           { label: 'Order ID', value: editingOrder.order_id },
-          { label: 'Items Count', value: validItems.length },
-          { label: 'Updated Total', value: `Rs. ${newTotalAmount.toLocaleString()}`, highlight: true },
+          { label: 'Items Count', value: res.items_count },
+          { label: 'Updated Total', value: `Rs. ${res.total_amount.toLocaleString()}`, highlight: true },
         ],
       });
     } catch (err: any) {
