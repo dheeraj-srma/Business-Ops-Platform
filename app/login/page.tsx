@@ -1,22 +1,24 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Shield, Lock, Mail, ArrowRight, AlertCircle, KeyRound } from 'lucide-react';
-import { createClient } from '@supabase/supabase-js';
-import { setAuthSession, getDefaultWorkspace, UserProfile } from '@/shared/auth';
+import { setAuthSession, getAuthSession, getDefaultWorkspace, UserProfile } from '@/shared/auth';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://deqrfmjzoxlirgfhuouh.supabase.co';
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || 'sb_publishable_bvWbNpkJMLzR0NOgQTOFQQ_C-G9N-2P';
-const supabase = createClient(supabaseUrl, supabaseKey);
-
-// Pre-seeded development accounts reference
+// Pre-seeded development accounts reference (3 canonical roles: admin, stock_manager, salesman)
 const SEEDED_DEV_ACCOUNTS: Record<string, UserProfile & { pass: string }> = {
   'admin@nalkametals.com': {
     id: 'usr-admin-001',
     email: 'admin@nalkametals.com',
     role: 'admin',
     full_name: 'System Administrator',
+    pass: 'password123',
+  },
+  'manager@nalkametals.com': {
+    id: 'usr-mgr-001',
+    email: 'manager@nalkametals.com',
+    role: 'stock_manager',
+    full_name: 'Operations & Stock Manager',
     pass: 'password123',
   },
   'stock@nalkametals.com': {
@@ -36,6 +38,23 @@ const SEEDED_DEV_ACCOUNTS: Record<string, UserProfile & { pass: string }> = {
   },
 };
 
+// Helper to mint a valid 3-part Base64 JWT for client-side dev fallbacks
+function mintDevJwtToken(profile: UserProfile): string {
+  const headerStr = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
+  const payloadStr = btoa(
+    JSON.stringify({
+      user_id: profile.id,
+      email: profile.email,
+      role: profile.role,
+      full_name: profile.full_name,
+      salesman_id: profile.salesman_id,
+      exp: Math.floor(Date.now() / 1000) + 86400,
+    })
+  );
+  const sigStr = btoa('dev-signature');
+  return `${headerStr}.${payloadStr}.${sigStr}`;
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState('');
@@ -43,13 +62,22 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // If already authenticated, redirect to user's canonical workspace automatically
+  useEffect(() => {
+    const session = getAuthSession();
+    if (session && session.user) {
+      const dest = getDefaultWorkspace(session.user.role);
+      router.replace(dest);
+    }
+  }, [router]);
+
+  const executeLogin = async (targetEmail: string, targetPass: string) => {
+    if (loading) return;
     setLoading(true);
     setError(null);
 
-    const cleanEmail = email.trim().toLowerCase();
-    const cleanPassword = password.trim();
+    const cleanEmail = targetEmail.trim().toLowerCase();
+    const cleanPassword = targetPass.trim();
 
     if (!cleanEmail || !cleanPassword) {
       setError('Please enter both email and password.');
@@ -59,83 +87,108 @@ export default function LoginPage() {
 
     try {
       let authenticatedProfile: UserProfile | null = null;
-      let sessionToken = 'nalka-jwt-session-token-' + Date.now();
+      let sessionToken: string | null = null;
+      let isDevFallback = false;
 
-      // 1. Attempt Supabase Auth sign-in
+      // STEP 0: Clear any stale cookies from prior sessions via logout
       try {
-        const { data: authData, error: authErr } = await supabase.auth.signInWithPassword({
-          email: cleanEmail,
-          password: cleanPassword,
+        await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+      } catch {
+        // ignore
+      }
+      document.cookie = 'nalka_token=; path=/; max-age=0';
+      document.cookie = 'nalka_user=; path=/; max-age=0';
+
+      // STEP 1: Always attempt authoritative backend authentication first
+      try {
+        const apiRes = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: cleanEmail, password: cleanPassword }),
+          credentials: 'include', // Ensures backend Set-Cookie header is handled by browser
         });
 
-        if (authData?.session && authData.user) {
-          sessionToken = authData.session.access_token;
-          
-          // Fetch database profile
-          const { data: profileData } = await supabase
-            .from('user_profiles')
-            .select('*')
-            .eq('id', authData.user.id)
-            .maybeSingle();
-
-          if (profileData) {
-            authenticatedProfile = {
-              id: profileData.id,
-              email: profileData.email || cleanEmail,
-              role: profileData.role || 'salesman',
-              full_name: profileData.salesman_name || cleanEmail.split('@')[0],
-              salesman_id: profileData.salesman_id || 'DIRECT',
-            };
-          } else {
-            const meta = authData.user.user_metadata || {};
+        if (apiRes.ok) {
+          const authData = await apiRes.json();
+          if (authData?.access_token && authData?.user) {
+            sessionToken = authData.access_token;
             authenticatedProfile = {
               id: authData.user.id,
-              email: authData.user.email || cleanEmail,
-              role: meta.role || 'salesman',
-              full_name: meta.full_name || cleanEmail.split('@')[0],
-              salesman_id: meta.salesman_id || 'DIRECT',
+              email: authData.user.email,
+              role: authData.user.role,
+              full_name: authData.user.full_name,
+              salesman_id: authData.user.salesman_id,
             };
           }
-        }
-      } catch (e) {
-        // Continue to fallback check
-      }
-
-      // 2. Dev account fallback verification
-      if (!authenticatedProfile) {
-        if (SEEDED_DEV_ACCOUNTS[cleanEmail]) {
-          const match = SEEDED_DEV_ACCOUNTS[cleanEmail];
-          if (cleanPassword === match.pass) {
-            authenticatedProfile = {
-              id: match.id,
-              email: match.email,
-              role: match.role,
-              full_name: match.full_name,
-              salesman_id: match.salesman_id,
-            };
-          } else {
-            setError('Invalid password. Please check your credentials.');
+        } else if (apiRes.status === 401) {
+          if (!SEEDED_DEV_ACCOUNTS[cleanEmail]) {
+            const errData = await apiRes.json().catch(() => null);
+            setError(errData?.detail || 'Invalid email or password.');
             setLoading(false);
             return;
           }
-        } else {
-          // Default profile fallback for valid email
+        }
+      } catch (backendErr) {
+        console.warn('Backend auth unreachable, falling back to dev credentials:', backendErr);
+      }
+
+      // STEP 2: Dev account fallback if backend authentication did not authenticate
+      if (!authenticatedProfile && SEEDED_DEV_ACCOUNTS[cleanEmail]) {
+        const match = SEEDED_DEV_ACCOUNTS[cleanEmail];
+        if (cleanPassword === match.pass) {
           authenticatedProfile = {
-            id: 'usr-' + Date.now(),
-            email: cleanEmail,
-            role: cleanEmail.includes('admin') ? 'admin' : cleanEmail.includes('stock') ? 'stock_manager' : 'salesman',
-            full_name: cleanEmail.split('@')[0].toUpperCase(),
-            salesman_id: 'DIRECT',
+            id: match.id,
+            email: match.email,
+            role: match.role,
+            full_name: match.full_name,
+            salesman_id: match.salesman_id,
           };
+          sessionToken = mintDevJwtToken(authenticatedProfile);
+          isDevFallback = true;
+        } else {
+          setError('Invalid password. Please check your credentials.');
+          setLoading(false);
+          return;
         }
       }
 
-      // Persist session token and profile
-      setAuthSession(sessionToken, authenticatedProfile);
+      // STEP 3: Fallback inference
+      if (!authenticatedProfile) {
+        const derivedRole = cleanEmail.includes('admin')
+          ? 'admin'
+          : cleanEmail.includes('manager') || cleanEmail.includes('stock') || cleanEmail.includes('order')
+          ? 'stock_manager'
+          : 'salesman';
 
-      // Route to user's authorized default workspace
-      const destination = getDefaultWorkspace(authenticatedProfile.role);
-      router.push(destination);
+        authenticatedProfile = {
+          id: 'usr-' + Date.now(),
+          email: cleanEmail,
+          role: derivedRole,
+          full_name: cleanEmail.split('@')[0].toUpperCase(),
+          salesman_id: derivedRole === 'salesman' ? 'TLY-SLM-003' : undefined,
+        };
+        sessionToken = mintDevJwtToken(authenticatedProfile);
+        isDevFallback = true;
+      }
+
+      if (sessionToken && authenticatedProfile) {
+        // Authoritative role determines canonical workspace destination:
+        // admin -> /management
+        // stock_manager / manager -> /operations
+        // salesman / viewer -> /sales
+        const normalizedRole = (authenticatedProfile.role || '').toLowerCase();
+        const destinationWs = normalizedRole === 'admin'
+          ? 'management'
+          : ['manager', 'stock_manager', 'order_manager'].includes(normalizedRole)
+          ? 'operations'
+          : 'sales';
+
+        // Set client-readable cookies (only write nalka_token if dev fallback)
+        setAuthSession(sessionToken, authenticatedProfile, isDevFallback);
+        router.push(`/${destinationWs}`);
+      } else {
+        setError('Authentication failed. Please try again.');
+      }
     } catch (err: any) {
       setError(err?.message || 'Login failed. Please check your credentials.');
     } finally {
@@ -143,11 +196,17 @@ export default function LoginPage() {
     }
   };
 
-  const setQuickDevAccount = (accEmail: string) => {
+  const handleFormSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    executeLogin(email, password);
+  };
+
+  const triggerQuickLogin = (accEmail: string) => {
     const acc = SEEDED_DEV_ACCOUNTS[accEmail];
     if (acc) {
       setEmail(acc.email);
       setPassword(acc.pass);
+      executeLogin(acc.email, acc.pass);
     }
   };
 
@@ -169,7 +228,8 @@ export default function LoginPage() {
           </div>
         )}
 
-        <form onSubmit={handleLogin} className="space-y-4">
+        {/* Credentials Form */}
+        <form onSubmit={handleFormSubmit} className="space-y-4">
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-slate-300">Email Address</label>
             <div className="relative">
@@ -205,38 +265,38 @@ export default function LoginPage() {
             disabled={loading}
             className="w-full py-3 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
           >
-            {loading ? 'Authenticating...' : 'Sign In to Platform'}
+            {loading ? 'Authenticating...' : 'Sign In'}
             <ArrowRight className="w-4 h-4" />
           </button>
         </form>
 
-        {/* Development Quick-Fill Accounts */}
+        {/* Development Quick-Fill & Direct Login Accounts */}
         <div className="pt-4 border-t border-slate-800/80 space-y-2">
           <div className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-400">
             <KeyRound className="w-3.5 h-3.5 text-indigo-400" />
-            <span>Development Quick-Login Accounts:</span>
+            <span>Development Quick-Login:</span>
           </div>
           <div className="grid grid-cols-3 gap-2">
             <button
               type="button"
-              onClick={() => setQuickDevAccount('admin@nalkametals.com')}
-              className="py-1.5 px-2 rounded-lg bg-slate-950 hover:bg-slate-800 border border-slate-800 text-slate-300 text-[10px] font-mono text-center cursor-pointer transition-colors"
+              onClick={() => triggerQuickLogin('admin@nalkametals.com')}
+              className="py-2 px-2 rounded-lg bg-slate-950 hover:bg-slate-800 border border-slate-800 text-slate-300 text-xs font-mono text-center cursor-pointer transition-colors"
             >
               Admin
             </button>
             <button
               type="button"
-              onClick={() => setQuickDevAccount('stock@nalkametals.com')}
-              className="py-1.5 px-2 rounded-lg bg-slate-950 hover:bg-slate-800 border border-slate-800 text-slate-300 text-[10px] font-mono text-center cursor-pointer transition-colors"
+              onClick={() => triggerQuickLogin('manager@nalkametals.com')}
+              className="py-2 px-2 rounded-lg bg-slate-950 hover:bg-slate-800 border border-slate-800 text-slate-300 text-xs font-mono text-center cursor-pointer transition-colors"
             >
-              Operations
+              Manager
             </button>
             <button
               type="button"
-              onClick={() => setQuickDevAccount('sales@nalkametals.com')}
-              className="py-1.5 px-2 rounded-lg bg-slate-950 hover:bg-slate-800 border border-slate-800 text-slate-300 text-[10px] font-mono text-center cursor-pointer transition-colors"
+              onClick={() => triggerQuickLogin('sales@nalkametals.com')}
+              className="py-2 px-2 rounded-lg bg-slate-950 hover:bg-slate-800 border border-slate-800 text-slate-300 text-xs font-mono text-center cursor-pointer transition-colors"
             >
-              Sales Rep
+              Sales
             </button>
           </div>
         </div>

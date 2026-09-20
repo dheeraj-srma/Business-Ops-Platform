@@ -16,26 +16,42 @@ export default function RouteGuard({ workspace, children }: RouteGuardProps) {
   const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
-    const session = getAuthSession();
+    const checkAuth = () => {
+      const session = getAuthSession();
 
-    if (!session || !session.user) {
-      // Unauthenticated -> redirect to login
-      router.push('/login');
-      return;
+      if (!session || !session.user) {
+        // Unauthenticated -> redirect to login
+        router.push('/login');
+        return;
+      }
+
+      const userRole = session.user.role || 'viewer';
+      const isAllowed = hasWorkspaceAccess(workspace, userRole);
+
+      if (!isAllowed) {
+        // Unauthorized -> redirect to user's allowed default workspace
+        const redirectPath = getDefaultWorkspace(userRole);
+        router.push(redirectPath);
+        return;
+      }
+
+      setAuthorized(true);
+      setLoading(false);
+    };
+
+    checkAuth();
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('nalka_auth_change', checkAuth);
+      window.addEventListener('storage', checkAuth);
     }
 
-    const userRole = session.user.role || 'viewer';
-    const isAllowed = hasWorkspaceAccess(workspace, userRole);
-
-    if (!isAllowed) {
-      // Unauthorized -> redirect to user's allowed default workspace
-      const redirectPath = getDefaultWorkspace(userRole);
-      router.push(redirectPath);
-      return;
-    }
-
-    setAuthorized(true);
-    setLoading(false);
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('nalka_auth_change', checkAuth);
+        window.removeEventListener('storage', checkAuth);
+      }
+    };
   }, [workspace, router]);
 
   if (loading || !authorized) {

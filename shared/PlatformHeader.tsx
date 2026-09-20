@@ -2,29 +2,38 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
-import { ShoppingCart, Boxes, BarChart3, LogOut, User, Shield } from 'lucide-react';
-import { getAuthSession, clearAuthSession, hasWorkspaceAccess, UserProfile } from './auth';
+import { usePathname } from 'next/navigation';
+import { ShoppingCart, Boxes, BarChart3, User, Shield } from 'lucide-react';
+import { getAuthSession, hasWorkspaceAccess, UserProfile } from './auth';
 
 export default function PlatformHeader() {
   const pathname = usePathname();
-  const router = useRouter();
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
 
   useEffect(() => {
-    const session = getAuthSession();
-    if (session && session.user) {
-      setUserProfile(session.user);
-    } else {
-      setUserProfile(null);
-    }
-  }, [pathname]);
+    const syncProfile = () => {
+      const session = getAuthSession();
+      if (session && session.user) {
+        setUserProfile(session.user);
+      } else {
+        setUserProfile(null);
+      }
+    };
 
-  const handleLogout = () => {
-    clearAuthSession();
-    setUserProfile(null);
-    router.push('/login');
-  };
+    syncProfile();
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('nalka_auth_change', syncProfile);
+      window.addEventListener('storage', syncProfile);
+    }
+
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('nalka_auth_change', syncProfile);
+        window.removeEventListener('storage', syncProfile);
+      }
+    };
+  }, [pathname]);
 
   const isSalesActive = pathname?.startsWith('/sales');
   const isOperationsActive = pathname?.startsWith('/operations');
@@ -40,7 +49,7 @@ export default function PlatformHeader() {
 
   return (
     <header className="sticky top-0 z-50 w-full bg-slate-900/95 backdrop-blur-md border-b border-slate-800 text-slate-100 shadow-lg">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between">
+      <div className="w-full px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between">
         {/* Brand & Workspace Title */}
         <div className="flex items-center gap-6">
           <Link href="/" className="flex items-center gap-2.5 font-bold text-base tracking-wide text-white hover:opacity-90 transition-opacity">
@@ -96,31 +105,29 @@ export default function PlatformHeader() {
           </nav>
         </div>
 
-        {/* User Info & Actions */}
+        {/* User Info */}
         <div className="flex items-center gap-3">
-          {userProfile && (
-            <div className="hidden sm:flex items-center gap-2 px-3 py-1 bg-slate-800/60 rounded-lg border border-slate-700/50 text-xs">
+          {userProfile ? (
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-800/60 rounded-lg border border-slate-700/50 text-xs">
               <User className="w-3.5 h-3.5 text-indigo-400" />
               <span className="font-medium text-slate-200">{userProfile.full_name || userProfile.email}</span>
               <span className="px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 font-mono text-[10px] uppercase">
                 {userProfile.role}
               </span>
             </div>
+          ) : (
+            <Link
+              href="/login"
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-md transition-all cursor-pointer"
+            >
+              <span>Sign In</span>
+            </Link>
           )}
-
-          <button
-            onClick={handleLogout}
-            title="Log out"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 text-xs font-semibold transition-all cursor-pointer"
-          >
-            <LogOut className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Logout</span>
-          </button>
         </div>
       </div>
 
       {/* Mobile Permission-Aware Nav Bar */}
-      <div className="flex md:hidden border-t border-slate-800 px-2 py-1.5 bg-slate-950 overflow-x-auto gap-1">
+      <div className="flex md:hidden border-t border-slate-800 px-4 sm:px-6 py-1.5 bg-slate-950 overflow-x-auto gap-1">
         {canAccessSales && (
           <Link
             href="/sales"
