@@ -38,6 +38,7 @@ from routers import (
     tally_router,
     salesman_router,
     geography_router,
+    settings_router,
 )
 
 logging.basicConfig(
@@ -146,6 +147,7 @@ app.include_router(webhook_router.router)
 app.include_router(tally_router.router)
 app.include_router(salesman_router.router)
 app.include_router(geography_router.router)
+app.include_router(settings_router.router)
 
 # ─── Health & Database Readiness Endpoints ────────────────────────────────────
 @app.get("/health", tags=["Observability"])
@@ -153,7 +155,7 @@ app.include_router(geography_router.router)
 @app.get("/api/health", tags=["Observability"])
 def liveness():
     return {
-        "status": "ok",
+        "status": "healthy",
         "service": "nalka-metals-api",
         "architecture": "Service/Repository/Router (Centralized & Admin Control Plane)",
         "timestamp": datetime.utcnow().isoformat(),
@@ -176,7 +178,7 @@ def database_health():
             error_msg = str(exc)
 
     return {
-        "status": "ok" if connected else "degraded",
+        "status": "ready" if connected else "degraded",
         "database": {
             "connected": connected,
             "error": error_msg
