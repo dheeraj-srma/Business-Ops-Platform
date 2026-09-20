@@ -22,6 +22,7 @@ import { supabase } from '../lib/supabaseClient';
 import { generateOrderPDF } from '../utils/pdfGenerator';
 import { downloadOrderAsJSON, type OrderPayload } from '../utils/buildOrder';
 import type { PDFOrderData, PDFOrderItem } from '../types';
+import { listOrders, getOrder } from '../../../../shared/api/orders';
 
 interface OrderItemRow {
   id?: number | string;
@@ -92,7 +93,72 @@ export default function SalesmanOrdersPanel({
     else setRefreshing(true);
 
     try {
-      // 1. Fetch order headers
+      // 1. Central Backend Read Attempt via listOrders API
+      try {
+        const apiRes = await listOrders({
+          page: 1,
+          page_size: 200,
+          salesman_id: salesmanId || undefined,
+        });
+
+        if (apiRes && Array.isArray(apiRes.items)) {
+          // Fetch details for each order header if line items missing
+          const detailedOrders: OrderHeaderRow[] = await Promise.all(
+            apiRes.items.map(async (header) => {
+              try {
+                const detail = await getOrder(header.order_id);
+                return {
+                  order_id: detail.order_id,
+                  salesman_id: detail.salesman_id || salesmanId || 'SLS-001',
+                  salesman_name: detail.salesman_name,
+                  shop_name: detail.shop_name,
+                  location_id: detail.location_id || '',
+                  city: detail.city || '',
+                  state: detail.state || '',
+                  item_count: detail.item_count,
+                  total_amount: detail.total_amount,
+                  status: detail.status,
+                  notes: detail.notes || '',
+                  created_at: detail.created_at,
+                  items: (detail.items || []).map((it) => ({
+                    id: it.id,
+                    order_id: it.order_id,
+                    sku: it.sku || '',
+                    item_name: it.item_name,
+                    category: it.category,
+                    quantity: it.quantity,
+                    price: it.price,
+                    total_price: it.total_price,
+                  })),
+                };
+              } catch {
+                return {
+                  order_id: header.order_id,
+                  salesman_id: header.salesman_id || salesmanId || 'SLS-001',
+                  salesman_name: header.salesman_name,
+                  shop_name: header.shop_name,
+                  location_id: header.location_id || '',
+                  city: header.city || '',
+                  state: header.state || '',
+                  item_count: header.item_count,
+                  total_amount: header.total_amount,
+                  status: header.status,
+                  notes: header.notes || '',
+                  created_at: header.created_at,
+                  items: [],
+                };
+              }
+            })
+          );
+
+          setOrders(detailedOrders);
+          return;
+        }
+      } catch (centralErr) {
+        console.warn('[SalesmanOrdersPanel] Central FastAPI order read fallback to direct Supabase:', centralErr);
+      }
+
+      // Fallback: Direct Supabase fetch
       const { data: orderHeaders, error: headerErr } = await supabase
         .from('pending_orders')
         .select('*')
@@ -101,7 +167,6 @@ export default function SalesmanOrdersPanel({
 
       if (headerErr) throw headerErr;
 
-      // Filter by salesman if specified
       const filteredHeaders = (orderHeaders || []).filter((o) => {
         if (!salesmanId && !salesmanName) return true;
         const matchId = salesmanId && o.salesman_id?.toLowerCase() === salesmanId.toLowerCase();
@@ -113,7 +178,6 @@ export default function SalesmanOrdersPanel({
 
       let allItems: OrderItemRow[] = [];
       if (orderIds.length > 0) {
-        // Fetch line items for these orders
         const { data: itemRows, error: itemErr } = await supabase
           .from('pending_order_items')
           .select('*')
@@ -124,7 +188,6 @@ export default function SalesmanOrdersPanel({
         }
       }
 
-      // Group items under headers
       const itemMap = new Map<string, OrderItemRow[]>();
       allItems.forEach((it) => {
         const arr = itemMap.get(it.order_id) || [];

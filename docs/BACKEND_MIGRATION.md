@@ -133,7 +133,9 @@ Migration is executed strictly domain-by-domain starting with low-risk read oper
 | **3d. Inventory (Reservations)** | `POST /api/orders/reserve` | Sales | High | **`CENTRALIZED`** (Phase 5C.5) |
 | **3e. Inventory (Returns)** | `POST /api/returns/restock` | Operations | High | **`CENTRALIZED`** (Phase 5C.6) |
 | **3f. Inventory (Stock-Out / Processing)** | `POST /api/orders/{id}/process`, `POST /api/inventory/stock-out` | Operations | High | **`CENTRALIZED`** (Phase 5C.7) |
-| **4. Orders (General Reads & Edits)** | `GET /api/orders`, `PUT /api/orders/{id}` | Sales, Operations, Management | High | **`LEGACY`** (Listing/History/Editing) |
+| **4a. Orders (Reads & History)** | `GET /api/orders`, `GET /api/orders/{id}` | Sales, Operations, Management | Medium | **`CENTRALIZED`** (Phase 6A) |
+| **4b. Orders (Editing)** | `POST /api/orders/update` | Operations | High | **`LEGACY`** |
+| **4c. Orders (Cancellation & Rejection)** | `POST /api/orders/reject`, `POST /api/orders/rollback-reject` | Operations | High | **`LEGACY`** |
 | **5. Returns (Restocking)** | `GET /api/returns`, `POST /api/returns` | Operations, Management | Medium | **`CENTRALIZED`** (Phase 5C.6) |
 | **6. Analytics** | `GET /api/analytics/*`, `GET /api/dashboard/*` | Management | Low | **`LEGACY`** |
 | **7. Tally ERP** | Express Server `/api/tally/*` (Port 9000) | Operations | High | **`LEGACY / EXISTING SERVICE`** |

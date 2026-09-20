@@ -1,14 +1,22 @@
 # backend/routers/order_router.py
 import logging
-from typing import List, Dict, Any
-from fastapi import APIRouter, HTTPException, Depends
+from typing import List, Dict, Any, Optional
+from fastapi import APIRouter, HTTPException, Depends, Query
 from schemas.orders import (
     OrderCreateSchema,
     BulkOrderCreateSchema,
     OrderReservationRequest,
-    OrderReservationResponse
+    OrderReservationResponse,
+    OrderProcessRequest,
+    OrderProcessResponse
+)
+from schemas.order_schemas import (
+    OrderSummarySchema,
+    OrderDetailSchema,
+    OrderListResponseSchema
 )
 from services.order_service import OrderService
+from services.order_read_service import OrderReadService
 from auth import require_role, require_permission
 
 logger = logging.getLogger("order_router")
@@ -44,13 +52,41 @@ def reserve_order(
         logger.error(f"Error executing order reservation: {exc}")
         raise HTTPException(status_code=500, detail=str(exc))
 
-@router.get("")
-def list_orders():
+@router.get(
+    "",
+    summary="List orders with pagination, search, and filtering",
+    description="Returns paginated order summaries. Supports search, status, salesman, customer, date range filtering, and deterministic sorting."
+)
+def list_orders(
+    page: int = Query(1, ge=1, description="Page number"),
+    page_size: int = Query(50, ge=1, le=200, description="Items per page"),
+    search: Optional[str] = Query(None, description="Search term for order ID, customer, or salesman"),
+    status: Optional[str] = Query(None, description="Order status filter"),
+    salesman_id: Optional[str] = Query(None, description="Salesman ID filter"),
+    customer_id: Optional[str] = Query(None, description="Customer / Shop name filter"),
+    date_from: Optional[str] = Query(None, description="Created at start date (ISO format)"),
+    date_to: Optional[str] = Query(None, description="Created at end date (ISO format)"),
+    sort_by: str = Query("created_at", description="Field to sort by (strict allowlist)"),
+    sort_dir: str = Query("desc", description="Sort direction (asc, desc)"),
+    current_user: dict = Depends(require_permission("orders.view"))
+):
     try:
-        return OrderService.list_orders()
+        return OrderReadService.list_orders(
+            current_user=current_user,
+            page=page,
+            page_size=page_size,
+            search=search,
+            status=status,
+            salesman_id=salesman_id,
+            customer_id=customer_id,
+            date_from=date_from,
+            date_to=date_to,
+            sort_by=sort_by,
+            sort_dir=sort_dir
+        )
     except Exception as exc:
         logger.error(f"Error listing orders: {exc}")
-        return []
+        raise HTTPException(status_code=500, detail=str(exc))
 
 @router.get("/pending")
 def pending_orders():
@@ -59,6 +95,26 @@ def pending_orders():
     except Exception as exc:
         logger.error(f"Error listing pending orders: {exc}")
         return []
+
+@router.get(
+    "/{order_id}",
+    response_model=OrderDetailSchema,
+    summary="Get order detail by ID",
+    description="Returns detailed order header and line items with salesman visibility checks."
+)
+def get_order_by_id(
+    order_id: str,
+    current_user: dict = Depends(require_permission("orders.view"))
+):
+    try:
+        return OrderReadService.get_order_by_id(order_id, current_user)
+    except ValueError as val_err:
+        raise HTTPException(status_code=404, detail=str(val_err))
+    except PermissionError as perm_err:
+        raise HTTPException(status_code=403, detail=str(perm_err))
+    except Exception as exc:
+        logger.error(f"Error retrieving order '{order_id}': {exc}")
+        raise HTTPException(status_code=500, detail=str(exc))
 
 @router.post("")
 def create_order(
@@ -103,16 +159,6 @@ def reject_order(
     except Exception as exc:
         logger.error(f"Error rejecting order: {exc}")
         raise HTTPException(status_code=400, detail=str(exc))
-
-
-from schemas.orders import (
-    OrderCreateSchema,
-    BulkOrderCreateSchema,
-    OrderReservationRequest,
-    OrderReservationResponse,
-    OrderProcessRequest,
-    OrderProcessResponse
-)
 
 @router.post(
     "/{order_id}/process",
@@ -193,4 +239,3 @@ def transition_order_status(
     except Exception as exc:
         logger.error(f"Error transitioning status for order {order_id}: {exc}")
         raise HTTPException(status_code=500, detail=str(exc))
-
