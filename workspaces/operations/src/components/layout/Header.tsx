@@ -2,17 +2,17 @@ import React, { useState } from 'react';
 import {
   AlertTriangle,
   RefreshCw,
-  UserCheck,
-  ShieldCheck,
   Menu,
   Sun,
   Moon,
   HelpCircle,
   Database,
+  LogOut,
 } from 'lucide-react';
 import { UserRole } from '../../types';
 import { cn } from '../../lib/utils';
 import { useTheme } from '../../context/ThemeContext';
+import { clearAuthSession } from '@/shared/auth';
 
 interface HeaderProps {
   currentTabTitle?: string;
@@ -20,7 +20,7 @@ interface HeaderProps {
   role: UserRole;
   allowNegativeOrders?: boolean;
   onToggleStockOverride?: (enabled: boolean) => void | Promise<void>;
-  onSwitchRole: (role: UserRole) => void;
+  onSwitchRole?: (role: UserRole) => void;
   onOpenStockIn?: () => void;
   onOpenStockOut?: () => void;
   onOpenStockAdjustment?: () => void;
@@ -46,8 +46,25 @@ export const Header: React.FC<HeaderProps> = ({
   isRefreshing = false,
   onOpenMobileMenu,
 }) => {
-  const isManager = role === 'manager';
+  const isManager = (() => {
+    if (role === 'manager' || (role as string) === 'stock_manager' || (role as string) === 'admin') return true;
+    try {
+      const session = getAuthSession();
+      const sRole = session?.user?.role;
+      if (sRole === 'manager' || sRole === 'stock_manager' || sRole === 'admin') return true;
+    } catch {}
+    return false;
+  })();
   const { isDark, toggleTheme } = useTheme();
+
+  const handleLogout = async () => {
+    try {
+      await clearAuthSession();
+    } catch (err) {
+      console.warn('Logout error:', err);
+    }
+    window.location.href = '/login';
+  };
 
   // Stock Override Warning Confirmation Modal State
   const [isOverrideModalOpen, setIsOverrideModalOpen] = useState(false);
@@ -78,6 +95,8 @@ export const Header: React.FC<HeaderProps> = ({
     try {
       await onToggleStockOverride?.(true);
       setIsOverrideModalOpen(false);
+    } catch (err) {
+      console.error('Failed to enable override:', err);
     } finally {
       setIsTogglingOverride(false);
     }
@@ -160,12 +179,17 @@ export const Header: React.FC<HeaderProps> = ({
             <RefreshCw className={cn('w-4 h-4', isRefreshing && 'animate-spin text-indigo-600 dark:text-indigo-400')} />
           </button>
 
-          {/* STOCK OVERRIDE TOGGLE & STATUS CAPSULE (Replaces previous quick buttons) */}
+          {/* STOCK OVERRIDE TOGGLE & STATUS CAPSULE */}
           <div className="flex items-center border-r border-slate-200 dark:border-slate-700 pr-1.5 sm:pr-2.5">
             {allowNegativeOrders ? (
               // ACTIVE INDICATOR & TOGGLE
-              <div className="flex items-center gap-2 px-2.5 py-1 sm:py-1.5 rounded-lg bg-amber-500/10 dark:bg-amber-950/40 border border-amber-500/30 dark:border-amber-500/40 shadow-xs transition-all">
-                <div className="flex items-center gap-1.5">
+              <div
+                id="btn-stock-override-capsule"
+                onClick={handleToggleClick}
+                data-tooltip="Stock Override is ACTIVE. Salesmen can place orders for zero/negative stock items. (Click to Disable)"
+                className="flex items-center gap-2 px-2.5 py-1 sm:py-1.5 rounded-lg bg-amber-500/10 dark:bg-amber-950/40 border border-amber-500/30 dark:border-amber-500/40 shadow-xs transition-all cursor-pointer select-none hover:bg-amber-500/20 active:scale-95"
+              >
+                <div className="flex items-center gap-1.5 pointer-events-none">
                   <span className="relative flex h-2.5 w-2.5">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
                     <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
@@ -177,18 +201,26 @@ export const Header: React.FC<HeaderProps> = ({
 
                 <button
                   id="btn-stock-override-toggle"
-                  onClick={handleToggleClick}
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleToggleClick();
+                  }}
                   disabled={isTogglingOverride}
-                  data-tooltip="Stock Override is ACTIVE. Salesmen can place orders for zero/negative stock items. (Click to Disable)"
-                  className="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-amber-500 transition-colors duration-200 ease-in-out focus:outline-hidden focus:ring-2 focus:ring-amber-400 active:scale-95"
+                  className="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-amber-500 transition-colors duration-200 ease-in-out focus:outline-hidden focus:ring-2 focus:ring-amber-400"
                 >
                   <span className="translate-x-4 pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out" />
                 </button>
               </div>
             ) : (
               // INACTIVE TOGGLE
-              <div className="flex items-center gap-2 px-2.5 py-1 sm:py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 transition-all">
-                <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
+              <div
+                id="btn-stock-override-capsule"
+                onClick={handleToggleClick}
+                data-tooltip="Enable Stock Override (Allow salesmen to place orders for zero/negative stock)"
+                className="flex items-center gap-2 px-2.5 py-1 sm:py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 transition-all cursor-pointer select-none hover:bg-slate-200/80 dark:hover:bg-slate-700/80 active:scale-95"
+              >
+                <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400 pointer-events-none">
                   <span className="h-2.5 w-2.5 rounded-full bg-slate-300 dark:bg-slate-600"></span>
                   <span className="text-[11px] sm:text-xs font-medium whitespace-nowrap">
                     Stock Override
@@ -197,10 +229,13 @@ export const Header: React.FC<HeaderProps> = ({
 
                 <button
                   id="btn-stock-override-toggle"
-                  onClick={handleToggleClick}
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleToggleClick();
+                  }}
                   disabled={isTogglingOverride}
-                  data-tooltip="Enable Stock Override (Allow salesmen to place orders for zero/negative stock)"
-                  className="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-slate-300 dark:bg-slate-600 transition-colors duration-200 ease-in-out focus:outline-hidden focus:ring-2 focus:ring-indigo-500 hover:bg-slate-400 dark:hover:bg-slate-500 active:scale-95"
+                  className="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-slate-300 dark:bg-slate-600 transition-colors duration-200 ease-in-out focus:outline-hidden focus:ring-2 focus:ring-indigo-500 hover:bg-slate-400 dark:hover:bg-slate-500"
                 >
                   <span className="translate-x-0 pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out" />
                 </button>
@@ -208,37 +243,16 @@ export const Header: React.FC<HeaderProps> = ({
             )}
           </div>
 
-          {/* Role Toggle Capsule */}
-          <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs">
-            <button
-              id="btn-role-manager"
-              onClick={() => onSwitchRole('manager')}
-              data-tooltip="Manager Role (Full access to prices, edits, & exports)"
-              className={cn(
-                'flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-md transition-all font-medium cursor-pointer text-[11px] sm:text-xs',
-                isManager
-                  ? 'bg-white dark:bg-slate-700 text-indigo-700 dark:text-indigo-300 shadow-2xs font-semibold'
-                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
-              )}
-            >
-              <ShieldCheck className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Manager</span>
-            </button>
-            <button
-              id="btn-role-staff"
-              onClick={() => onSwitchRole('staff')}
-              data-tooltip="Staff Role (Operational movements & view-only catalog)"
-              className={cn(
-                'flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-md transition-all font-medium cursor-pointer text-[11px] sm:text-xs',
-                !isManager
-                  ? 'bg-white dark:bg-slate-700 text-indigo-700 dark:text-indigo-300 shadow-2xs font-semibold'
-                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
-              )}
-            >
-              <UserCheck className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Staff</span>
-            </button>
-          </div>
+          {/* Logout Button */}
+          <button
+            id="btn-header-logout"
+            onClick={handleLogout}
+            title="Sign out of Operations Workspace"
+            className="p-1.5 sm:px-2.5 sm:py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800/80 hover:bg-rose-50 dark:hover:bg-rose-950/40 border border-slate-200 dark:border-slate-700 hover:border-rose-200 dark:hover:border-rose-800/60 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition-all cursor-pointer flex items-center gap-1.5 ml-1"
+          >
+            <LogOut className="w-3.5 h-3.5 text-rose-500" />
+            <span className="hidden sm:inline text-xs">Logout</span>
+          </button>
         </div>
       </header>
 

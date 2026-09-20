@@ -27,12 +27,23 @@ import { Product, Category, DashboardStats, AppSettings, UserRole } from './type
 import { api } from './lib/api';
 import { GlobalTooltipProvider } from './components/common/Tooltip';
 import { ScrollToTopButton } from './components/common/ScrollToTopButton';
+import { ThemeProvider } from './context/ThemeContext';
+import { DialogProvider } from './context/DialogContext';
+import { getAuthSession } from '@/shared/auth';
 
 export default function App() {
   // Navigation & Role State
   const [currentTab, setCurrentTab] = useState<string>('dashboard');
   const [lastContentTab, setLastContentTab] = useState<string>('dashboard');
-  const [role, setRole] = useState<UserRole>('manager');
+  const [role, setRole] = useState<UserRole>(() => {
+    try {
+      const session = getAuthSession();
+      if (session?.user?.role === 'staff') return 'staff';
+      return 'manager';
+    } catch {
+      return 'manager';
+    }
+  });
   const [inventoryStatusFilter, setInventoryStatusFilter] = useState<string>('all');
   const [navigationHistory, setNavigationHistory] = useState<Array<{ tab: string; inventoryStatusFilter: string }>>([]);
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState<boolean>(false);
@@ -114,7 +125,24 @@ export default function App() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [settings, setSettings] = useState<AppSettings | null>(null);
+  const [settings, setSettings] = useState<AppSettings>({
+    companyName: 'Nalka Metals Pvt Ltd',
+    company_name: 'Nalka Metals Pvt Ltd',
+    tallyCompanyName: 'Nalka Metals (2026-27)',
+    tally_company_name: 'Nalka Metals (2026-27)',
+    defaultCriticalThreshold: 5,
+    default_critical_threshold: 5,
+    defaultMinimumThreshold: 20,
+    default_minimum_threshold: 20,
+    defaultCriticalStock: 5,
+    defaultMinimumStock: 20,
+    tallyXmlGuidPrefix: 'NALKA-STOCK-',
+    tally_xml_guid_prefix: 'NALKA-STOCK-',
+    allow_negative_orders: false,
+    allowNegativeOrders: false,
+    lastExportCheckpoint: new Date().toISOString(),
+    last_export_checkpoint: new Date().toISOString(),
+  });
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isBackupModalOpen, setIsBackupModalOpen] = useState<boolean>(false);
 
@@ -221,8 +249,11 @@ export default function App() {
       if (statsRes) {
         setStats((statsRes as any).stats || statsRes);
       }
-      if (settingsRes) {
-        setSettings(settingsRes.settings);
+      if (settingsRes?.settings) {
+        setSettings((prev) => ({
+          ...prev,
+          ...settingsRes.settings,
+        }));
       }
 
       setPendingOrdersCount((ordersRes as any)?.orders?.length || 0);
@@ -298,18 +329,30 @@ export default function App() {
   };
 
   const handleToggleStockOverride = async (enabled: boolean) => {
+    // Optimistically update the UI state immediately
+    setSettings((prev) => ({
+      ...prev,
+      allow_negative_orders: enabled,
+      allowNegativeOrders: enabled,
+    }));
+
     try {
       const res = await api.setStockOverride(enabled);
-      setSettings((prev) =>
-        prev
-          ? {
-              ...prev,
-              allow_negative_orders: res.allow_negative_orders,
-              allowNegativeOrders: res.allow_negative_orders,
-            }
-          : prev
-      );
+      const isAllowed = res?.allow_negative_orders ?? res?.allowNegativeOrders ?? enabled;
+      setSettings((prev) => ({
+        ...prev,
+        ...(res?.settings || {}),
+        allow_negative_orders: isAllowed,
+        allowNegativeOrders: isAllowed,
+      }));
     } catch (err: any) {
+      console.error('Failed to update stock override setting:', err);
+      // Revert optimistic update on failure
+      setSettings((prev) => ({
+        ...prev,
+        allow_negative_orders: !enabled,
+        allowNegativeOrders: !enabled,
+      }));
       alert(err.message || 'Failed to update stock override setting.');
     }
   };
@@ -384,255 +427,258 @@ export default function App() {
   }, [currentTabMeta.title]);
 
   return (
-    <GlobalTooltipProvider>
-      <div className="h-screen w-screen overflow-hidden flex bg-slate-100 dark:bg-slate-950 antialiased text-slate-800 dark:text-slate-100 selection:bg-indigo-500 selection:text-white transition-colors">
-      {/* Navigation Sidebar */}
-      <Sidebar
-        currentTab={currentTab}
-        onSelectTab={(tab) => navigateTo(tab, 'all')}
-        lowStockCount={lowStockCount}
-        criticalStockCount={criticalStockCount}
-        pendingOrdersCount={pendingOrdersCount}
-        tallyConnected={tallyConnected}
-        role={role}
-        isCollapsed={isSidebarCollapsed}
-        onToggleCollapse={handleToggleSidebar}
-        isMobileOpen={isMobileDrawerOpen}
-        onCloseMobile={() => setIsMobileDrawerOpen(false)}
-        onOpenStockIn={() => handleOpenStockIn()}
-        onOpenStockOut={() => handleOpenStockOut()}
-        onOpenStockAdjustment={() => handleOpenStockAdjustment()}
-        onOpenNewProduct={handleOpenNewProduct}
-        onOpenCustomerReturn={() => handleOpenCustomerReturn()}
-      />
-
-      {/* Right Content Area (Header + Scrollable Main Content) */}
-      <div className="flex-1 flex flex-col h-screen min-w-0 overflow-hidden">
-        {/* Top Header */}
-        <Header
-          currentTabTitle={currentTabMeta.title}
-          subtitle={currentTabMeta.subtitle}
-          role={role}
-          allowNegativeOrders={
-            settings?.allow_negative_orders ?? (settings as any)?.allowNegativeOrders ?? false
-          }
-          onToggleStockOverride={handleToggleStockOverride}
-          onSwitchRole={setRole}
-          onOpenStockIn={() => handleOpenStockIn()}
-          onOpenStockOut={() => handleOpenStockOut()}
-          onOpenStockAdjustment={() => handleOpenStockAdjustment()}
-          onOpenNewProduct={handleOpenNewProduct}
-          onOpenTallyExport={() => navigateTo('tally')}
-          onOpenHelp={() => navigateTo('help')}
-          onOpenBackup={() => setIsBackupModalOpen(true)}
-          onRefresh={fetchData}
-          isRefreshing={isLoading}
-          onOpenMobileMenu={() => setIsMobileDrawerOpen(true)}
-        />
-
-        {/* Dynamic Main Workspace Area (Only this content area scrolls) */}
-        <main
-          ref={mainScrollRef}
-          className="flex-1 overflow-y-auto overflow-x-hidden bg-slate-50/50 dark:bg-slate-900/50 pb-16 transition-colors relative"
-        >
-          {activeContentTab === 'dashboard' && (
-            <DashboardView
-              stats={stats}
-              isLoading={isLoading}
-              onOpenProductDetail={handleOpenProductDetail}
-              onOpenStockIn={handleOpenStockIn}
-              onOpenStockOut={handleOpenStockOut}
-              onNavigateToInventory={handleNavigateToInventory}
-              onNavigateToTransactions={() => navigateTo('transactions')}
-              onNavigateToTally={() => navigateTo('tally')}
-              onNavigateToRestockPlanner={() => navigateTo('restock_planner')}
-            />
-          )}
-
-          {(activeContentTab === 'pending_orders' || activeContentTab === 'pending-orders') && (
-            <PendingOrdersView
-              products={products}
-              onRefreshProducts={fetchData}
-              onGoBack={handleGoBack}
-            />
-          )}
-
-          {activeContentTab === 'inventory' && (
-            <InventoryView
-              products={products}
-              categories={categories}
+    <ThemeProvider>
+      <DialogProvider>
+        <GlobalTooltipProvider>
+          <div className="h-screen w-screen overflow-hidden flex bg-slate-100 dark:bg-slate-950 antialiased text-slate-800 dark:text-slate-100 selection:bg-indigo-500 selection:text-white transition-colors">
+            {/* Navigation Sidebar */}
+            <Sidebar
+              currentTab={currentTab}
+              onSelectTab={(tab) => navigateTo(tab, 'all')}
+              lowStockCount={lowStockCount}
+              criticalStockCount={criticalStockCount}
+              pendingOrdersCount={pendingOrdersCount}
+              tallyConnected={tallyConnected}
               role={role}
-              isLoading={isLoading}
-              onRefresh={fetchData}
+              isCollapsed={isSidebarCollapsed}
+              onToggleCollapse={handleToggleSidebar}
+              isMobileOpen={isMobileDrawerOpen}
+              onCloseMobile={() => setIsMobileDrawerOpen(false)}
+              onOpenStockIn={() => handleOpenStockIn()}
+              onOpenStockOut={() => handleOpenStockOut()}
+              onOpenStockAdjustment={() => handleOpenStockAdjustment()}
               onOpenNewProduct={handleOpenNewProduct}
-              onOpenEditProduct={handleOpenEditProduct}
-              onOpenProductDetail={handleOpenProductDetail}
+              onOpenCustomerReturn={() => handleOpenCustomerReturn()}
+            />
+
+            {/* Right Content Area (Header + Scrollable Main Content) */}
+            <div className="flex-1 flex flex-col h-screen min-w-0 overflow-hidden">
+              {/* Top Header */}
+              <Header
+                currentTabTitle={currentTabMeta.title}
+                subtitle={currentTabMeta.subtitle}
+                role={role}
+                allowNegativeOrders={
+                  settings?.allow_negative_orders ?? (settings as any)?.allowNegativeOrders ?? false
+                }
+                onToggleStockOverride={handleToggleStockOverride}
+                onOpenStockIn={() => handleOpenStockIn()}
+                onOpenStockOut={() => handleOpenStockOut()}
+                onOpenStockAdjustment={() => handleOpenStockAdjustment()}
+                onOpenNewProduct={handleOpenNewProduct}
+                onOpenTallyExport={() => navigateTo('tally')}
+                onOpenHelp={() => navigateTo('help')}
+                onOpenBackup={() => setIsBackupModalOpen(true)}
+                onRefresh={fetchData}
+                isRefreshing={isLoading}
+                onOpenMobileMenu={() => setIsMobileDrawerOpen(true)}
+              />
+
+              {/* Dynamic Main Workspace Area (Only this content area scrolls) */}
+              <main
+                ref={mainScrollRef}
+                className="flex-1 overflow-y-auto overflow-x-hidden bg-slate-50/50 dark:bg-slate-900/50 pb-16 transition-colors relative"
+              >
+                {activeContentTab === 'dashboard' && (
+                  <DashboardView
+                    stats={stats}
+                    isLoading={isLoading}
+                    onOpenProductDetail={handleOpenProductDetail}
+                    onOpenStockIn={handleOpenStockIn}
+                    onOpenStockOut={handleOpenStockOut}
+                    onNavigateToInventory={handleNavigateToInventory}
+                    onNavigateToTransactions={() => navigateTo('transactions')}
+                    onNavigateToTally={() => navigateTo('tally')}
+                    onNavigateToRestockPlanner={() => navigateTo('restock_planner')}
+                  />
+                )}
+
+                {(activeContentTab === 'pending_orders' || activeContentTab === 'pending-orders') && (
+                  <PendingOrdersView
+                    products={products}
+                    onRefreshProducts={fetchData}
+                    onGoBack={handleGoBack}
+                  />
+                )}
+
+                {activeContentTab === 'inventory' && (
+                  <InventoryView
+                    products={products}
+                    categories={categories}
+                    role={role}
+                    isLoading={isLoading}
+                    onRefresh={fetchData}
+                    onOpenNewProduct={handleOpenNewProduct}
+                    onOpenEditProduct={handleOpenEditProduct}
+                    onOpenProductDetail={handleOpenProductDetail}
+                    onOpenStockIn={handleOpenStockIn}
+                    onOpenStockOut={handleOpenStockOut}
+                    onOpenStockAdjustment={handleOpenStockAdjustment}
+                    initialStatusFilter={inventoryStatusFilter}
+                    onGoBack={handleGoBack}
+                  />
+                )}
+
+                {activeContentTab === 'restock_planner' && (
+                  <RestockPlannerView
+                    categories={categories}
+                    role={role}
+                    onOpenStockIn={handleOpenStockIn}
+                    onOpenProductDetail={handleOpenProductDetail}
+                    onRefreshAll={fetchData}
+                  />
+                )}
+
+                {activeContentTab === 'transactions' && (
+                  <TransactionHistoryView
+                    categories={categories}
+                    onOpenProductDetail={handleOpenProductDetail}
+                    onGoBack={handleGoBack}
+                  />
+                )}
+
+                {activeContentTab === 'categories' && (
+                  <CategoriesView
+                    categories={categories}
+                    products={products}
+                    role={role}
+                    onOpenNewCategory={handleOpenNewCategory}
+                    onOpenEditCategory={handleOpenEditCategory}
+                    onOpenProductDetail={handleOpenProductDetail}
+                    onOpenStockIn={handleOpenStockIn}
+                    onOpenStockOut={handleOpenStockOut}
+                    onOpenEditProduct={handleOpenEditProduct}
+                    onOpenNewProduct={handleOpenNewProduct}
+                    onFilterByCategory={handleFilterByCategory}
+                    onGoBack={handleGoBack}
+                  />
+                )}
+
+                {activeContentTab === 'coupons' && (
+                  <CouponsView
+                    role={role}
+                    products={products}
+                    categories={categories}
+                    onGoBack={handleGoBack}
+                  />
+                )}
+
+                {activeContentTab === 'tally-sync' && (
+                  <TallySyncDashboard
+                    products={products}
+                    onGoBack={handleGoBack}
+                  />
+                )}
+
+                {(activeContentTab === 'tally-import' || activeContentTab === 'tally_import') && (
+                  <div className="w-full px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
+                    <TallyImportPanel
+                      products={products}
+                      onRefreshAll={fetchData}
+                    />
+                  </div>
+                )}
+
+                {activeContentTab === 'tally' && <TallyExportView onGoBack={handleGoBack} />}
+
+                {(activeContentTab === 'help' || activeContentTab === 'manual') && <HelpManualView />}
+
+                {activeContentTab === 'settings' && (
+                  <SettingsView
+                    settings={settings}
+                    role={role}
+                    products={products}
+                    categories={categories}
+                    onRefresh={fetchData}
+                    onGoBack={handleGoBack}
+                    onOpenProductDetail={handleOpenProductDetail}
+                  />
+                )}
+
+                {/* Floating Scroll to Top button */}
+                <ScrollToTopButton containerRef={mainScrollRef} />
+              </main>
+            </div>
+
+            {/* Modal Dialogs */}
+            <StockInModal
+              isOpen={isStockInOpen}
+              onClose={() => {
+                setIsStockInOpen(false);
+                setSelectedProductId(undefined);
+              }}
+              onSuccess={fetchData}
+              products={products}
+              initialProductId={selectedProductId}
+              onViewInLedger={() => navigateTo('transactions')}
+            />
+
+            <StockOutModal
+              isOpen={isStockOutOpen}
+              onClose={() => {
+                setIsStockOutOpen(false);
+                setSelectedProductId(undefined);
+              }}
+              onSuccess={fetchData}
+              products={products}
+              initialProductId={selectedProductId}
+              onViewInLedger={() => navigateTo('transactions')}
+            />
+
+            <StockAdjustmentModal
+              isOpen={isStockAdjustOpen}
+              onClose={() => setIsStockAdjustOpen(false)}
+              onSuccess={fetchData}
+              products={products}
+              initialProductId={selectedProductId}
+            />
+
+            <CustomerReturnModal
+              isOpen={isCustomerReturnOpen}
+              onClose={() => {
+                setIsCustomerReturnOpen(false);
+                setSelectedProductId(undefined);
+              }}
+              onSuccess={fetchData}
+              products={products}
+              initialProductId={selectedProductId}
+              onViewInLedger={() => navigateTo('transactions')}
+            />
+
+            <ProductFormModal
+              isOpen={isProductFormOpen}
+              onClose={() => setIsProductFormOpen(false)}
+              onSuccess={fetchData}
+              categories={categories}
+              editingProduct={editingProduct}
+            />
+
+            <ProductDetailModal
+              isOpen={isProductDetailOpen}
+              onClose={() => setIsProductDetailOpen(false)}
+              productId={selectedProductId || null}
               onOpenStockIn={handleOpenStockIn}
               onOpenStockOut={handleOpenStockOut}
               onOpenStockAdjustment={handleOpenStockAdjustment}
-              initialStatusFilter={inventoryStatusFilter}
-              onGoBack={handleGoBack}
-            />
-          )}
-
-          {activeContentTab === 'restock_planner' && (
-            <RestockPlannerView
-              categories={categories}
-              role={role}
-              onOpenStockIn={handleOpenStockIn}
-              onOpenProductDetail={handleOpenProductDetail}
-              onRefreshAll={fetchData}
-            />
-          )}
-
-          {activeContentTab === 'transactions' && (
-            <TransactionHistoryView
-              categories={categories}
-              onOpenProductDetail={handleOpenProductDetail}
-              onGoBack={handleGoBack}
-            />
-          )}
-
-          {activeContentTab === 'categories' && (
-            <CategoriesView
-              categories={categories}
-              products={products}
-              role={role}
-              onOpenNewCategory={handleOpenNewCategory}
-              onOpenEditCategory={handleOpenEditCategory}
-              onOpenProductDetail={handleOpenProductDetail}
-              onOpenStockIn={handleOpenStockIn}
-              onOpenStockOut={handleOpenStockOut}
               onOpenEditProduct={handleOpenEditProduct}
-              onOpenNewProduct={handleOpenNewProduct}
-              onFilterByCategory={handleFilterByCategory}
-              onGoBack={handleGoBack}
-            />
-          )}
-
-          {activeContentTab === 'coupons' && (
-            <CouponsView
-              role={role}
-              products={products}
-              categories={categories}
-              onGoBack={handleGoBack}
-            />
-          )}
-
-          {activeContentTab === 'tally-sync' && (
-            <TallySyncDashboard
-              products={products}
-              onGoBack={handleGoBack}
-            />
-          )}
-
-          {(activeContentTab === 'tally-import' || activeContentTab === 'tally_import') && (
-            <div className="w-full px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
-              <TallyImportPanel
-                products={products}
-                onRefreshAll={fetchData}
-              />
-            </div>
-          )}
-
-          {activeContentTab === 'tally' && <TallyExportView onGoBack={handleGoBack} />}
-
-          {(activeContentTab === 'help' || activeContentTab === 'manual') && <HelpManualView />}
-
-          {activeContentTab === 'settings' && (
-            <SettingsView
-              settings={settings}
-              role={role}
-              products={products}
-              categories={categories}
               onRefresh={fetchData}
-              onGoBack={handleGoBack}
-              onOpenProductDetail={handleOpenProductDetail}
+              isManager={role === 'manager' || role === 'admin'}
             />
-          )}
 
-          {/* Floating Scroll to Top button */}
-          <ScrollToTopButton containerRef={mainScrollRef} />
-        </main>
-      </div>
+            <CategoryModal
+              isOpen={isCategoryFormOpen}
+              onClose={() => setIsCategoryFormOpen(false)}
+              onSuccess={fetchData}
+              editingCategory={editingCategory}
+            />
 
-      {/* Modal Dialogs */}
-      <StockInModal
-        isOpen={isStockInOpen}
-        onClose={() => {
-          setIsStockInOpen(false);
-          setSelectedProductId(undefined);
-        }}
-        onSuccess={fetchData}
-        products={products}
-        initialProductId={selectedProductId}
-        onViewInLedger={() => navigateTo('transactions')}
-      />
-
-      <StockOutModal
-        isOpen={isStockOutOpen}
-        onClose={() => {
-          setIsStockOutOpen(false);
-          setSelectedProductId(undefined);
-        }}
-        onSuccess={fetchData}
-        products={products}
-        initialProductId={selectedProductId}
-        onViewInLedger={() => navigateTo('transactions')}
-      />
-
-      <StockAdjustmentModal
-        isOpen={isStockAdjustOpen}
-        onClose={() => setIsStockAdjustOpen(false)}
-        onSuccess={fetchData}
-        products={products}
-        initialProductId={selectedProductId}
-      />
-
-      <CustomerReturnModal
-        isOpen={isCustomerReturnOpen}
-        onClose={() => {
-          setIsCustomerReturnOpen(false);
-          setSelectedProductId(undefined);
-        }}
-        onSuccess={fetchData}
-        products={products}
-        initialProductId={selectedProductId}
-        onViewInLedger={() => navigateTo('transactions')}
-      />
-
-      <ProductFormModal
-        isOpen={isProductFormOpen}
-        onClose={() => setIsProductFormOpen(false)}
-        onSuccess={fetchData}
-        categories={categories}
-        editingProduct={editingProduct}
-      />
-
-      <ProductDetailModal
-        isOpen={isProductDetailOpen}
-        onClose={() => setIsProductDetailOpen(false)}
-        productId={selectedProductId || null}
-        onOpenStockIn={handleOpenStockIn}
-        onOpenStockOut={handleOpenStockOut}
-        onOpenStockAdjustment={handleOpenStockAdjustment}
-        onOpenEditProduct={handleOpenEditProduct}
-        onRefresh={fetchData}
-        isManager={role === 'manager' || role === 'admin'}
-      />
-
-      <CategoryModal
-        isOpen={isCategoryFormOpen}
-        onClose={() => setIsCategoryFormOpen(false)}
-        onSuccess={fetchData}
-        editingCategory={editingCategory}
-      />
-
-      <DatabaseBackupModal
-        isOpen={isBackupModalOpen}
-        onClose={() => setIsBackupModalOpen(false)}
-      />
-    </div>
-    </GlobalTooltipProvider>
+            <DatabaseBackupModal
+              isOpen={isBackupModalOpen}
+              onClose={() => setIsBackupModalOpen(false)}
+            />
+          </div>
+        </GlobalTooltipProvider>
+      </DialogProvider>
+    </ThemeProvider>
   );
 }
