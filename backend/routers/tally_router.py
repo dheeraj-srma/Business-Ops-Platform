@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Header, Request, status, 
 from typing import Dict, Any, Optional, List
 from auth import get_current_user, require_roles
 from services.tally_service import tally_service
+from services.snapshot_service import SnapshotService
 
 logger = logging.getLogger("tally_router")
 router = APIRouter(prefix="/api/tally", tags=["Tally Integration"])
@@ -23,6 +24,7 @@ def sync_tally_payload(
     x_correlation_id: Optional[str] = Header(None),
     user: Dict[str, Any] = Depends(require_roles(["tally_operator", "admin", "stock_manager"]))
 ):
+    SnapshotService.assert_writable("tally sync")
     try:
         return tally_service.process_tally_payload(payload, correlation_id=x_correlation_id)
     except ValueError as ve:
@@ -84,6 +86,7 @@ def get_stock_reservations(status: Optional[str] = None, search: Optional[str] =
 
 @router.post("/sync/reservations/{reservation_id}/release")
 def release_stock_reservation(reservation_id: str):
+    SnapshotService.assert_writable("reservation release")
     try:
         from supabase_client import get_supabase_client
         client = get_supabase_client()

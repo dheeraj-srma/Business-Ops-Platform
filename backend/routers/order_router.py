@@ -154,6 +154,7 @@ def confirm_order_preview(payload: dict):
 
 @router.post("/reject")
 def reject_order_preview(payload: dict):
+    SnapshotService.assert_writable("order rejection")
     order_id = payload.get("orderId")
     reason = payload.get("reason")
     if not order_id:
@@ -166,6 +167,7 @@ def reject_order_preview(payload: dict):
 
 @router.post("/reopen")
 def reopen_order_preview(payload: dict):
+    SnapshotService.assert_writable("order reopening")
     order_id = payload.get("orderId")
     if not order_id:
         raise HTTPException(status_code=400, detail="Missing orderId")
@@ -177,6 +179,7 @@ def reopen_order_preview(payload: dict):
 
 @router.post("/rollback-reject")
 def rollback_reject_preview(payload: dict):
+    SnapshotService.assert_writable("order rollback-reject")
     order_id = payload.get("orderId")
     reason = payload.get("reason")
     if not order_id:
@@ -190,6 +193,7 @@ def rollback_reject_preview(payload: dict):
 
 @router.post("/update")
 def update_pending_preview(payload: dict):
+    SnapshotService.assert_writable("order update")
     order_id = payload.get("orderId")
     items = payload.get("items") or []
     metadata = payload.get("metadata")
@@ -353,6 +357,7 @@ def approve_order(
     order_id: str,
     current_user: dict = Depends(require_role(["admin", "order_manager", "stock_manager"]))
 ):
+    SnapshotService.assert_writable("order approval")
     try:
         return OrderService.approve_order(order_id)
     except Exception as exc:
@@ -399,6 +404,7 @@ def dispatch_order(
     order_id: str,
     current_user: dict = Depends(require_permission("orders.process"))
 ):
+    SnapshotService.assert_writable("order dispatch")
     try:
         res = OrderService.process_order(order_id, current_user=current_user)
         return OrderProcessResponse(
@@ -428,6 +434,7 @@ def transition_order_status(
     payload: dict,
     current_user: dict = Depends(require_role(["admin", "order_manager", "stock_manager", "salesman"]))
 ):
+    SnapshotService.assert_writable("order status transition")
     target_status = payload.get("target_status")
     reason = payload.get("reason")
     if not target_status:

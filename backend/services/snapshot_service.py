@@ -39,7 +39,7 @@ class SnapshotService:
     3. Tracking DB health and enforcing READ-ONLY mode on mutations during outages.
     """
 
-    _lock = threading.Lock()
+    _lock = threading.RLock()
     _in_memory_snapshots: Dict[str, Dict[str, Any]] = {}
     _db_connected: bool = True
     _last_db_error: Optional[str] = None
@@ -69,16 +69,72 @@ class SnapshotService:
                 logger.warning(f"Error initializing snapshot directory: {e}")
             cls._initialized = True
 
+    SNAPSHOT_REFRESH_INTERVAL_SECONDS = 24 * 3600  # 24 hours
+
     @classmethod
-    def record_successful_read(cls, entity: str, data: Any, metadata: Optional[Dict[str, Any]] = None) -> None:
+    def should_refresh_snapshot(cls, entity: str, ttl_seconds: int = SNAPSHOT_REFRESH_INTERVAL_SECONDS) -> bool:
+        """Returns True if the snapshot for entity does not exist or is older than ttl_seconds."""
+        cls._ensure_init()
+        with cls._lock:
+            snap = cls._in_memory_snapshots.get(entity)
+            if not snap:
+                return True
+            captured_at_str = snap.get("captured_at")
+            if not captured_at_str:
+                return True
+            try:
+                captured_at = datetime.fromisoformat(captured_at_str)
+                if captured_at.tzinfo is None:
+                    captured_at = captured_at.replace(tzinfo=timezone.utc)
+                now = datetime.now(timezone.utc)
+                age = (now - captured_at).total_seconds()
+                return age >= ttl_seconds
+            except Exception:
+                return True
+
+    @classmethod
+    def record_successful_read(
+        cls,
+        entity: str,
+        data: Any,
+        metadata: Optional[Dict[str, Any]] = None,
+        force_refresh: bool = False,
+        ttl_seconds: int = SNAPSHOT_REFRESH_INTERVAL_SECONDS
+    ) -> bool:
         """
         Invoked after any successful PostgreSQL read.
-        Updates in-memory snapshot and flushes atomically to disk.
+        Updates database health status unconditionally.
+        Only performs disk rewrite if:
+          - force_refresh is True, OR
+          - snapshot for entity does not exist, OR
+          - snapshot age >= ttl_seconds (default 24 hours).
+        Replaces the old snapshot in memory and disk ONLY AFTER successful generation.
+        Returns True if snapshot was refreshed, False if skipped because age < ttl_seconds.
         """
         cls._ensure_init()
-        now_iso = datetime.now(timezone.utc).isoformat()
-        row_count = len(data) if isinstance(data, list) else (len(data.keys()) if isinstance(data, dict) else 1)
+        now = datetime.now(timezone.utc)
+        now_iso = now.isoformat()
 
+        with cls._lock:
+            cls._db_connected = True
+            cls._last_db_error = None
+            cls._last_db_success_at = now_iso
+
+            existing = cls._in_memory_snapshots.get(entity)
+            if not force_refresh and existing and existing.get("captured_at"):
+                try:
+                    captured_at = datetime.fromisoformat(existing["captured_at"])
+                    if captured_at.tzinfo is None:
+                        captured_at = captured_at.replace(tzinfo=timezone.utc)
+                    age = (now - captured_at).total_seconds()
+                    if age < ttl_seconds:
+                        logger.debug(f"Snapshot for '{entity}' is fresh (age {age:.1f}s < {ttl_seconds}s). Skipping disk rewrite.")
+                        return False
+                except Exception as parse_err:
+                    logger.warning(f"Error parsing existing snapshot timestamp for '{entity}': {parse_err}")
+
+        # Prepare new payload
+        row_count = len(data) if isinstance(data, list) else (len(data.keys()) if isinstance(data, dict) else 1)
         payload = {
             "entity": entity,
             "captured_at": now_iso,
@@ -88,22 +144,30 @@ class SnapshotService:
             "data": data
         }
 
-        with cls._lock:
-            cls._in_memory_snapshots[entity] = payload
-            cls._db_connected = True
-            cls._last_db_error = None
-            cls._last_db_success_at = now_iso
-
-        # Asynchronously or safely persist to disk without blocking execution
+        # Atomically write to temp file first
+        target_file = SNAPSHOT_DIR / f"{entity}_snapshot.json"
+        temp_file = SNAPSHOT_DIR / f"{entity}_snapshot.json.tmp"
         try:
-            target_file = SNAPSHOT_DIR / f"{entity}_snapshot.json"
-            temp_file = SNAPSHOT_DIR / f"{entity}_snapshot.json.tmp"
             with open(temp_file, "w", encoding="utf-8") as f:
                 json.dump(payload, f, indent=2, ensure_ascii=False)
+                f.flush()
+                os.fsync(f.fileno())
+            # Replace target file ONLY AFTER successful generation
             temp_file.replace(target_file)
+            # Update memory ONLY AFTER successful disk persistence
+            with cls._lock:
+                cls._in_memory_snapshots[entity] = payload
             logger.debug(f"Saved snapshot for '{entity}' ({row_count} records) to {target_file}")
+            return True
         except Exception as exc:
             logger.error(f"Failed to persist snapshot for '{entity}' to disk: {exc}")
+            if temp_file.exists():
+                try:
+                    temp_file.unlink()
+                except Exception:
+                    pass
+            # Old valid snapshot remains intact!
+            return False
 
     @classmethod
     def record_db_failure(cls, entity: str, error: Exception) -> None:
@@ -176,9 +240,33 @@ class SnapshotService:
             return cls._db_connected
 
     @classmethod
+    def get_database_status(cls) -> str:
+        """Returns 'CONNECTED' if database is reachable, otherwise 'UNAVAILABLE'."""
+        return "CONNECTED" if cls.is_db_available() else "UNAVAILABLE"
+
+    @classmethod
     def get_system_mode(cls) -> str:
         """Returns 'LIVE' if DB is available, otherwise 'READ_ONLY'."""
         return "LIVE" if cls.is_db_available() else "READ_ONLY"
+
+    @classmethod
+    def get_write_status(cls) -> str:
+        """Returns 'WRITABLE' if mutations are allowed, otherwise 'BLOCKED'."""
+        return "WRITABLE" if cls.is_db_available() else "BLOCKED"
+
+    @classmethod
+    def get_health_status(cls) -> Dict[str, Any]:
+        """Provides unambiguous status breakdown across database, system mode, and write protection."""
+        cls._ensure_init()
+        with cls._lock:
+            return {
+                "database_status": cls.get_database_status(),
+                "system_mode": cls.get_system_mode(),
+                "write_status": cls.get_write_status(),
+                "last_db_error": cls._last_db_error,
+                "last_success_at": cls._last_db_success_at,
+                "snapshots": cls.get_all_snapshots_meta(),
+            }
 
     @classmethod
     def assert_writable(cls, operation_name: str = "write") -> None:

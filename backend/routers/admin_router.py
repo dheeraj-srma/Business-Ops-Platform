@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException, Depends, Query, status
 from services.admin_service import admin_service
 from repositories.admin_repo import admin_repo
 from auth import require_role
+from services.snapshot_service import SnapshotService
 
 logger = logging.getLogger("admin_router")
 router = APIRouter(prefix="/api/admin", tags=["Central Admin Control Center"])
@@ -51,6 +52,7 @@ def create_user(
     payload: dict,
     current_user: dict = Depends(require_role(["admin"]))
 ):
+    SnapshotService.assert_writable("user creation")
     try:
         return admin_service.create_user(payload, current_user)
     except ValueError as ve:
@@ -65,6 +67,7 @@ def update_user(
     payload: dict,
     current_user: dict = Depends(require_role(["admin"]))
 ):
+    SnapshotService.assert_writable("user update")
     try:
         return admin_service.update_user(user_id, payload, current_user)
     except ValueError as ve:
@@ -78,6 +81,7 @@ def delete_user(
     user_id: str,
     current_user: dict = Depends(require_role(["admin"]))
 ):
+    SnapshotService.assert_writable("user deletion")
     try:
         return admin_service.delete_user(user_id, current_user)
     except Exception as exc:
@@ -90,6 +94,7 @@ def set_user_status(
     payload: dict,
     current_user: dict = Depends(require_role(["admin"]))
 ):
+    SnapshotService.assert_writable("user status update")
     is_active = payload.get("is_active", True)
     try:
         return admin_service.set_user_status(user_id, is_active, current_user)
@@ -103,6 +108,7 @@ def reset_password(
     payload: dict,
     current_user: dict = Depends(require_role(["admin"]))
 ):
+    SnapshotService.assert_writable("user password reset")
     temp_pass = payload.get("password") or "NalkaTemp2026!"
     try:
         return admin_service.reset_user_password(user_id, temp_pass, current_user)
@@ -129,6 +135,7 @@ def update_setting(
     payload: dict,
     current_user: dict = Depends(require_role(["admin"]))
 ):
+    SnapshotService.assert_writable("setting update")
     value = payload.get("setting_value") or payload.get("value") or ""
     try:
         return admin_service.update_setting(key, str(value), current_user)
@@ -141,6 +148,7 @@ def adjust_inventory_stock(
     payload: dict,
     current_user: dict = Depends(require_role(["admin"]))
 ):
+    SnapshotService.assert_writable("admin inventory adjustment")
     product_id = payload.get("product_id")
     new_quantity = payload.get("new_quantity")
     reason = payload.get("reason", "Admin manual stock correction")

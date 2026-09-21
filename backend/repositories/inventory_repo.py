@@ -26,25 +26,6 @@ class InventoryRepository:
     @staticmethod
     def _load_master_inventory_from_disk() -> List[Dict[str, Any]]:
         master_path = _find_file(["server/nalka_master.json", "nalka_master.json"])
-        inv_db_path = _find_file(["data/inventory_db.json", "inventory_db.json"])
-
-        reservations: Dict[str, float] = {}
-        db_products: List[Dict[str, Any]] = []
-
-        if inv_db_path:
-            try:
-                with open(inv_db_path, "r", encoding="utf-8") as f:
-                    inv_db = json.load(f)
-                    for r in inv_db.get("stock_reservations", []):
-                        if r.get("status") == "ACTIVE":
-                            sku = r.get("product_sku")
-                            qty = float(r.get("reserved_quantity", 0.0))
-                            if sku:
-                                reservations[sku] = reservations.get(sku, 0.0) + qty
-                    db_products = inv_db.get("products", [])
-            except Exception as e:
-                logger.warning(f"Could not read inventory_db.json: {e}")
-
         records: List[Dict[str, Any]] = []
         seen_names = set()
 
@@ -115,53 +96,6 @@ class InventoryRepository:
                         seen_names.add(name.lower())
             except Exception as e:
                 logger.error(f"Failed loading nalka_master.json: {e}")
-
-        # Merge custom db_products if not already present
-        for p in db_products:
-            p_name = (p.get("name") or "").strip()
-            if p_name and p_name.lower() in seen_names:
-                continue
-            sku = p.get("sku") or p.get("id") or f"PRD-{len(records)+1}"
-            q_on_hand = float(p.get("current_stock") or 0.0)
-            q_res = float(p.get("reserved_stock") or reservations.get(sku, 0.0))
-            q_avail = q_on_hand - q_res
-            cost_p = float(p.get("unit_cost") or 0.0)
-
-            records.append({
-                "id": p.get("id") or sku,
-                "SKU": sku,
-                "sku": sku,
-                "Item Name": p_name,
-                "name": p_name,
-                "Category": p.get("category_id") or "General",
-                "category": p.get("category_id") or "General",
-                "categoryName": p.get("category_id") or "General",
-                "categoryId": p.get("category_id") or "General",
-                "description": p.get("description") or f"Nalka Metals | Unit: {p.get('unit', 'Pieces')}",
-                "Brand": "Nalka Metals",
-                "brand": "Nalka Metals",
-                "Price": cost_p,
-                "price": cost_p,
-                "Cost Price": cost_p,
-                "cost_price": cost_p,
-                "unitCost": cost_p,
-                "Current Stock": q_on_hand,
-                "currentStock": q_on_hand,
-                "physical_stock": q_on_hand,
-                "physicalStock": q_on_hand,
-                "Reserved Quantity": q_res,
-                "reservedStock": q_res,
-                "reserved_stock": q_res,
-                "Available Stock": q_avail,
-                "availableStock": q_avail,
-                "available_stock": q_avail,
-                "Unit": p.get("unit") or "Pieces",
-                "unit": p.get("unit") or "Pieces",
-                "status": "HEALTHY" if q_avail > 15 else "LOW" if q_avail > 5 else "CRITICAL" if q_avail > 0 else "OUT_OF_STOCK",
-                "is_active": True,
-                "isActive": True,
-                "Updated At": "2026-09-20T00:00:00Z",
-            })
 
         logger.info(f"Loaded {len(records)} authoritative inventory items from disk.")
         return records

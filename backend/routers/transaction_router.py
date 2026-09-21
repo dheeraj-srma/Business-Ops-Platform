@@ -7,7 +7,7 @@ from repositories.transaction_repo import TransactionRepository
 from repositories.order_repo import OrderRepository
 from services.inventory_service import InventoryService
 from auth import require_permission
-from supabase_client import get_supabase_client
+from services.snapshot_service import SnapshotService
 
 logger = logging.getLogger("transaction_router")
 router = APIRouter(prefix="/api", tags=["Stock Movements & Transactions"])
@@ -100,6 +100,7 @@ def create_return(
     item: ReturnCreateSchema,
     current_user: dict = Depends(require_permission("returns.manage"))
 ):
+    SnapshotService.assert_writable("return creation")
     try:
         res = InventoryService.process_return(item, current_user)
         return res

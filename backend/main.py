@@ -191,14 +191,18 @@ def database_health():
     else:
         SnapshotService.record_db_status(False, error=error_msg)
 
+    health = SnapshotService.get_health_status()
     return {
         "status": "ready" if connected else "degraded",
-        "mode": SnapshotService.get_system_mode(),
+        "database_status": health["database_status"],
+        "system_mode": health["system_mode"],
+        "write_status": health["write_status"],
+        "mode": health["system_mode"],
         "database": {
             "connected": connected,
             "error": error_msg
         },
-        "snapshots": SnapshotService.get_all_snapshots_meta(),
+        "snapshots": health["snapshots"],
         "timestamp": datetime.utcnow().isoformat(),
     }
 

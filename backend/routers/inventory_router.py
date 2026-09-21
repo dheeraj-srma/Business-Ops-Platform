@@ -351,6 +351,7 @@ def fix_inventory_reconciliation(
     product_id: str,
     current_user: dict = Depends(require_role(["admin"]))
 ):
+    SnapshotService.assert_writable("inventory reconciliation fix")
     from services.reconciliation_service import reconciliation_service
     try:
         return reconciliation_service.fix_inventory_discrepancy(

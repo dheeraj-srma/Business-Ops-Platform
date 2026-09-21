@@ -10,6 +10,7 @@ from typing import Dict, Any, Optional, List
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel
 from config.database import get_db_client
+from services.snapshot_service import SnapshotService
 
 logger = logging.getLogger("settings_router")
 router = APIRouter(prefix="/api/settings", tags=["System Settings & Stock Override"])
@@ -99,6 +100,7 @@ def update_settings(payload: Dict[str, Any]) -> Dict[str, Any]:
     """
     Update application settings and sync allow_negative_orders to Supabase.
     """
+    SnapshotService.assert_writable("settings update")
     client = get_db_client(raise_on_missing=False)
     now_iso = datetime.utcnow().isoformat()
 
@@ -137,6 +139,7 @@ def set_stock_override(payload: Dict[str, Any]) -> Dict[str, Any]:
     Toggle allow_negative_orders switch and sync directly to Supabase system_settings table.
     Enables/disables ordering when physical stock is zero or negative.
     """
+    SnapshotService.assert_writable("stock override update")
     enabled = bool(payload.get("enabled", False))
     client = get_db_client(raise_on_missing=False)
     supa_synced = False
@@ -205,6 +208,7 @@ def update_catalog_prices(payload: Dict[str, Any]) -> Dict[str, Any]:
     """
     Update pricing or stock threshold levels across SKUs in master catalog.
     """
+    SnapshotService.assert_writable("catalog prices update")
     client = get_db_client(raise_on_missing=False)
     updates = payload.get("updates") or []
     count = 0
@@ -241,6 +245,7 @@ def apply_bulk_price_adjustment(payload: Dict[str, Any]) -> Dict[str, Any]:
     """
     Bulk price adjustment by percentage or fixed amount.
     """
+    SnapshotService.assert_writable("bulk price adjustment")
     return {"success": True, "count": 0}
 
 @router.post("/import-catalog-csv")
@@ -248,6 +253,7 @@ def import_catalog_csv(payload: Dict[str, Any]) -> Dict[str, Any]:
     """
     Import master catalog CSV rows.
     """
+    SnapshotService.assert_writable("import catalog CSV")
     items = payload.get("items") or []
     return {
         "success": True,
