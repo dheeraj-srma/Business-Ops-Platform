@@ -90,6 +90,19 @@ export default function AIDecisionIntelligence({
     'jindal stainless steel': 8
   };
 
+  // Actual covered days from ordersList
+  const coveredDays = useMemo(() => {
+    const dates = ordersList
+      .map(o => String(o.Timestamp || o.date || o.created_at || '').slice(0, 10))
+      .filter(d => d.length === 10)
+      .sort();
+    if (dates.length < 2) return 30;
+    const first = new Date(dates[0]).getTime();
+    const last = new Date(dates[dates.length - 1]).getTime();
+    const diff = Math.round((last - first) / (1000 * 60 * 60 * 24)) + 1;
+    return Math.max(1, diff);
+  }, [ordersList]);
+
   const productMetrics = useMemo(() => {
     return inventoryList.map((p, idx) => {
       const sku = String(p.SKU || p.sku || '').trim() || `SKU-${idx + 1}`;
@@ -101,38 +114,38 @@ export default function AIDecisionIntelligence({
       const price = Number(p.Price ?? p.price ?? 450);
       const supplierName = String(p.Supplier || p.supplier || 'Standard Vendor').trim();
       
-      // Calculate daily demand velocity
+      // Calculate daily demand velocity from actual covered days
       let totalSold = (skuSalesSummary.qtyMap[skuKey] || 0) || (skuSalesSummary.qtyMap[nameKey] || 0);
       const orderCount = (skuSalesSummary.orderCountMap[skuKey] || 0) || (skuSalesSummary.orderCountMap[nameKey] || 0);
 
-      // Fallback velocity calculation for full catalog presentation if orders are sparse
       let dailyVelocity = 0;
+      let hasHistoricalDemand = false;
+      let confidence = 'High';
+      let confidencePct = 94;
+
       if (totalSold > 0) {
-        dailyVelocity = parseFloat((totalSold / 30).toFixed(2));
+        dailyVelocity = parseFloat((totalSold / coveredDays).toFixed(2));
+        hasHistoricalDemand = true;
+        confidence = orderCount >= 5 ? 'High' : 'Medium';
+        confidencePct = orderCount >= 5 ? 92 : 72;
       } else {
-        // Derive realistic velocity based on item current stock & index hash to ensure diverse risk distribution
-        const pseudoDemand = Math.max(0.15, parseFloat(((currentStock > 0 ? currentStock * 0.06 : (idx % 7 + 1) * 2.5) / 30).toFixed(2)));
-        dailyVelocity = pseudoDemand;
-        totalSold = Math.round(pseudoDemand * 30);
+        // Do NOT invent velocity from current stock
+        dailyVelocity = 0;
+        hasHistoricalDemand = false;
+        confidence = 'Low';
+        confidencePct = 25;
       }
 
       // Sourced lead time or standard baseline
       const leadTime = supplierLeadTimes[supplierName.toLowerCase()] || (5 + (idx % 4));
 
       // Baseline safety stock
-      const safetyStock = Math.max(10, Math.ceil(dailyVelocity * 3));
+      const safetyStock = hasHistoricalDemand ? Math.max(10, Math.ceil(dailyVelocity * 3)) : 0;
       const leadTimeDemand = Math.ceil(dailyVelocity * leadTime);
       const reorderPoint = leadTimeDemand + safetyStock;
 
       // Days to stockout
       const daysToStockout = dailyVelocity > 0 ? parseFloat((currentStock / dailyVelocity).toFixed(1)) : 999;
-
-      let confidence = 'High';
-      let confidencePct = 94;
-      if (orderCount === 0) {
-        confidence = 'Medium';
-        confidencePct = 78;
-      }
 
       return {
         sku,
@@ -142,6 +155,7 @@ export default function AIDecisionIntelligence({
         price,
         supplierName,
         dailyVelocity,
+        hasHistoricalDemand,
         leadTime,
         safetyStock,
         reorderPoint,
@@ -152,7 +166,7 @@ export default function AIDecisionIntelligence({
         totalSold
       };
     });
-  }, [inventoryList, skuSalesSummary]);
+  }, [inventoryList, skuSalesSummary, coveredDays]);
 
   // --- Scenario simulation calculations ---
   const simulatedMetrics = useMemo(() => {
@@ -344,15 +358,17 @@ export default function AIDecisionIntelligence({
       lowerBound: undefined
     }));
 
-    // Add forecast horizon projection
-    const lastRev = timeline[timeline.length - 1]?.actual || 420000;
+    // If no historical demand exists, return empty array to trigger standard Insufficient Data empty state
+    if (timeline.length === 0) {
+      return [];
+    }
+
+    // Add forecast horizon projection based on actual historical daily run-rate
+    const avgDailyRev = timeline.reduce((acc, curr) => acc + (curr.actual || 0), 0) / timeline.length;
     const simDemandMultiplier = (1 + demandShift / 100);
 
     for (let i = 1; i <= forecastHorizon; i++) {
-      const day = i < 10 ? `0${i}` : `${i}`;
-      // Seasonal demand factor simulator
-      const factor = 1.0 + 0.12 * Math.sin(i / 2);
-      const simulatedForecast = Math.round(lastRev * factor * simDemandMultiplier);
+      const simulatedForecast = Math.round(avgDailyRev * simDemandMultiplier);
       const variance = Math.round(simulatedForecast * 0.08); // 8% uncertainty range
 
       timeline.push({
@@ -360,7 +376,7 @@ export default function AIDecisionIntelligence({
         actual: undefined,
         forecast: simulatedForecast,
         upperBound: simulatedForecast + variance,
-        lowerBound: simulatedForecast - variance
+        lowerBound: Math.max(0, simulatedForecast - variance)
       });
     }
 
@@ -369,7 +385,7 @@ export default function AIDecisionIntelligence({
 
   const forecastSeries = [
     { key: 'actual', label: 'Historical Actual Sales (₹)', color: '#6366f1' },
-    { key: 'forecast', label: 'AI Projected Demand (₹)', color: '#10b981' }
+    { key: 'forecast', label: 'Scenario Projected Demand (Heuristic Simulator) (₹)', color: '#10b981' }
   ];
 
   // --- Predictive Chart Data: Sales Velocity by SKU ---
@@ -407,9 +423,12 @@ export default function AIDecisionIntelligence({
     simulatedMetrics.list.forEach((p: any) => {
       const cat = p.category || 'General';
       const monthlyDemand = Math.round((p.simVelocity || 0) * 30);
-      catMap[cat] = (catMap[cat] || 0) + (monthlyDemand || 10);
+      if (monthlyDemand > 0) {
+        catMap[cat] = (catMap[cat] || 0) + monthlyDemand;
+      }
     });
     return Object.entries(catMap)
+      .filter(([_, val]) => val > 0)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 8)
       .map(([name, value]) => ({ name, value }));
@@ -917,15 +936,17 @@ export default function AIDecisionIntelligence({
                       <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 'normal' }}>{p.name}</div>
                     </td>
                     <td className="mono" style={{ fontWeight: 600 }}>{p.currentStock} units</td>
-                    <td className="text-right mono">{p.simVelocity} /day</td>
+                    <td className="text-right mono">
+                      {p.hasHistoricalDemand ? `${p.simVelocity} /day` : <span style={{ fontSize: '0.68rem', color: '#94a3b8' }}>Insufficient data</span>}
+                    </td>
                     <td className="text-right mono" style={{ color: 'var(--text-muted)' }}>{p.simSafetyStock} units</td>
                     <td className="text-right mono" style={{ color: 'var(--text-muted)' }}>{p.simLeadTime} days</td>
                     <td className="mono" style={{ color: isCritical ? '#ef4444' : (isWarning ? '#f59e0b' : '#10b981'), fontWeight: 600 }}>
-                      {daysLabel}
+                      {p.hasHistoricalDemand ? daysLabel : '—'}
                     </td>
                     <td>
-                      <span className={`badge ${badgeClass}`} style={{ fontSize: '0.68rem', padding: '2px 6px' }}>
-                        {p.risk}
+                      <span className={`badge ${p.hasHistoricalDemand ? badgeClass : 'badge-ghost'}`} style={{ fontSize: '0.68rem', padding: '2px 6px' }}>
+                        {p.hasHistoricalDemand ? p.risk : 'INSUFFICIENT DATA'}
                       </span>
                     </td>
                     <td className="text-right mono" style={{ color: reorderAmount > 0 ? '#10b981' : 'var(--text-muted)', fontWeight: reorderAmount > 0 ? 700 : 'normal' }}>

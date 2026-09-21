@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import GithubHeatmap, { HeatmapDay } from './GithubHeatmap';
 import InteractiveChart from './InteractiveChart';
+import { resolveDateRange, DateRangeType } from '../utils/dateRange';
 
 interface TeamSummary {
   total_team_sales: number;
@@ -99,40 +100,11 @@ export default function SalesmanPerformanceView() {
   const [loadingHeatmap, setLoadingHeatmap] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // Derive start_date and end_date ISO strings based on dateRange
-  const { startDateStr, endDateStr } = useMemo(() => {
-    if (dateRange === 'custom' && customStart && customEnd) {
-      return { startDateStr: customStart, endDateStr: customEnd };
-    }
-    const end = new Date();
-    const start = new Date();
-
-    if (dateRange === 'today') {
-      start.setHours(0, 0, 0, 0);
-    } else if (dateRange === '7d') {
-      start.setDate(end.getDate() - 7);
-    } else if (dateRange === '30d') {
-      start.setDate(end.getDate() - 30);
-    } else if (dateRange === 'this_month') {
-      start.setDate(1);
-    } else if (dateRange === 'last_month') {
-      start.setMonth(start.getMonth() - 1);
-      start.setDate(1);
-      const lastDay = new Date(start.getFullYear(), start.getMonth() + 1, 0);
-      return {
-        startDateStr: start.toISOString().split('T')[0],
-        endDateStr: lastDay.toISOString().split('T')[0]
-      };
-    } else if (dateRange === 'this_year' || dateRange === 'ytd') {
-      start.setMonth(0, 1);
-    } else if (dateRange === '12m') {
-      start.setFullYear(end.getFullYear() - 1);
-    }
-
-    return {
-      startDateStr: start.toISOString().split('T')[0],
-      endDateStr: end.toISOString().split('T')[0]
-    };
+  // Authoritative calendar date strings derived from dateRange.ts
+  const { startDateStr, endDateStr, daysCount } = useMemo(() => {
+    const rangeType = (dateRange === 'this_year' ? 'ytd' : dateRange) as DateRangeType;
+    const res = resolveDateRange(rangeType, customStart, customEnd);
+    return { startDateStr: res.startDate, endDateStr: res.endDate, daysCount: res.daysCount };
   }, [dateRange, customStart, customEnd]);
 
   // Get Auth Token from localStorage if needed
@@ -142,25 +114,6 @@ export default function SalesmanPerformanceView() {
     return token ? { Authorization: `Bearer ${token}` } : {};
   };
 
-  const DEFAULT_SUMMARY: TeamSummary = {
-    total_team_sales: 2118515.75,
-    total_orders: 167,
-    total_units_sold: 14570,
-    total_active_salesmen: 7,
-    total_customers_served: 182,
-    average_order_value: 12685.72,
-  };
-
-  const DEFAULT_SALESMEN: SalesmanListItem[] = [
-    { salesman_id: 'SLM-101', name: 'RAVINDER KUMAR', salesman_code: 'SLM-101', location: 'Gurugram / Haryana North', is_active: true, sales: 645000, orders: 42, average_order_value: 15357, customers: 48, units_sold: 4050, active_days: 24 },
-    { salesman_id: 'SLM-102', name: 'ANKIT', salesman_code: 'SLM-102', location: 'Delhi NCR / East', is_active: true, sales: 520000, orders: 35, average_order_value: 14857, customers: 38, units_sold: 3420, active_days: 22 },
-    { salesman_id: 'SLM-103', name: 'SAURAV', salesman_code: 'SLM-103', location: 'Panipat / Ambala', is_active: true, sales: 385000, orders: 28, average_order_value: 13750, customers: 32, units_sold: 2680, active_days: 19 },
-    { salesman_id: 'SLM-104', name: 'CHANDRA PRAKASH', salesman_code: 'SLM-104', location: 'Haryana South / Rewari', is_active: true, sales: 320000, orders: 24, average_order_value: 13333, customers: 26, units_sold: 2150, active_days: 18 },
-    { salesman_id: 'SLM-105', name: 'AMIT SHARMA', salesman_code: 'SLM-105', location: 'Faridabad / Palwal', is_active: true, sales: 140000, orders: 18, average_order_value: 7778, customers: 18, units_sold: 1240, active_days: 15 },
-    { salesman_id: 'SLM-106', name: 'VIKRAM SINGH', salesman_code: 'SLM-106', location: 'Uttar Pradesh / Noida', is_active: true, sales: 65000, orders: 12, average_order_value: 5417, customers: 12, units_sold: 620, active_days: 10 },
-    { salesman_id: 'SLM-107', name: 'RAHUL VERMA', salesman_code: 'SLM-107', location: 'Punjab & Chandigarh', is_active: true, sales: 43515.75, orders: 8, average_order_value: 5439, customers: 8, units_sold: 410, active_days: 8 },
-  ];
-
   // Fetch Team Summary
   const fetchSummary = async () => {
     setLoadingSummary(true);
@@ -169,17 +122,13 @@ export default function SalesmanPerformanceView() {
       const res = await fetch(url, { headers: getAuthHeaders() });
       if (res.ok) {
         const data = await res.json();
-        if (data && data.total_team_sales > 0) {
-          setTeamSummary(data);
-        } else {
-          setTeamSummary(DEFAULT_SUMMARY);
-        }
+        setTeamSummary(data);
       } else {
-        setTeamSummary(DEFAULT_SUMMARY);
+        setTeamSummary(null);
       }
     } catch (err) {
       console.error(err);
-      setTeamSummary(DEFAULT_SUMMARY);
+      setTeamSummary(null);
     } finally {
       setLoadingSummary(false);
     }
@@ -196,17 +145,13 @@ export default function SalesmanPerformanceView() {
       const res = await fetch(url, { headers: getAuthHeaders() });
       if (res.ok) {
         const data = await res.json();
-        if (data && data.salesmen && data.salesmen.length > 0 && data.salesmen.some((s: any) => s.sales > 0)) {
-          setSalesmenList(data.salesmen);
-        } else {
-          setSalesmenList(DEFAULT_SALESMEN);
-        }
+        setSalesmenList(data?.salesmen || []);
       } else {
-        setSalesmenList(DEFAULT_SALESMEN);
+        setSalesmenList([]);
       }
     } catch (err) {
       console.error(err);
-      setSalesmenList(DEFAULT_SALESMEN);
+      setSalesmenList([]);
     } finally {
       setLoadingList(false);
     }
@@ -221,44 +166,34 @@ export default function SalesmanPerformanceView() {
       if (res.ok) {
         const data = await res.json();
         setSalesmanDetail(data);
+      } else {
+        setSalesmanDetail(null);
       }
     } catch (err) {
       console.error(err);
+      setSalesmanDetail(null);
     } finally {
       setLoadingDetail(false);
     }
-  };
-
-  // Helper to resolve range string or dates to exact days count
-  const getDaysFromRangeStr = (rangeStr: string): number => {
-    if (rangeStr === '7d' || rangeStr === 'today') return 7;
-    if (rangeStr === '30d' || rangeStr === '1m' || rangeStr === 'this_month' || rangeStr === 'last_month') return 30;
-    if (rangeStr === '3m' || rangeStr === '90d') return 90;
-    if (rangeStr === '6m' || rangeStr === '180d') return 180;
-    if (rangeStr === 'this_year' || rangeStr === 'ytd') return 250;
-    if (rangeStr === '12m' || rangeStr === '1y') return 365;
-    if (rangeStr === 'custom' && customStart && customEnd) {
-      const s = new Date(customStart);
-      const e = new Date(customEnd);
-      const diffDays = Math.ceil(Math.abs(e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-      return Math.max(1, Math.min(diffDays, 365));
-    }
-    return 30;
   };
 
   // Fetch Heatmap for selected salesman
   const fetchHeatmap = async (salesmanId: string, range: string) => {
     setLoadingHeatmap(true);
     try {
-      const daysCount = getDaysFromRangeStr(range);
-      const url = `/api/sales/salesmen/${salesmanId}/heatmap?days=${daysCount}`;
+      const rangeType = (range === 'this_year' ? 'ytd' : range) as DateRangeType;
+      const resDates = resolveDateRange(rangeType, customStart, customEnd);
+      const url = `/api/sales/salesmen/${salesmanId}/heatmap?days=${resDates.daysCount || 30}`;
       const res = await fetch(url, { headers: getAuthHeaders() });
       if (res.ok) {
         const data = await res.json();
         setHeatmapDays(data.days || []);
+      } else {
+        setHeatmapDays([]);
       }
     } catch (err) {
       console.error(err);
+      setHeatmapDays([]);
     } finally {
       setLoadingHeatmap(false);
     }
@@ -328,16 +263,24 @@ export default function SalesmanPerformanceView() {
       }));
     }
 
-    // Weekly aggregation (Group every 7 days)
-    const weeksList: { name: string; Sales: number; Orders: number }[] = [];
-    for (let i = 0; i < raw.length; i += 7) {
-      const chunk = raw.slice(i, i + 7);
-      const wSales = chunk.reduce((acc, c) => acc + c.sales, 0);
-      const wOrders = chunk.reduce((acc, c) => acc + c.orders, 0);
-      const wName = chunk[0].date.slice(5);
-      weeksList.push({ name: `Wk ${wName}`, Sales: wSales, Orders: wOrders });
-    }
-    return weeksList;
+    // Weekly aggregation (Group by actual ISO calendar week / start-of-week Monday)
+    const weekMap = new Map<string, { sales: number; orders: number }>();
+    raw.forEach(d => {
+      const dt = new Date(`${d.date}T00:00:00Z`);
+      const dayOfWeek = (dt.getUTCDay() + 6) % 7; // Monday = 0, Sunday = 6
+      const mon = new Date(dt.getTime() - dayOfWeek * 86400000);
+      const wKey = mon.toISOString().slice(5, 10); // MM-DD of Monday
+      const curr = weekMap.get(wKey) || { sales: 0, orders: 0 };
+      weekMap.set(wKey, {
+        sales: curr.sales + d.sales,
+        orders: curr.orders + d.orders
+      });
+    });
+    return Array.from(weekMap.entries()).map(([wKey, val]) => ({
+      name: `Wk ${wKey}`,
+      Sales: val.sales,
+      Orders: val.orders
+    }));
   }, [salesmanDetail, chartGranularity]);
 
   return (

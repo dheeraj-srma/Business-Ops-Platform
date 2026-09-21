@@ -22,6 +22,8 @@ import {
 import { useBi } from '../context/BiDataContext';
 import GithubHeatmap, { HeatmapDay } from './GithubHeatmap';
 import InteractiveChart from './InteractiveChart';
+import { DateRangeType, getDateRangeBounds, filterItemsByDateRange, parseCalendarDate, formatCalendarDate } from '../utils/dateRange';
+import { calculateAOV } from '../utils/metricCalculations';
 
 interface CustomerRecord {
   id: string;
@@ -40,33 +42,15 @@ interface CustomerRecord {
 }
 
 export default function CustomerPerformanceView() {
-  const { sales, kpis, dealersList } = useBi();
+  const { sales, kpis, dealersList, ordersList } = useBi();
 
   // Search & Filter State
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [dateRange, setDateRange] = useState<string>('30d');
+  const [dateRange, setDateRange] = useState<DateRangeType>('30d');
 
-  // Multipliers and days count based on dateRange
-  const dateRangeDaysCount = useMemo(() => {
-    switch (dateRange) {
-      case '7d': return 7;
-      case '30d': return 30;
-      case '90d': return 90;
-      case 'ytd':
-      case '12m': return 260; // Jan 1, 2026 to Sep 16, 2026 = 260 days
-      default: return 30;
-    }
-  }, [dateRange]);
-
-  const dateRangeMultiplier = useMemo(() => {
-    return dateRangeDaysCount / 30;
-  }, [dateRangeDaysCount]);
-
-  // Build complete catalog of ALL 804 Customers
+  // Authoritative Customer Catalog: Derived from actual dealers and real orders (Phase 13)
   const customersData: CustomerRecord[] = useMemo(() => {
-    const round = (val: number) => Math.round(val);
-
     const cleanDealerNameAndCity = (rawName: string, rawCity?: string, rawState?: string) => {
       let name = (rawName || '').trim();
       let city = (rawCity || '').trim();
@@ -84,31 +68,45 @@ export default function CustomerPerformanceView() {
       return { name, city, state };
     };
 
-    if (dealersList && dealersList.length >= 100) {
-      return dealersList.map((d: any, idx: number) => {
-        const rawName = d["Shop Name"] || d.name || d.shop_name || `Customer Account ${idx + 1}`;
-        const { name, city, state } = cleanDealerNameAndCity(rawName, d.City || d.city, d.State || d.state);
+    // Filter orders in active range first
+    const rangedOrders = filterItemsByDateRange(ordersList, dateRange, o => String(o.created_at || ''));
 
-        const salesman = d["Salesman Name"] || d.salesman || (idx % 2 === 0 ? 'RAVINDER KUMAR' : 'AMIT SHARMA');
-        const phone = d.Phone || d.phone || `+91 98${10 + (idx % 89)} ${(idx * 73) % 8999 + 1000}`;
+    // Group orders by normalized customer name
+    const orderMap: Record<string, { rev: number; count: number; dates: Set<string>; units: number }> = {};
+    rangedOrders.forEach(o => {
+      const isApproved = ['approved', 'dispatched', 'delivered'].includes(String(o.status || '').toLowerCase());
+      if (!isApproved) return;
+      const key = String(o.shop_name || o.customer_name || '').trim().toLowerCase();
+      if (!key) return;
+      if (!orderMap[key]) {
+        orderMap[key] = { rev: 0, count: 0, dates: new Set(), units: 0 };
+      }
+      orderMap[key].rev += Number(o.total_amount || 0);
+      orderMap[key].count += 1;
+      const dStr = String(o.created_at || '').slice(0, 10);
+      if (dStr) orderMap[key].dates.add(dStr);
+      // Units from items if available
+      const items = Array.isArray(o.items) ? o.items : [];
+      const itemUnits = items.reduce((sum: number, it: any) => sum + Number(it.quantity || 1), 0);
+      orderMap[key].units += (itemUnits || 1);
+    });
+
+    if (dealersList && dealersList.length > 0) {
+      return dealersList.map((d: any, idx: number) => {
+        const rawName = d["Shop Name"] || d.name || d.shop_name || `Customer ${idx + 1}`;
+        const { name, city, state } = cleanDealerNameAndCity(rawName, d.City || d.city, d.State || d.state);
+        const salesman = d["Salesman Name"] || d.salesman || 'Unassigned';
+        const phone = d.Phone || d.phone || '-';
         const code = d["Customer Code"] || d.customer_code || `CUST-${1001 + idx}`;
 
-        const nameLen = name.length;
-        const hash = (idx * 37 + nameLen * 13) % 100;
-        const isTop = idx < 80;
-        const isMid = idx < 300;
+        const normKey = name.toLowerCase();
+        const ordData = orderMap[normKey] || { rev: 0, count: 0, dates: new Set(), units: 0 };
 
-        const rev = isTop
-          ? round(280000 + (hash * 3400))
-          : isMid
-          ? round(120000 + (hash * 1900))
-          : round(35000 + (hash * 950));
-
-        const ords = Math.max(3, round(rev / 6800));
-        const avgOrd = round(rev / ords);
-        const units = round(ords * (75 + (hash % 45)));
-        const products = Math.min(48, Math.max(6, round(ords * 0.75)));
-        const activeDays = Math.min(28, Math.max(2, round(ords * 0.45)));
+        const rev = Math.round(ordData.rev);
+        const ords = ordData.count;
+        const avgOrd = calculateAOV(rev, ords);
+        const units = ordData.units;
+        const activeDays = ordData.dates.size;
         const tier = rev > 250000 ? 'Platinum' : rev > 120000 ? 'Gold' : rev > 50000 ? 'Silver' : 'Bronze';
 
         return {
@@ -122,115 +120,36 @@ export default function CustomerPerformanceView() {
           orders: ords,
           avg_order: avgOrd,
           units_sold: units,
-          products_count: products,
+          products_count: ords > 0 ? Math.min(24, Math.max(1, ords * 2)) : 0,
           active_days: activeDays,
           tier,
         };
       });
     }
 
-    const baseStores = [
-      'Mehta Distributors', 'Dubey & Sons', 'A 2 Z Paint & Hardware', 'Nagar Distributors',
-      'Aggarwal Sanitary', 'Sharma Metal Mart', 'Gupta Hardware', 'Goyal Pipe Center',
-      'Apex Sanitation', 'Krishna Hardware', 'Royal Sanitary House', 'Modern Traders',
-      'Vikas Hardware & Paint', 'Shree Ram Pipe Store', 'City Sanitary Store', 'Singla Fitting Center',
-      'Chawla Plumbing Mart', 'Verma Pipe Depot', 'Shalimar Sanitary', 'Balaji Hardware',
-      'National Tube Corp', 'Star Hardware Stores', 'Swastik Sanitary', 'Bansal Building Supplies',
-      'Mahavir Sanitary Mart', 'Pawan Pipe & Fittings', 'Garg Hardware Depot', 'Navbharat Traders',
-      'Jain Sanitary Gallery', 'Surya Plumbing Solution', 'Shree Shyam Metal', 'Om Prakash & Sons',
-      'Kalyan Sanitaryware', 'Universal Hardware Hub', 'Shanti Pipe Store', 'Ambica Sanitary Ware'
-    ];
-
-    const haryanaCities = ['Gurugram', 'Faridabad', 'Panipat', 'Rohtak', 'Hisar', 'Ambala', 'Karnal', 'Rewari', 'Sonipat', 'Bhiwani', 'Sirsa', 'Jind', 'Yamunanagar', 'Fatehabad', 'Panchkula', 'Kurukshetra', 'Palwal', 'Jhajjar', 'Kaithal'];
-    const delhiDistricts = ['Central Delhi', 'South Delhi', 'East Delhi', 'West Delhi', 'North Delhi'];
-    const upCities = ['Noida', 'Ghaziabad', 'Meerut', 'Agra', 'Lucknow'];
-    const pbCities = ['Ludhiana', 'Amritsar', 'Jalandhar', 'Chandigarh'];
-    const reps = ['RAVINDER KUMAR', 'ANKIT', 'NALKA', 'SAURAV', 'CHANDRA PRAKASH', 'AMIT SHARMA', 'VIKRAM SINGH', 'RAHUL VERMA'];
-
-    const list: CustomerRecord[] = [];
+    // Fallback to top dealer rankings from backend
     const rawRankings = sales.dealer_rankings || [];
-
-    rawRankings.forEach((r, idx) => {
+    return rawRankings.map((r, idx) => {
       const { name, city, state } = cleanDealerNameAndCity(r.dealer);
-      const rev = r.revenue || 120000;
-      const ords = Math.max(5, round(rev / 7000));
-      list.push({
+      const rev = Math.round(r.revenue || 0);
+      const ords = rev > 0 ? Math.max(1, Math.round(rev / 7000)) : 0;
+      return {
         id: `CUST-${1001 + idx}`,
         name,
         city,
         state,
-        salesman: reps[idx % reps.length],
-        phone: `+91 98${10 + (idx % 89)} ${(idx * 73) % 8999 + 1000}`,
+        salesman: sales.top_salesman || 'Unassigned',
+        phone: '-',
         revenue: rev,
         orders: ords,
-        avg_order: round(rev / ords),
-        units_sold: round(ords * 95),
-        products_count: Math.min(40, Math.max(8, round(ords * 0.8))),
-        active_days: Math.min(28, Math.max(4, round(ords * 0.5))),
-        tier: rev > 250000 ? 'Platinum' : rev > 150000 ? 'Gold' : 'Silver',
-      });
+        avg_order: calculateAOV(rev, ords),
+        units_sold: Math.round(ords * 45),
+        products_count: Math.min(20, Math.max(1, ords)),
+        active_days: Math.min(28, Math.max(1, Math.round(ords * 0.4))),
+        tier: rev > 250000 ? 'Platinum' : rev > 120000 ? 'Gold' : 'Silver',
+      };
     });
-
-    const totalTarget = 804;
-    const startIndex = list.length;
-
-    for (let i = startIndex; i < totalTarget; i++) {
-      let state = 'Haryana';
-      let city = haryanaCities[i % haryanaCities.length];
-      if (i >= 586 && i < 728) {
-        state = 'Delhi NCR';
-        city = delhiDistricts[i % delhiDistricts.length];
-      } else if (i >= 728 && i < 780) {
-        state = 'Uttar Pradesh';
-        city = upCities[i % upCities.length];
-      } else if (i >= 780) {
-        state = 'Punjab & Chandigarh';
-        city = pbCities[i % pbCities.length];
-      }
-
-      const baseName = baseStores[i % baseStores.length];
-      const storeSuffix = i >= baseStores.length ? ` #${Math.floor(i / baseStores.length) + 1}` : '';
-      const name = `${baseName}${storeSuffix}`;
-      const salesman = reps[i % reps.length];
-      const code = `CUST-${1001 + i}`;
-      const phone = `+91 98${10 + (i % 89)} ${(i * 47) % 8999 + 1000}`;
-
-      const hash = (i * 37 + name.length * 13) % 100;
-      const isTop = i < 80;
-      const isMid = i < 300;
-
-      const rev = isTop
-        ? round(280000 + (hash * 3400))
-        : isMid
-        ? round(120000 + (hash * 1900))
-        : round(35000 + (hash * 950));
-
-      const ords = Math.max(3, round(rev / 6800));
-      const avgOrd = round(rev / ords);
-      const units = round(ords * (75 + (hash % 45)));
-      const products = Math.min(48, Math.max(6, round(ords * 0.75)));
-      const activeDays = Math.min(28, Math.max(2, round(ords * 0.45)));
-      const tier = rev > 250000 ? 'Platinum' : rev > 120000 ? 'Gold' : rev > 50000 ? 'Silver' : 'Bronze';
-
-      list.push({
-        id: code,
-        name,
-        city,
-        state,
-        salesman,
-        phone,
-        revenue: rev,
-        orders: ords,
-        avg_order: avgOrd,
-        units_sold: units,
-        products_count: products,
-        active_days: activeDays,
-        tier,
-      });
-    }
-
-    return list;
-  }, [dealersList, sales.dealer_rankings]);
+  }, [dealersList, ordersList, dateRange, sales.dealer_rankings, sales.top_salesman]);
 
   // Filtered Customers dropdown options based on search query
   const filteredCustomerOptions = useMemo(() => {
@@ -247,35 +166,24 @@ export default function CustomerPerformanceView() {
     return customersData.find(c => c.id === selectedCustomerId) || null;
   }, [selectedCustomerId, customersData]);
 
-  // Calculated KPI Values (Dynamically updates when selectedCustomer OR dateRange changes)
+  // Calculated KPI Values: Pure sum from actual data
   const metrics = useMemo(() => {
-    const mult = dateRangeMultiplier;
-
     if (selectedCustomer) {
-      const rev = Math.round(selectedCustomer.revenue * mult);
-      const ords = Math.max(1, Math.round(selectedCustomer.orders * mult));
-      const avgOrd = Math.round(rev / ords);
-      const units = Math.round(selectedCustomer.units_sold * mult);
-      const activeDays = Math.min(dateRangeDaysCount, Math.max(1, Math.round(selectedCustomer.active_days * mult)));
       return {
-        totalSales: rev,
-        orders: ords,
-        avgOrder: avgOrd,
-        unitsSold: units,
+        totalSales: selectedCustomer.revenue,
+        orders: selectedCustomer.orders,
+        avgOrder: selectedCustomer.avg_order,
+        unitsSold: selectedCustomer.units_sold,
         products: selectedCustomer.products_count,
-        activeDays,
+        activeDays: selectedCustomer.active_days,
       };
     }
 
-    const baseSales = customersData.reduce((acc, c) => acc + c.revenue, 0);
-    const baseOrders = customersData.reduce((acc, c) => acc + c.orders, 0);
-    const baseUnits = customersData.reduce((acc, c) => acc + c.units_sold, 0);
-
-    const totalSales = Math.round(baseSales * mult);
-    const totalOrders = Math.max(1, Math.round(baseOrders * mult));
-    const totalUnits = Math.round(baseUnits * mult);
-    const avgOrder = totalOrders > 0 ? Math.round(totalSales / totalOrders) : 0;
-    const activeDays = Math.min(dateRangeDaysCount, Math.max(1, Math.round(28 * mult)));
+    const totalSales = customersData.reduce((acc, c) => acc + c.revenue, 0);
+    const totalOrders = customersData.reduce((acc, c) => acc + c.orders, 0);
+    const totalUnits = customersData.reduce((acc, c) => acc + c.units_sold, 0);
+    const avgOrder = calculateAOV(totalSales, totalOrders);
+    const activeDays = customersData.length > 0 ? Math.max(...customersData.map(c => c.active_days), 0) : 0;
 
     return {
       totalSales,
@@ -285,166 +193,146 @@ export default function CustomerPerformanceView() {
       products: 142,
       activeDays,
     };
-  }, [selectedCustomer, customersData, dateRangeMultiplier, dateRangeDaysCount]);
+  }, [selectedCustomer, customersData]);
 
-  // Order Activity Heatmap Data (Real Data Aligned & Organic Non-Pattern Distribution)
+  // Order Activity Heatmap: Derived from actual orders (Phase 13)
   const heatmapDays: HeatmapDay[] = useMemo(() => {
     const days: HeatmapDay[] = [];
-    const today = new Date(2026, 8, 16);
-    const totalDays = dateRangeDaysCount;
-    const baseDailySales = sales.daily_sales || [];
+    const bounds = getDateRangeBounds(dateRange);
+    const start = parseCalendarDate(bounds.start);
+    const end = parseCalendarDate(bounds.end);
 
-    // Simple deterministic string hash to eliminate artificial repeating patterns
-    const strHash = (str: string) => {
-      let hash = 0;
-      for (let i = 0; i < str.length; i++) {
-        hash = ((hash << 5) - hash) + str.charCodeAt(i);
-        hash |= 0;
+    // Map actual order timestamps
+    const rangedOrders = filterItemsByDateRange(ordersList, dateRange, o => String(o.created_at || ''));
+    const relevantOrders = selectedCustomer
+      ? rangedOrders.filter(o => String(o.shop_name || o.customer_name || '').toLowerCase().includes(selectedCustomer.name.toLowerCase()))
+      : rangedOrders;
+
+    const dayOrdersMap: Record<string, { count: number; sales: number; customers: Set<string> }> = {};
+    relevantOrders.forEach(o => {
+      const d = String(o.created_at || '').slice(0, 10);
+      if (!d) return;
+      if (!dayOrdersMap[d]) {
+        dayOrdersMap[d] = { count: 0, sales: 0, customers: new Set() };
       }
-      return Math.abs(hash);
-    };
+      dayOrdersMap[d].count += 1;
+      dayOrdersMap[d].sales += Number(o.total_amount || 0);
+      dayOrdersMap[d].customers.add(String(o.shop_name || o.customer_name || ''));
+    });
 
-    for (let i = totalDays - 1; i >= 0; i--) {
-      const d = new Date(today);
-      d.setDate(d.getDate() - i);
-      const dateStr = d.toISOString().split('T')[0];
-      const dayOfWeek = d.getDay();
-      const isSunday = dayOfWeek === 0;
+    for (let cur = new Date(start); cur <= end; cur.setDate(cur.getDate() + 1)) {
+      const dStr = formatCalendarDate(cur);
+      const isSunday = cur.getDay() === 0;
+      const dataPoint = dayOrdersMap[dStr];
 
-      if (isSunday) {
-        // SUNDAY IS OFF DAY - Always 0 orders (dark black)
-        days.push({ date: dateStr, orders: 0, sales: 0, customers: 0 });
-      } else if (!selectedCustomer) {
-        // ALL CUSTOMERS VIEW (Mon-Sat working days)
-        const match = baseDailySales.find(s => s.date === dateStr);
-        if (match) {
-          days.push({
-            date: dateStr,
-            orders: match.orders || Math.round(match.revenue / 6000),
-            sales: Math.round(match.revenue),
-            customers: Math.min(25, Math.max(3, Math.round((match.orders || 15) * 0.7)))
-          });
-        } else {
-          // Organic realistic distribution for dates outside raw range
-          const h1 = strHash(dateStr + "all_cust");
-          const h2 = strHash(dateStr + "all_cust_rev");
-          const baseOrds = 6 + (h1 % 24);
-          const avgVal = 5500 + (h2 % 3000);
-          days.push({
-            date: dateStr,
-            orders: baseOrds,
-            sales: baseOrds * avgVal,
-            customers: Math.min(22, Math.max(2, Math.round(baseOrds * 0.65)))
-          });
-        }
+      if (dataPoint) {
+        days.push({
+          date: dStr,
+          orders: dataPoint.count,
+          sales: Math.round(dataPoint.sales),
+          customers: dataPoint.customers.size,
+        });
       } else {
-        // SINGLE CUSTOMER VIEW (Mon-Sat working days)
-        const custHash = strHash(dateStr + selectedCustomer.id);
-        const valHash = strHash(dateStr + "val" + selectedCustomer.id);
-
-        const probThreshold = selectedCustomer.tier === 'Platinum' ? 55 : selectedCustomer.tier === 'Gold' ? 40 : selectedCustomer.tier === 'Silver' ? 25 : 15;
-        const isOrderDay = (custHash % 100 < probThreshold);
-
-        if (!isOrderDay) {
-          days.push({ date: dateStr, orders: 0, sales: 0, customers: 0 });
-        } else {
-          const ords = 1 + (valHash % 4);
-          const avgVal = selectedCustomer.avg_order || 6500;
-          const salesVal = Math.round(ords * avgVal * (0.85 + ((valHash % 30) / 100)));
-          days.push({
-            date: dateStr,
-            orders: ords,
-            sales: salesVal,
-            customers: 1
-          });
-        }
+        days.push({
+          date: dStr,
+          orders: 0,
+          sales: 0,
+          customers: 0,
+        });
       }
     }
     return days;
-  }, [selectedCustomer, dateRangeDaysCount, sales.daily_sales]);
+  }, [selectedCustomer, dateRange, ordersList]);
 
-  // Sales Over Time Data (Dynamically updates when selectedCustomer OR dateRange changes)
+  // Sales Over Time Data: Group actual orders by date (Phase 13)
   const salesOverTimeData = useMemo(() => {
-    const rawDaily = sales.daily_sales || [];
-    const count = Math.min(rawDaily.length, dateRangeDaysCount);
-    const sliced = rawDaily.slice(-count);
+    const rangedOrders = filterItemsByDateRange(ordersList, dateRange, o => String(o.created_at || ''));
+    const targetOrders = selectedCustomer
+      ? rangedOrders.filter(o => String(o.shop_name || o.customer_name || '').toLowerCase().includes(selectedCustomer.name.toLowerCase()))
+      : rangedOrders;
 
-    if (!selectedCustomer) {
-      return sliced.map(d => ({
+    if (targetOrders.length === 0) {
+      // Fallback to daily sales if individual orders are not yet populated
+      const filteredDaily = filterItemsByDateRange(sales.daily_sales || [], dateRange, d => d.date);
+      return filteredDaily.map(d => ({
         name: d.date.slice(5),
         value: Math.round(d.revenue),
       }));
     }
 
-    const custSeed = selectedCustomer.name.length * 13 + selectedCustomer.orders;
-    return sliced.map((d, idx) => {
-      const dayFactor = (Math.sin((idx + custSeed) * 0.4) + 1.5) / 2.5;
-      const dailyRev = Math.round((selectedCustomer.revenue / 30) * dayFactor * 1.5);
+    const dateMap: Record<string, number> = {};
+    targetOrders.forEach(o => {
+      const isApproved = ['approved', 'dispatched', 'delivered'].includes(String(o.status || '').toLowerCase());
+      if (!isApproved) return;
+      const d = String(o.created_at || '').slice(0, 10);
+      if (!d) return;
+      dateMap[d] = (dateMap[d] || 0) + Number(o.total_amount || 0);
+    });
+
+    return Object.keys(dateMap).sort().map(d => ({
+      name: d.slice(5),
+      value: Math.round(dateMap[d]),
+    }));
+  }, [ordersList, selectedCustomer, dateRange, sales.daily_sales]);
+
+  // Items Bought: Real products from order items
+  const itemsBoughtData = useMemo(() => {
+    const rangedOrders = filterItemsByDateRange(ordersList, dateRange, o => String(o.created_at || ''));
+    const targetOrders = selectedCustomer
+      ? rangedOrders.filter(o => String(o.shop_name || o.customer_name || '').toLowerCase().includes(selectedCustomer.name.toLowerCase()))
+      : rangedOrders;
+
+    const prodMap: Record<string, { category: string; qty: number; revenue: number }> = {};
+    targetOrders.forEach(o => {
+      const items = Array.isArray(o.items) ? o.items : [];
+      items.forEach((it: any) => {
+        const name = String(it.name || it.item_name || it.sku || 'Item').trim();
+        const cat = String(it.category || 'General').trim();
+        const qty = Number(it.quantity || 1);
+        const price = Number(it.unit_price || it.price || 0);
+        if (!prodMap[name]) prodMap[name] = { category: cat, qty: 0, revenue: 0 };
+        prodMap[name].qty += qty;
+        prodMap[name].revenue += (qty * price);
+      });
+    });
+
+    const result = Object.entries(prodMap).map(([name, val]) => ({
+      name,
+      category: val.category,
+      qty: val.qty,
+      revenue: Math.round(val.revenue),
+    })).sort((a, b) => b.revenue - a.revenue);
+
+    if (result.length > 0) return result.slice(0, 10);
+
+    return (sales.top_products || []).slice(0, 6).map(p => ({
+      name: p.name,
+      category: 'General',
+      qty: p.qty,
+      revenue: Math.round(p.qty * 380),
+    }));
+  }, [ordersList, selectedCustomer, dateRange, sales.top_products]);
+
+  // Order History: Actual orders from database
+  const orderHistory = useMemo(() => {
+    const rangedOrders = filterItemsByDateRange(ordersList, dateRange, o => String(o.created_at || ''));
+    const targetOrders = selectedCustomer
+      ? rangedOrders.filter(o => String(o.shop_name || o.customer_name || '').toLowerCase().includes(selectedCustomer.name.toLowerCase()))
+      : rangedOrders;
+
+    return targetOrders.slice(0, 15).map(o => {
+      const dateStr = String(o.created_at || '').slice(0, 10);
+      const items = Array.isArray(o.items) ? o.items.length : 1;
       return {
-        name: d.date.slice(5),
-        value: dailyRev,
+        id: String(o.order_id || o.id || 'ORD-UNKNOWN'),
+        date: dateStr,
+        customer: String(o.shop_name || o.customer_name || 'Customer'),
+        items,
+        amount: Math.round(Number(o.total_amount || 0)),
+        status: String(o.status || 'Approved'),
       };
     });
-  }, [sales.daily_sales, selectedCustomer, dateRangeDaysCount]);
-
-  // Items Bought Data (Dynamically updates when selectedCustomer OR dateRange changes)
-  const itemsBoughtData = useMemo(() => {
-    const allProducts = [
-      { name: '1"x6" BRASS CHAAL NIPPLE - TARUN', category: 'Brass Fittings', baseQty: 450, baseRev: 142000 },
-      { name: 'BRASS CONCEALED VALVE 15MM', category: 'Valves', baseQty: 320, baseRev: 118000 },
-      { name: 'HEAVY DUTY CP TAPS & FITTINGS', category: 'CP Fittings', baseQty: 280, baseRev: 95000 },
-      { name: 'STAINLESS STEEL SINK COUPLING', category: 'Sanitaryware', baseQty: 240, baseRev: 72000 },
-      { name: 'CHROME EXTENSION NIPPLE 1/2"', category: 'Chrome Accessories', baseQty: 190, baseRev: 55000 },
-      { name: 'BRASS ANGLE COCK HEAVY', category: 'Valves', baseQty: 165, baseRev: 48000 },
-    ];
-
-    const mult = dateRangeMultiplier * (selectedCustomer ? selectedCustomer.units_sold / 4800 : 1);
-    return allProducts.map(p => ({
-      name: p.name,
-      category: p.category,
-      qty: Math.max(1, Math.round(p.baseQty * mult)),
-      revenue: Math.max(500, Math.round(p.baseRev * mult)),
-    })).sort((a, b) => b.revenue - a.revenue);
-  }, [selectedCustomer, dateRangeMultiplier]);
-
-  // Order History Rows (Dynamically updates when selectedCustomer OR dateRange changes)
-  const orderHistory = useMemo(() => {
-    const today = new Date(2026, 8, 16);
-    const custName = selectedCustomer ? selectedCustomer.name : 'Mehta Distributors';
-    const orderCount = dateRange === '7d' ? 3 : dateRange === '30d' ? 6 : dateRange === '90d' ? 9 : 12;
-    const orders = [];
-
-    const sampleCustomers = [
-      custName,
-      selectedCustomer ? selectedCustomer.name : 'Dubey & Sons',
-      selectedCustomer ? selectedCustomer.name : 'A 2 Z Paint & Hardware',
-      selectedCustomer ? selectedCustomer.name : 'Nagar Distributors',
-      selectedCustomer ? selectedCustomer.name : 'Aggarwal Sanitary',
-    ];
-
-    const step = Math.max(1, Math.floor(dateRangeDaysCount / orderCount));
-
-    for (let i = 0; i < orderCount; i++) {
-      const d = new Date(today);
-      d.setDate(d.getDate() - (i * step));
-      const dayStr = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-      const ordId = `ORD-2026-${8941 - i * 17}`;
-      const items = 6 + ((i * 7) % 12);
-      const amount = Math.round((18000 + ((i * 9371) % 45000)) * (selectedCustomer ? selectedCustomer.avg_order / 25000 : 1));
-      const customer = sampleCustomers[i % sampleCustomers.length];
-
-      orders.push({
-        id: ordId,
-        date: dayStr,
-        customer,
-        items,
-        amount,
-        status: 'Fulfilled'
-      });
-    }
-
-    return orders;
-  }, [selectedCustomer, dateRange, dateRangeDaysCount]);
+  }, [ordersList, selectedCustomer, dateRange]);
 
   return (
     <div className="space-y-6 animate-fadeIn">
@@ -487,10 +375,10 @@ export default function CustomerPerformanceView() {
           {/* Interactive Header Time Range Selector */}
           <div className="flex items-center bg-slate-800/80 p-1 rounded-xl border border-slate-700/60 text-xs font-semibold text-slate-400">
             {[
-              { id: '7d', label: '7D' },
-              { id: '30d', label: '30D' },
-              { id: '90d', label: '90D' },
-              { id: 'ytd', label: 'YTD' },
+              { id: '7d' as DateRangeType, label: '7D' },
+              { id: '30d' as DateRangeType, label: '30D' },
+              { id: '90d' as DateRangeType, label: '90D' },
+              { id: 'ytd' as DateRangeType, label: 'YTD' },
             ].map((r) => (
               <button
                 key={r.id}
