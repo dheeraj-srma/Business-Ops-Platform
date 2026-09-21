@@ -172,8 +172,8 @@ function ReturnsContent() {
   const fetchReturns = useCallback(() => {
     setLoading(true);
     getReturns()
-      .then(data => setReturns(Array.isArray(data) ? data : []))
-      .catch(err => {
+      .then((data: any) => setReturns(Array.isArray(data) ? data : []))
+      .catch((err: any) => {
         console.warn('Failed to fetch returns:', err);
         setReturns([]);
       })
