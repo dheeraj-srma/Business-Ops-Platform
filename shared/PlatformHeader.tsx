@@ -31,9 +31,16 @@ export default function PlatformHeader() {
         if (res.ok) {
           const data = await res.json();
           if (data.user) {
-            setUserProfile(data.user);
+            const freshUser: UserProfile = {
+              id: data.user.id || data.user.user_id || 'usr-active',
+              email: data.user.email || '',
+              role: data.user.role || 'viewer',
+              full_name: data.user.full_name || data.user.email || 'User',
+              salesman_id: data.user.salesman_id,
+            };
+            setUserProfile(freshUser);
             if (typeof window !== 'undefined') {
-              document.cookie = `nalka_user=${encodeURIComponent(JSON.stringify(data.user))}; path=/; max-age=86400; SameSite=Lax`;
+              document.cookie = `nalka_user=${encodeURIComponent(JSON.stringify(freshUser))}; path=/; max-age=86400; SameSite=Lax`;
             }
           }
         }
@@ -45,18 +52,27 @@ export default function PlatformHeader() {
     syncProfile();
     refreshProfileFromBackend();
 
+    const handleAuthEvent = () => {
+      syncProfile();
+      refreshProfileFromBackend();
+    };
+
     if (typeof window !== 'undefined') {
-      window.addEventListener('nalka_auth_change', () => {
-        syncProfile();
-        refreshProfileFromBackend();
+      window.addEventListener('nalka_auth_change', handleAuthEvent);
+      window.addEventListener('storage', handleAuthEvent);
+      window.addEventListener('focus', handleAuthEvent);
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+          handleAuthEvent();
+        }
       });
-      window.addEventListener('storage', syncProfile);
     }
 
     return () => {
       if (typeof window !== 'undefined') {
-        window.removeEventListener('nalka_auth_change', syncProfile);
-        window.removeEventListener('storage', syncProfile);
+        window.removeEventListener('nalka_auth_change', handleAuthEvent);
+        window.removeEventListener('storage', handleAuthEvent);
+        window.removeEventListener('focus', handleAuthEvent);
       }
     };
   }, [pathname]);

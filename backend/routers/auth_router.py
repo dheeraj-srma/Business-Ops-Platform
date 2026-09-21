@@ -201,18 +201,44 @@ def logout(response: Response):
     return {"message": "Logged out successfully."}
 
 @router.get("/me")
-def get_auth_me(current_user: dict = Depends(get_current_user)):
+def get_auth_me(response: Response, current_user: dict = Depends(get_current_user)):
     """Returns the latest authoritative user profile queried directly from the PostgreSQL users table."""
+    import uuid
+    import json
+    import urllib.parse
+    
     client = get_supabase_client()
-    if client and current_user and current_user.get("user_id"):
+    if client and current_user:
         try:
-            u_id = current_user["user_id"]
-            user_res = client.table("users").select("id, email, full_name, username, role, is_active, phone").eq("id", u_id).limit(1).execute()
-            if not user_res.data and current_user.get("email"):
-                user_res = client.table("users").select("id, email, full_name, username, role, is_active, phone").eq("email", current_user["email"]).limit(1).execute()
-            
-            if user_res.data:
+            u_id = current_user.get("user_id") or current_user.get("id")
+            email = (current_user.get("email") or "").strip().lower()
+            role = (current_user.get("role") or "").strip().lower()
+            user_res = None
+
+            # 1. Try querying by UUID if u_id is valid UUID
+            if u_id:
+                try:
+                    uuid.UUID(str(u_id))
+                    user_res = client.table("users").select("id, email, full_name, username, role, is_active, phone").eq("id", str(u_id)).limit(1).execute()
+                except (ValueError, AttributeError):
+                    user_res = None
+
+            # 2. If not found, try querying by email
+            if (not user_res or not user_res.data) and email:
+                user_res = client.table("users").select("id, email, full_name, username, role, is_active, phone").ilike("email", email).limit(1).execute()
+
+            # 3. If not found and legacy admin email or role is admin, match the admin account
+            if (not user_res or not user_res.data) and (email == "admin@nalkametals.com" or role == "admin" or u_id == "usr-admin-001"):
+                user_res = client.table("users").select("id, email, full_name, username, role, is_active, phone").eq("role", "admin").limit(1).execute()
+
+            # 4. If not found, try username
+            if (not user_res or not user_res.data) and current_user.get("username"):
+                user_res = client.table("users").select("id, email, full_name, username, role, is_active, phone").eq("username", current_user["username"]).limit(1).execute()
+
+            if user_res and user_res.data:
                 db_user = user_res.data[0]
+                current_user["id"] = db_user.get("id")
+                current_user["user_id"] = db_user.get("id")
                 current_user["full_name"] = db_user.get("full_name") or current_user.get("full_name")
                 current_user["email"] = db_user.get("email") or current_user.get("email")
                 current_user["username"] = db_user.get("username")
@@ -229,5 +255,25 @@ def get_auth_me(current_user: dict = Depends(get_current_user)):
                     pass
         except Exception as e:
             logger.warning(f"Could not refresh current user profile from DB: {e}")
-            
+
+    # Set client-readable profile cookie so browser immediately syncs latest DB profile
+    if current_user and current_user.get("full_name"):
+        cookie_user = {
+            "id": current_user.get("id") or current_user.get("user_id"),
+            "email": current_user.get("email"),
+            "role": current_user.get("role"),
+            "full_name": current_user.get("full_name"),
+            "salesman_id": current_user.get("salesman_id"),
+            "username": current_user.get("username")
+        }
+        response.set_cookie(
+            key="nalka_user",
+            value=urllib.parse.quote(json.dumps(cookie_user)),
+            httponly=False,
+            samesite="lax",
+            max_age=86400,
+            path="/"
+        )
+
     return {"user": current_user}
+

@@ -7,19 +7,19 @@ import { setAuthSession, getAuthSession, getDefaultWorkspace, UserProfile } from
 
 // Authoritative PostgreSQL user mapping reference
 const SEEDED_DEV_ACCOUNTS: Record<string, UserProfile & { pass: string }> = {
-  // Admin: Jagmohan Sharma
+  // Admin: Jagmohan Sardhana
   'jagmohan@nalkametals.com': {
     id: 'e0ccb273-9d2b-4ce2-98d4-3ca3f5de85d6',
     email: 'jagmohan@nalkametals.com',
     role: 'admin',
-    full_name: 'Jagmohan Sharma',
+    full_name: 'Jagmohan Sardhana',
     pass: 'Jagmohan@2026',
   },
   'jagmohan': {
     id: 'e0ccb273-9d2b-4ce2-98d4-3ca3f5de85d6',
     email: 'jagmohan@nalkametals.com',
     role: 'admin',
-    full_name: 'Jagmohan Sharma',
+    full_name: 'Jagmohan Sardhana',
     pass: 'Jagmohan@2026',
   },
   // Warehouse Manager: Parag Sharma

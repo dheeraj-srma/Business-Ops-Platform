@@ -164,6 +164,17 @@ export default function CentralAdminPage() {
           token = data.access_token;
           if (typeof window !== 'undefined') {
             document.cookie = `nalka_token=${token}; path=/; max-age=86400; SameSite=Lax`;
+            if (data.user) {
+              const freshUser = {
+                id: data.user.id || data.user.user_id,
+                email: data.user.email,
+                role: data.user.role,
+                full_name: data.user.full_name,
+                salesman_id: data.user.salesman_id
+              };
+              document.cookie = `nalka_user=${encodeURIComponent(JSON.stringify(freshUser))}; path=/; max-age=86400; SameSite=Lax`;
+              window.dispatchEvent(new Event('nalka_auth_change'));
+            }
           }
         }
       }
@@ -504,13 +515,21 @@ export default function CentralAdminPage() {
 
         // If the updated user is the currently active user, immediately sync profile
         const activeSession = getAuthSession();
-        if (
+        const activeEmail = (activeSession?.user?.email || '').toLowerCase();
+        const selectedEmail = (selectedUser.email || '').toLowerCase();
+        const activeId = activeSession?.user?.id || '';
+        const selectedId = selectedUser.id || '';
+        const isSelf =
           activeSession?.user &&
-          (activeSession.user.id === selectedUser.id ||
-            activeSession.user.email?.toLowerCase() === selectedUser.email?.toLowerCase())
-        ) {
+          (activeId === selectedId ||
+            activeEmail === selectedEmail ||
+            (activeSession.user.role === 'admin' && (selectedUser.role === 'admin' || payload.role === 'admin')) ||
+            (activeEmail === 'admin@nalkametals.com' && selectedEmail === 'jagmohan@nalkametals.com'));
+
+        if (isSelf) {
           const updatedProfile = {
             ...activeSession.user,
+            id: selectedId || activeId,
             full_name: payload.full_name || activeSession.user.full_name,
             email: payload.email || activeSession.user.email,
             role: payload.role || activeSession.user.role,
