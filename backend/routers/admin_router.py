@@ -208,3 +208,107 @@ def get_system_health():
             "status": "configured",
         }
     }
+
+# ==========================================
+# CUSTOMER & SALESMAN ASSIGNMENTS MANAGEMENT
+# ==========================================
+
+@router.get("/salesmen")
+def list_salesmen(
+    current_user: dict = Depends(require_role(["admin", "manager"]))
+):
+    """Returns all active field salesmen for assignment options."""
+    from repositories.customer_repo import CustomerRepository
+    try:
+        salesmen = CustomerRepository.get_all_salesmen()
+        return {"salesmen": salesmen, "count": len(salesmen)}
+    except Exception as exc:
+        logger.error(f"Error fetching salesmen: {exc}")
+        raise HTTPException(status_code=500, detail="Failed to fetch salesmen directory.")
+
+@router.get("/customer-assignments")
+def list_customer_assignments(
+    offset: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=500),
+    search: Optional[str] = Query(None),
+    salesman_id: Optional[str] = Query(None),
+    current_user: dict = Depends(require_role(["admin", "manager"]))
+):
+    """Returns paginated customer accounts with their assigned salesman."""
+    from repositories.customer_repo import CustomerRepository
+    try:
+        return CustomerRepository.get_customer_assignments(
+            offset=offset,
+            limit=limit,
+            search=search,
+            salesman_id=salesman_id
+        )
+    except Exception as exc:
+        logger.error(f"Error fetching customer assignments: {exc}")
+        raise HTTPException(status_code=500, detail="Failed to fetch customer assignments.")
+
+@router.patch("/customer-assignments/{customer_id}")
+def assign_customer_salesman(
+    customer_id: str,
+    payload: dict,
+    current_user: dict = Depends(require_role(["admin", "manager"]))
+):
+    """Assigns or changes the assigned salesman for a customer/dealer account."""
+    SnapshotService.assert_writable("customer assignment update")
+    from repositories.customer_repo import CustomerRepository
+    from services.audit_service import audit_service
+
+    salesman_id = payload.get("salesman_id")
+    try:
+        updated = CustomerRepository.assign_customer_to_salesman(customer_id, salesman_id)
+        
+        audit_service.log_event(
+            actor_id=current_user.get("user_id", "admin"),
+            actor_email=current_user.get("email", "admin@nalkametals.com"),
+            actor_role=current_user.get("role", "admin"),
+            action="ASSIGN_CUSTOMER_SALESMAN",
+            target_entity="customers",
+            target_id=customer_id,
+            new_value={"salesman_id": salesman_id, "salesman_name": updated.get("salesman_name")}
+        )
+
+        return {"status": "success", "assignment": updated}
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as exc:
+        logger.error(f"Error updating customer assignment '{customer_id}': {exc}")
+        raise HTTPException(status_code=500, detail=str(exc))
+
+@router.post("/customer-assignments/bulk")
+def bulk_assign_customers_salesman(
+    payload: dict,
+    current_user: dict = Depends(require_role(["admin", "manager"]))
+):
+    """Bulk reassigns multiple customer accounts to a salesman in a single operation."""
+    SnapshotService.assert_writable("bulk customer assignment")
+    from repositories.customer_repo import CustomerRepository
+    from services.audit_service import audit_service
+
+    customer_ids = payload.get("customer_ids", [])
+    salesman_id = payload.get("salesman_id")
+
+    if not customer_ids or not isinstance(customer_ids, list):
+        raise HTTPException(status_code=400, detail="customer_ids must be a non-empty list of IDs.")
+
+    try:
+        res = CustomerRepository.bulk_assign_customers(customer_ids, salesman_id)
+
+        audit_service.log_event(
+            actor_id=current_user.get("user_id", "admin"),
+            actor_email=current_user.get("email", "admin@nalkametals.com"),
+            actor_role=current_user.get("role", "admin"),
+            action="BULK_ASSIGN_CUSTOMERS",
+            target_entity="customers",
+            target_id="bulk",
+            new_value={"count": res["updated_count"], "salesman_id": salesman_id}
+        )
+
+        return {"status": "success", **res}
+    except Exception as exc:
+        logger.error(f"Error executing bulk customer assignments: {exc}")
+        raise HTTPException(status_code=500, detail=str(exc))

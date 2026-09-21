@@ -30,7 +30,11 @@ import {
   RotateCcw,
   Zap,
   Layers,
-  Server
+  Server,
+  Briefcase,
+  CheckSquare,
+  Square,
+  ArrowRightLeft
 } from 'lucide-react';
 
 import { getAuthSession } from '@/shared/auth';
@@ -46,6 +50,7 @@ const getApiUrl = () => {
 type TabType =
   | 'overview'
   | 'users'
+  | 'customer-assignments'
   | 'staff'
   | 'master-data'
   | 'system-health';
@@ -113,6 +118,19 @@ export default function CentralAdminPage() {
     new_quantity: 0,
     reason: ''
   });
+
+  // Customer & Salesman Assignments state
+  const [assignmentCustomers, setAssignmentCustomers] = useState<any[]>([]);
+  const [salesmenList, setSalesmenList] = useState<any[]>([]);
+  const [assignmentsTotal, setAssignmentsTotal] = useState(0);
+  const [assignmentsLoading, setAssignmentsLoading] = useState(false);
+  const [assignmentSearch, setAssignmentSearch] = useState('');
+  const [selectedSalesmanFilter, setSelectedSalesmanFilter] = useState('');
+  const [selectedCustomerIds, setSelectedCustomerIds] = useState<string[]>([]);
+  const [bulkTargetSalesman, setBulkTargetSalesman] = useState('');
+  const [assignmentPage, setAssignmentPage] = useState(0);
+  const [reassigningId, setReassigningId] = useState<string | null>(null);
+  const ASSIGNMENTS_PER_PAGE = 50;
 
   const ensureAdminSession = async (forceLogin = false): Promise<string> => {
     const apiUrl = getApiUrl();
@@ -275,13 +293,113 @@ export default function CentralAdminPage() {
     }
   };
 
+  const fetchSalesmen = async () => {
+    try {
+      const headers = await getAdminHeaders();
+      const res = await fetch(`${getApiUrl()}/api/admin/salesmen`, { headers, credentials: 'include' });
+      if (res.ok) {
+        const data = await res.json();
+        setSalesmenList(data.salesmen || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch salesmen list:', err);
+    }
+  };
+
+  const fetchCustomerAssignments = async (page = assignmentPage, search = assignmentSearch, smFilter = selectedSalesmanFilter) => {
+    setAssignmentsLoading(true);
+    try {
+      const headers = await getAdminHeaders();
+      const params = new URLSearchParams({
+        offset: String(page * ASSIGNMENTS_PER_PAGE),
+        limit: String(ASSIGNMENTS_PER_PAGE)
+      });
+      if (search.trim()) params.append('search', search.trim());
+      if (smFilter) params.append('salesman_id', smFilter);
+
+      const res = await fetch(`${getApiUrl()}/api/admin/customer-assignments?${params.toString()}`, { headers, credentials: 'include' });
+      if (res.ok) {
+        const data = await res.json();
+        setAssignmentCustomers(data.customers || []);
+        setAssignmentsTotal(data.total || 0);
+        if (data.salesmen && data.salesmen.length > 0) {
+          setSalesmenList(data.salesmen);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch customer assignments:', err);
+    } finally {
+      setAssignmentsLoading(false);
+    }
+  };
+
+  const handleReassignCustomer = async (customerId: string, targetSalesmanId: string | null) => {
+    setReassigningId(customerId);
+    try {
+      const headers = await getAdminHeaders();
+      const res = await fetch(`${getApiUrl()}/api/admin/customer-assignments/${customerId}`, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({ salesman_id: targetSalesmanId })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const assignedName = data.assignment?.salesman_name || 'Direct / House Account';
+        setMessage({ type: 'success', text: `Assigned '${data.assignment?.name}' to ${assignedName}.` });
+        fetchCustomerAssignments(assignmentPage, assignmentSearch, selectedSalesmanFilter);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        setMessage({ type: 'error', text: err.detail || 'Failed to reassign customer.' });
+      }
+    } catch (err) {
+      setMessage({ type: 'error', text: 'Network error updating assignment.' });
+    } finally {
+      setReassigningId(null);
+    }
+  };
+
+  const handleBulkReassign = async () => {
+    if (selectedCustomerIds.length === 0) return;
+    try {
+      const headers = await getAdminHeaders();
+      const targetId = bulkTargetSalesman === 'unassigned' ? null : bulkTargetSalesman;
+      const res = await fetch(`${getApiUrl()}/api/admin/customer-assignments/bulk`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          customer_ids: selectedCustomerIds,
+          salesman_id: targetId
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setMessage({ type: 'success', text: `Successfully reassigned ${data.updated_count} customers!` });
+        setSelectedCustomerIds([]);
+        setBulkTargetSalesman('');
+        fetchCustomerAssignments(assignmentPage, assignmentSearch, selectedSalesmanFilter);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        setMessage({ type: 'error', text: err.detail || 'Failed bulk reassignment.' });
+      }
+    } catch (err) {
+      setMessage({ type: 'error', text: 'Network error during bulk reassignment.' });
+    }
+  };
+
   useEffect(() => {
     fetchAdminOverview();
     fetchUsers();
     fetchAuditLogs();
     fetchSettings();
     fetchSystemHealth();
+    fetchSalesmen();
   }, []);
+
+  useEffect(() => {
+    if (activeTab === 'customer-assignments') {
+      fetchCustomerAssignments(assignmentPage, assignmentSearch, selectedSalesmanFilter);
+    }
+  }, [activeTab, assignmentPage, selectedSalesmanFilter]);
 
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -383,6 +501,25 @@ export default function CentralAdminPage() {
         setShowEditUserModal(false);
         fetchUsers();
         fetchAdminOverview();
+
+        // If the updated user is the currently active user, immediately sync profile
+        const activeSession = getAuthSession();
+        if (
+          activeSession?.user &&
+          (activeSession.user.id === selectedUser.id ||
+            activeSession.user.email?.toLowerCase() === selectedUser.email?.toLowerCase())
+        ) {
+          const updatedProfile = {
+            ...activeSession.user,
+            full_name: payload.full_name || activeSession.user.full_name,
+            email: payload.email || activeSession.user.email,
+            role: payload.role || activeSession.user.role,
+          };
+          if (typeof window !== 'undefined') {
+            document.cookie = `nalka_user=${encodeURIComponent(JSON.stringify(updatedProfile))}; path=/; max-age=86400; SameSite=Lax`;
+            window.dispatchEvent(new Event('nalka_auth_change'));
+          }
+        }
       } else {
         setMessage({ type: 'error', text: data.detail || 'Failed to update user details.' });
       }
@@ -578,6 +715,7 @@ export default function CentralAdminPage() {
         {[
           { id: 'overview', label: 'Overview', icon: Layers },
           { id: 'users', label: 'Users', icon: Users },
+          { id: 'customer-assignments', label: 'Customer Assignments', icon: Briefcase },
           { id: 'staff', label: 'Staff', icon: UserCheck },
           { id: 'master-data', label: 'Master Data', icon: Building2 },
           { id: 'system-health', label: 'System Health', icon: Server },
@@ -858,6 +996,263 @@ export default function CentralAdminPage() {
                 )}
               </tbody>
             </table>
+          </div>
+
+        </div>
+      )}
+
+      {/* TAB: CUSTOMER & SALESMAN ASSIGNMENTS */}
+      {activeTab === 'customer-assignments' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          
+          {/* Header & Controls */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+              <div style={{ position: 'relative' }}>
+                <Search size={16} style={{ position: 'absolute', left: '12px', top: '10px', color: '#64748b' }} />
+                <input
+                  type="text"
+                  placeholder="Search customer name or code..."
+                  value={assignmentSearch}
+                  onChange={(e) => {
+                    setAssignmentSearch(e.target.value);
+                    setAssignmentPage(0);
+                    fetchCustomerAssignments(0, e.target.value, selectedSalesmanFilter);
+                  }}
+                  style={{ padding: '8px 12px 8px 36px', borderRadius: '8px', background: '#1e293b', border: '1px solid #334155', color: '#f8fafc', fontSize: '0.85rem', width: '280px' }}
+                />
+              </div>
+
+              <select
+                value={selectedSalesmanFilter}
+                onChange={(e) => {
+                  setSelectedSalesmanFilter(e.target.value);
+                  setAssignmentPage(0);
+                  fetchCustomerAssignments(0, assignmentSearch, e.target.value);
+                }}
+                style={{ padding: '8px 12px', borderRadius: '8px', background: '#1e293b', border: '1px solid #334155', color: '#f8fafc', fontSize: '0.85rem' }}
+              >
+                <option value="">All Field Salesmen ({assignmentsTotal})</option>
+                <option value="unassigned">Unassigned / Direct House Accounts</option>
+                {salesmenList.map((sm) => (
+                  <option key={sm.id} value={sm.id}>
+                    {sm.salesman_code} — {sm.full_name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Bulk Reassignment Action Toolbar */}
+            {selectedCustomerIds.length > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'rgba(99, 102, 241, 0.1)', padding: '6px 12px', borderRadius: '8px', border: '1px solid rgba(99, 102, 241, 0.3)' }}>
+                <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#a5b4fc' }}>
+                  {selectedCustomerIds.length} customer{selectedCustomerIds.length > 1 ? 's' : ''} selected
+                </span>
+                <select
+                  value={bulkTargetSalesman}
+                  onChange={(e) => setBulkTargetSalesman(e.target.value)}
+                  style={{ padding: '6px 10px', borderRadius: '6px', background: '#0f172a', border: '1px solid #334155', color: '#f8fafc', fontSize: '0.8rem' }}
+                >
+                  <option value="">Reassign to Salesman...</option>
+                  <option value="unassigned">Unassigned / Direct</option>
+                  {salesmenList.map((sm) => (
+                    <option key={sm.id} value={sm.id}>
+                      {sm.salesman_code} — {sm.full_name}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  disabled={!bulkTargetSalesman}
+                  onClick={handleBulkReassign}
+                  style={{
+                    padding: '6px 12px',
+                    borderRadius: '6px',
+                    background: bulkTargetSalesman ? '#4f46e5' : '#334155',
+                    color: '#ffffff',
+                    border: 'none',
+                    fontWeight: 600,
+                    fontSize: '0.8rem',
+                    cursor: bulkTargetSalesman ? 'pointer' : 'not-allowed'
+                  }}
+                >
+                  Apply
+                </button>
+                <button
+                  onClick={() => setSelectedCustomerIds([])}
+                  style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: '0.78rem', cursor: 'pointer', textDecoration: 'underline' }}
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Assignments Data Table */}
+          <div style={{ background: '#1e293b', borderRadius: '12px', border: '1px solid #334155', overflow: 'hidden' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
+              <thead>
+                <tr style={{ background: 'rgba(15, 23, 42, 0.6)', borderBottom: '1px solid #334155', color: '#94a3b8' }}>
+                  <th style={{ padding: '12px 14px', width: '40px', textAlign: 'center' }}>
+                    <input
+                      type="checkbox"
+                      checked={assignmentCustomers.length > 0 && selectedCustomerIds.length === assignmentCustomers.length}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedCustomerIds(assignmentCustomers.map(c => c.id));
+                        } else {
+                          setSelectedCustomerIds([]);
+                        }
+                      }}
+                      style={{ cursor: 'pointer' }}
+                    />
+                  </th>
+                  <th style={{ padding: '12px 16px' }}>Customer / Shop Name</th>
+                  <th style={{ padding: '12px 16px' }}>Customer Code</th>
+                  <th style={{ padding: '12px 16px' }}>Contact & Phone</th>
+                  <th style={{ padding: '12px 16px' }}>Current Salesman</th>
+                  <th style={{ padding: '12px 16px', minWidth: '240px' }}>Reassign Salesman</th>
+                </tr>
+              </thead>
+              <tbody>
+                {assignmentsLoading ? (
+                  <tr>
+                    <td colSpan={6} style={{ padding: '2.5rem', textAlign: 'center', color: '#6366f1' }}>
+                      <RefreshCw size={20} className="animate-spin" style={{ margin: '0 auto 8px auto' }} />
+                      <div>Loading customer accounts & salesman assignments...</div>
+                    </td>
+                  </tr>
+                ) : assignmentCustomers.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} style={{ padding: '2.5rem', textAlign: 'center', color: '#64748b' }}>
+                      No customers found matching search or filter criteria.
+                    </td>
+                  </tr>
+                ) : (
+                  assignmentCustomers.map((cust) => {
+                    const isSelected = selectedCustomerIds.includes(cust.id);
+                    const isReassigning = reassigningId === cust.id;
+                    return (
+                      <tr key={cust.id} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.05)', background: isSelected ? 'rgba(99, 102, 241, 0.08)' : 'transparent' }}>
+                        <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedCustomerIds(prev => [...prev, cust.id]);
+                              } else {
+                                setSelectedCustomerIds(prev => prev.filter(id => id !== cust.id));
+                              }
+                            }}
+                            style={{ cursor: 'pointer' }}
+                          />
+                        </td>
+                        <td style={{ padding: '12px 16px' }}>
+                          <div style={{ fontWeight: 600, color: '#f8fafc' }}>{cust.name}</div>
+                          {cust.gst_number && cust.gst_number !== '—' && (
+                            <div style={{ fontSize: '0.72rem', color: '#64748b' }}>GST: {cust.gst_number}</div>
+                          )}
+                        </td>
+                        <td style={{ padding: '12px 16px' }}>
+                          <span style={{ fontFamily: 'monospace', fontSize: '0.78rem', color: '#cbd5e1', background: 'rgba(255, 255, 255, 0.06)', padding: '2px 6px', borderRadius: '4px' }}>
+                            {cust.customer_code}
+                          </span>
+                        </td>
+                        <td style={{ padding: '12px 16px', color: '#94a3b8', fontSize: '0.8rem' }}>
+                          {cust.phone || '—'}
+                        </td>
+                        <td style={{ padding: '12px 16px' }}>
+                          <span style={{
+                            padding: '3px 10px',
+                            borderRadius: '12px',
+                            fontSize: '0.72rem',
+                            fontWeight: 700,
+                            background: cust.assigned_salesman_id ? 'rgba(245, 158, 11, 0.15)' : 'rgba(148, 163, 184, 0.15)',
+                            color: cust.assigned_salesman_id ? '#fbbf24' : '#94a3b8',
+                            border: `1px solid ${cust.assigned_salesman_id ? 'rgba(245, 158, 11, 0.3)' : 'rgba(148, 163, 184, 0.3)'}`
+                          }}>
+                            {cust.salesman_code} • {cust.salesman_name}
+                          </span>
+                        </td>
+                        <td style={{ padding: '12px 16px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <select
+                              disabled={isReassigning}
+                              value={cust.assigned_salesman_id || 'unassigned'}
+                              onChange={(e) => {
+                                const newSmId = e.target.value === 'unassigned' ? null : e.target.value;
+                                handleReassignCustomer(cust.id, newSmId);
+                              }}
+                              style={{
+                                padding: '6px 10px',
+                                borderRadius: '6px',
+                                background: '#0f172a',
+                                border: '1px solid #334155',
+                                color: '#f8fafc',
+                                fontSize: '0.8rem',
+                                width: '100%',
+                                maxWidth: '240px',
+                                cursor: isReassigning ? 'wait' : 'pointer'
+                              }}
+                            >
+                              <option value="unassigned">Direct / House Account</option>
+                              {salesmenList.map((sm) => (
+                                <option key={sm.id} value={sm.id}>
+                                  {sm.salesman_code} — {sm.full_name}
+                                </option>
+                              ))}
+                            </select>
+                            {isReassigning && <RefreshCw size={14} className="animate-spin text-indigo-400" />}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+
+            {/* Pagination Controls */}
+            <div style={{ padding: '12px 16px', background: 'rgba(15, 23, 42, 0.6)', borderTop: '1px solid #334155', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.82rem', color: '#94a3b8' }}>
+              <div>
+                Showing {assignmentsTotal > 0 ? assignmentPage * ASSIGNMENTS_PER_PAGE + 1 : 0} to {Math.min((assignmentPage + 1) * ASSIGNMENTS_PER_PAGE, assignmentsTotal)} of {assignmentsTotal} customers
+              </div>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  disabled={assignmentPage === 0 || assignmentsLoading}
+                  onClick={() => setAssignmentPage(prev => Math.max(0, prev - 1))}
+                  style={{
+                    padding: '5px 12px',
+                    borderRadius: '6px',
+                    background: assignmentPage === 0 ? '#1e293b' : '#334155',
+                    color: assignmentPage === 0 ? '#64748b' : '#f8fafc',
+                    border: '1px solid #475569',
+                    cursor: assignmentPage === 0 ? 'not-allowed' : 'pointer',
+                    fontSize: '0.8rem'
+                  }}
+                >
+                  Previous
+                </button>
+                <span style={{ padding: '5px 10px', color: '#cbd5e1' }}>
+                  Page {assignmentPage + 1} of {Math.max(1, Math.ceil(assignmentsTotal / ASSIGNMENTS_PER_PAGE))}
+                </span>
+                <button
+                  disabled={(assignmentPage + 1) * ASSIGNMENTS_PER_PAGE >= assignmentsTotal || assignmentsLoading}
+                  onClick={() => setAssignmentPage(prev => prev + 1)}
+                  style={{
+                    padding: '5px 12px',
+                    borderRadius: '6px',
+                    background: (assignmentPage + 1) * ASSIGNMENTS_PER_PAGE >= assignmentsTotal ? '#1e293b' : '#334155',
+                    color: (assignmentPage + 1) * ASSIGNMENTS_PER_PAGE >= assignmentsTotal ? '#64748b' : '#f8fafc',
+                    border: '1px solid #475569',
+                    cursor: (assignmentPage + 1) * ASSIGNMENTS_PER_PAGE >= assignmentsTotal ? 'not-allowed' : 'pointer',
+                    fontSize: '0.8rem'
+                  }}
+                >
+                  Next
+                </button>
+              </div>
+            </div>
           </div>
 
         </div>

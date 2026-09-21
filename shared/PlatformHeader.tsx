@@ -20,10 +20,36 @@ export default function PlatformHeader() {
       }
     };
 
+    const refreshProfileFromBackend = async () => {
+      try {
+        const session = getAuthSession();
+        const headers: Record<string, string> = {};
+        if (session?.token && session.token !== 'httponly-session-token') {
+          headers['Authorization'] = `Bearer ${session.token}`;
+        }
+        const res = await fetch('/api/auth/me', { headers, credentials: 'include' });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.user) {
+            setUserProfile(data.user);
+            if (typeof window !== 'undefined') {
+              document.cookie = `nalka_user=${encodeURIComponent(JSON.stringify(data.user))}; path=/; max-age=86400; SameSite=Lax`;
+            }
+          }
+        }
+      } catch (err) {
+        // preserve local session gracefully
+      }
+    };
+
     syncProfile();
+    refreshProfileFromBackend();
 
     if (typeof window !== 'undefined') {
-      window.addEventListener('nalka_auth_change', syncProfile);
+      window.addEventListener('nalka_auth_change', () => {
+        syncProfile();
+        refreshProfileFromBackend();
+      });
       window.addEventListener('storage', syncProfile);
     }
 

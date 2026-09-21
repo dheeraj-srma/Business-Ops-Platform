@@ -202,4 +202,32 @@ def logout(response: Response):
 
 @router.get("/me")
 def get_auth_me(current_user: dict = Depends(get_current_user)):
+    """Returns the latest authoritative user profile queried directly from the PostgreSQL users table."""
+    client = get_supabase_client()
+    if client and current_user and current_user.get("user_id"):
+        try:
+            u_id = current_user["user_id"]
+            user_res = client.table("users").select("id, email, full_name, username, role, is_active, phone").eq("id", u_id).limit(1).execute()
+            if not user_res.data and current_user.get("email"):
+                user_res = client.table("users").select("id, email, full_name, username, role, is_active, phone").eq("email", current_user["email"]).limit(1).execute()
+            
+            if user_res.data:
+                db_user = user_res.data[0]
+                current_user["full_name"] = db_user.get("full_name") or current_user.get("full_name")
+                current_user["email"] = db_user.get("email") or current_user.get("email")
+                current_user["username"] = db_user.get("username")
+                raw_role = db_user.get("role", "").lower()
+                current_user["role"] = "warehouse_manager" if raw_role == "stock_manager" else raw_role
+                current_user["is_active"] = db_user.get("is_active", True)
+                
+                # Fetch salesman code if linked
+                try:
+                    sm_res = client.table("salesmen").select("id, salesman_code").eq("user_id", db_user["id"]).limit(1).execute()
+                    if sm_res.data:
+                        current_user["salesman_id"] = sm_res.data[0].get("salesman_code")
+                except Exception:
+                    pass
+        except Exception as e:
+            logger.warning(f"Could not refresh current user profile from DB: {e}")
+            
     return {"user": current_user}
