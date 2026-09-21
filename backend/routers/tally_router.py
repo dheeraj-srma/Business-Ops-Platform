@@ -307,3 +307,61 @@ def simulate_tally_scenario(payload: Dict[str, Any]):
         "message": f"Simulation for scenario '{scenario}' completed successfully."
     }
 
+# ─── Tally Export, Validation & History ──────────────────────────────────────
+
+_TALLY_EXPORT_HISTORY: List[Dict[str, Any]] = []
+
+@router.get("/history")
+def get_tally_history():
+    return {
+        "exports": _TALLY_EXPORT_HISTORY,
+        "lastCheckpoint": datetime.utcnow().isoformat()
+    }
+
+@router.get("/validation-check")
+def get_tally_validation_check(exportType: Optional[str] = "FULL"):
+    return {
+        "validationReport": {
+            "canProceed": True,
+            "totalChecked": 0,
+            "readyCount": 0,
+            "warningCount": 0,
+            "errorCount": 0,
+            "issues": []
+        }
+    }
+
+@router.post("/export")
+def execute_tally_export(payload: Dict[str, Any]):
+    export_type = payload.get("exportType", "FULL")
+    export_format = payload.get("exportFormat", "XML")
+    record_id = f"exp_{int(datetime.utcnow().timestamp())}"
+    now_str = datetime.utcnow().isoformat()
+    file_name = f"Tally_Export_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.{'xml' if export_format == 'XML' else 'json'}"
+    
+    rec = {
+        "id": record_id,
+        "exportType": export_type,
+        "exportFormat": export_format,
+        "productCount": 0,
+        "status": "COMPLETED",
+        "fileName": file_name,
+        "exportedByName": "System User",
+        "createdAt": now_str,
+    }
+    _TALLY_EXPORT_HISTORY.insert(0, rec)
+    
+    content = "<ENVELOPE></ENVELOPE>" if export_format == "XML" else "{}"
+    
+    return {
+        "success": True,
+        "exportRecord": rec,
+        "fileContent": content,
+        "validationReport": {
+            "canProceed": True,
+            "totalChecked": 0,
+            "issues": []
+        }
+    }
+
+

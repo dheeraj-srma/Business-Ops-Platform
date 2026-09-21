@@ -106,55 +106,6 @@ export const DataExchangeView: React.FC<DataExchangeViewProps> = ({
         </div>
       </div>
 
-      {/* Feature Navigation Cards Ribbon */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div
-          onClick={() => setActiveMode('import')}
-          className={cn(
-            'p-4 rounded-xl border transition-all cursor-pointer',
-            activeMode === 'import'
-              ? 'bg-indigo-50/50 dark:bg-indigo-950/20 border-indigo-400 dark:border-indigo-600 shadow-2xs'
-              : 'bg-white dark:bg-slate-800/70 border-slate-200 dark:border-slate-700/60 hover:border-slate-300'
-          )}
-        >
-          <div className="flex items-center justify-between mb-1.5">
-            <div className="flex items-center gap-2 font-bold text-xs text-slate-800 dark:text-slate-200">
-              <UploadCloud className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-              <span>Import Module (Reconcile & Update)</span>
-            </div>
-            <span className="text-[10px] font-mono text-indigo-600 dark:text-indigo-400 font-semibold bg-indigo-50 dark:bg-indigo-950 px-2 py-0.5 rounded">
-              JSON • XML • CSV
-            </span>
-          </div>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            Upload files to detect stock discrepancies, adjust inventory balances, apply price changes, and register new SKUs.
-          </p>
-        </div>
-
-        <div
-          onClick={() => setActiveMode('export')}
-          className={cn(
-            'p-4 rounded-xl border transition-all cursor-pointer',
-            activeMode === 'export'
-              ? 'bg-indigo-50/50 dark:bg-indigo-950/20 border-indigo-400 dark:border-indigo-600 shadow-2xs'
-              : 'bg-white dark:bg-slate-800/70 border-slate-200 dark:border-slate-700/60 hover:border-slate-300'
-          )}
-        >
-          <div className="flex items-center justify-between mb-1.5">
-            <div className="flex items-center gap-2 font-bold text-xs text-slate-800 dark:text-slate-200">
-              <Download className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-              <span>Export Module (Generate & Download)</span>
-            </div>
-            <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 font-semibold bg-emerald-50 dark:bg-emerald-950 px-2 py-0.5 rounded">
-              JSON • XML • XLS • CSV
-            </span>
-          </div>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            Generate compliant TallyPrime XML envelopes, structured JSON payloads, Excel workbooks, or CSV files with pre-export audit checks.
-          </p>
-        </div>
-      </div>
-
       {/* Main Content Area */}
       <div className="w-full">
         {activeMode === 'import' ? (

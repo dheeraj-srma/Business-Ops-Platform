@@ -465,9 +465,19 @@ export const api = {
   },
 
   async getTallyHistory(): Promise<{ exports: TallyExportRecord[]; lastCheckpoint?: string }> {
-    const res = await fetch('/api/tally/history');
-    if (!res.ok) throw new Error('Failed to load export history');
-    return res.json();
+    try {
+      const res = await fetch('/api/tally/history');
+      if (!res.ok) {
+        return { exports: [], lastCheckpoint: undefined };
+      }
+      const data = await res.json();
+      return {
+        exports: Array.isArray(data?.exports) ? data.exports : [],
+        lastCheckpoint: data?.lastCheckpoint,
+      };
+    } catch {
+      return { exports: [], lastCheckpoint: undefined };
+    }
   },
 
   // Tally Live Integration & Synchronization

@@ -121,10 +121,10 @@ export const TallyExportView: React.FC<TallyExportViewProps> = ({ products = [],
   const loadHistory = async () => {
     try {
       const res = await api.getTallyHistory();
-      setExportHistory(res.exports);
-      setLastCheckpoint(res.lastCheckpoint);
+      setExportHistory(Array.isArray(res?.exports) ? res.exports : []);
+      setLastCheckpoint(res?.lastCheckpoint);
     } catch (err: any) {
-      console.error('Failed to load export history', err);
+      console.warn('Could not load export history:', err);
     }
   };
 
