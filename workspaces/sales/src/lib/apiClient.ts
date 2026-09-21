@@ -1,7 +1,8 @@
 // Order App API Client Adapter for Central FastAPI Backend
 const getEnvVar = (key: string): string => {
-  if (typeof process !== 'undefined' && process.env && process.env[key]) {
-    return process.env[key] as string;
+  const proc = (globalThis as any).process;
+  if (proc && proc.env && proc.env[key]) {
+    return proc.env[key] as string;
   }
   try {
     if (typeof import.meta !== 'undefined' && (import.meta as any)?.env?.[key]) {

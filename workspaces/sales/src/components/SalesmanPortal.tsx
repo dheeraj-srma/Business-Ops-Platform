@@ -31,9 +31,6 @@ import {
   Clock,
   MapPin,
   CloudOff,
-  Lock,
-  Mail,
-  KeyRound,
   ShieldCheck
 } from 'lucide-react';
 
@@ -203,22 +200,11 @@ export default function SalesmanPortal() {
 
   // Authentication & Identity (Bound to Supabase Auth)
   const {
-    user,
     profile,
     isAuthenticated,
     loading: authLoading,
-    signInWithEmail,
-    signInAsSalesman,
     signOut
   } = useAuth();
-
-  // Login Form States (for unauthenticated view)
-  const [loginMode, setLoginMode] = useState<'profile' | 'credentials'>('profile');
-  const [loginSalesman, setLoginSalesman] = useState<string>(VALID_SALESMAN_NAMES[0]);
-  const [loginEmail, setLoginEmail] = useState<string>('');
-  const [loginPassword, setLoginPassword] = useState<string>('password123');
-  const [authError, setAuthError] = useState<string | null>(null);
-  const [authSubmitting, setAuthSubmitting] = useState<boolean>(false);
 
   // Authoritative identity derived exclusively from server-side profile
   const userRole = profile?.role === 'customer' ? 'Customer' : profile?.role === 'admin' ? 'Admin' : profile?.role === 'stock_manager' || profile?.role === 'manager' ? 'Stock Manager' : 'Salesman';
@@ -331,8 +317,109 @@ export default function SalesmanPortal() {
 
 
   // Helper to provide initial fallback inventory when offline
+  // Helper to provide initial fallback inventory when offline
   const loadCsvInventoryFallback = (): InventoryItem[] => {
     return [
+      {
+        SKU: 'BF-AV-01',
+        'Item Name': 'Angle Valve 1/2" Brass Chrome',
+        Category: 'Bathroom Fittings',
+        Brand: 'Nalka Metals',
+        Price: 320,
+        'Current Stock': 115,
+        'Total Stock': 145,
+        'Reserved Stock': 30,
+      },
+      {
+        SKU: 'BF-BC-02',
+        'Item Name': 'Bib Cock 2-in-1 Wall Mount',
+        Category: 'Bathroom Fittings',
+        Brand: 'Nalka Metals',
+        Price: 650,
+        'Current Stock': 18,
+        'Total Stock': 18,
+        'Reserved Stock': 0,
+      },
+      {
+        SKU: 'BF-OHS-03',
+        'Item Name': 'Overhead Rain Shower 8" SS304',
+        Category: 'Bathroom Fittings',
+        Brand: 'Nalka Metals',
+        Price: 1250,
+        'Current Stock': 62,
+        'Total Stock': 62,
+        'Reserved Stock': 0,
+      },
+      {
+        SKU: 'PP-CPVC-01',
+        'Item Name': 'CPVC Pipe 1" Schedule 40 (3m)',
+        Category: 'Plumbing & Pipes',
+        Brand: 'Nalka Metals',
+        Price: 480,
+        'Current Stock': 340,
+        'Total Stock': 340,
+        'Reserved Stock': 0,
+      },
+      {
+        SKU: 'PP-UPVC-02',
+        'Item Name': 'UPVC Ball Valve 1-1/2" Threaded',
+        Category: 'Plumbing & Pipes',
+        Brand: 'Nalka Metals',
+        Price: 290,
+        'Current Stock': 85,
+        'Total Stock': 85,
+        'Reserved Stock': 0,
+      },
+      {
+        SKU: 'PP-UJ-03',
+        'Item Name': 'Union Joint Brass 3/4" BSP',
+        Category: 'Plumbing & Pipes',
+        Brand: 'Nalka Metals',
+        Price: 175,
+        'Current Stock': 210,
+        'Total Stock': 210,
+        'Reserved Stock': 0,
+      },
+      {
+        SKU: 'HW-SS-01',
+        'Item Name': 'SS Screws 8x35mm Box (100pcs)',
+        Category: 'Hardware & Fasteners',
+        Brand: 'Nalka Metals',
+        Price: 110,
+        'Current Stock': 520,
+        'Total Stock': 520,
+        'Reserved Stock': 0,
+      },
+      {
+        SKU: 'HW-TB-02',
+        'Item Name': 'Teflon Tape 12mm x 10m Pack (10pcs)',
+        Category: 'Hardware & Fasteners',
+        Brand: 'Nalka Metals',
+        Price: 95,
+        'Current Stock': 850,
+        'Total Stock': 850,
+        'Reserved Stock': 0,
+      },
+      {
+        SKU: 'SV-PRV-01',
+        'Item Name': 'Pressure Relief Valve 1/2" 6 Bar',
+        Category: 'Specialty Valves',
+        Brand: 'Nalka Metals',
+        Price: 850,
+        'Current Stock': 42,
+        'Total Stock': 42,
+        'Reserved Stock': 0,
+      },
+      {
+        SKU: 'SV-NRV-02',
+        'Item Name': 'Non-Return Check Valve 1" Brass',
+        Category: 'Specialty Valves',
+        Brand: 'Nalka Metals',
+        Price: 520,
+        'Current Stock': 75,
+        'Total Stock': 75,
+        'Reserved Stock': 0,
+      },
       {
         SKU: 'AL-ROD-01',
         'Item Name': 'Aluminum Rod 12mm',
@@ -356,7 +443,7 @@ export default function SalesmanPortal() {
     ];
   };
 
-  // Fetch Inventory from Supabase (with automatic CSV fallback and user feedback)
+  // Fetch Inventory from Central API (with cloud database & offline fallback)
   const fetchInventoryData = async (forceOfflineMode = manualOffline, isManualSync = false) => {
     setSyncingInventory(true);
     try {
@@ -375,7 +462,70 @@ export default function SalesmanPortal() {
         return;
       }
 
-      // Try Supabase (Fetch ALL rows in batches of 1000 to bypass PostgREST max row limit)
+      // 1. Primary: Central Inventory Backend API
+      try {
+        const res = await fetch('/api/inventory?page=1&page_size=10000');
+        if (res.ok) {
+          const data = await res.json();
+          const rawItems = data.items || data.products || (Array.isArray(data) ? data : []);
+          if (Array.isArray(rawItems) && rawItems.length > 0) {
+            const mapped: InventoryItem[] = rawItems.map((row: any) => {
+              const itemName = String(row['Item Name'] || row.name || row.item_name || '').trim();
+              const cat = String(row['Category'] || row.category || row.categoryName || 'General').trim();
+              const br = String(row['Brand'] || row.brand || deriveBrand(cat) || 'Nalka Metals').trim();
+              const currentStock = Number(row['Current Stock'] ?? row.currentStock ?? row.physical_stock ?? row.quantity_on_hand ?? 0);
+              const availStock = Number(row['Available Stock'] ?? row.availableStock ?? row.available_stock ?? row['Current Stock'] ?? 0);
+              const reserved = Number(row['Reserved Quantity'] ?? row['Reserved Stock'] ?? row.reservedStock ?? row.reserved_stock ?? 0);
+              const price = Number(row['Price'] ?? row.price ?? row.sale_price ?? row.cost_price ?? row.unitCost ?? 0);
+
+              return {
+                SKU: String(row['SKU'] || row.sku || itemName),
+                'Item Name': itemName,
+                Category: cat,
+                Brand: br,
+                Price: price,
+                'Current Stock': availStock,
+                'Total Stock': currentStock,
+                'Reserved Stock': reserved,
+              };
+            }).filter((it: any) => Boolean(it['Item Name']));
+
+            if (mapped.length > 0) {
+              setInventory(mapped);
+              setIsOffline(false);
+
+              // Sync system settings for stock override
+              try {
+                const sRes = await fetch('/api/settings');
+                if (sRes.ok) {
+                  const sData = await sRes.json();
+                  const isAllowed = sData?.settings?.allow_negative_orders ?? sData?.settings?.allowNegativeOrders ?? sData?.allow_negative_orders ?? sData?.allowNegativeOrders ?? false;
+                  setAllowNegativeOrders(Boolean(isAllowed));
+                }
+              } catch (sErr) {
+                // Ignore settings sync failure
+              }
+
+              if (isManualSync) {
+                showModal({
+                  type: 'success',
+                  title: 'Stock Catalog Synced',
+                  message: 'Successfully refreshed live product inventory and pricing from the central inventory service.',
+                  details: [
+                    { label: 'Total Products', value: `${mapped.length} SKUs`, highlight: true },
+                    { label: 'Database Status', value: 'Connected & Live' }
+                  ]
+                });
+              }
+              return;
+            }
+          }
+        }
+      } catch (apiErr) {
+        console.warn('Central API inventory fetch failed, attempting cloud database fallback:', apiErr);
+      }
+
+      // 2. Secondary: Try Supabase (Fetch ALL rows in batches of 1000 to bypass PostgREST max row limit)
       let allRows: any[] = [];
       let page = 0;
       const batchSize = 1000;
@@ -390,8 +540,9 @@ export default function SalesmanPortal() {
           .range(from, to);
 
         if (chunkError) {
-          console.error('Error fetching inventory_catalog:', chunkError);
-          throw chunkError;
+          console.warn('Supabase inventory_catalog query notice (activating fallback):', chunkError?.message || chunkError);
+          hasMore = false;
+          break;
         }
 
         if (chunk && chunk.length > 0) {
@@ -454,7 +605,6 @@ export default function SalesmanPortal() {
       const mapped: InventoryItem[] = [];
       for (const row of allRows) {
         const itemName = String(row['Item Name'] || row.item_name || row.name || '').trim();
-        // Discard any row with empty or missing item name
         if (!itemName) continue;
 
         const cat = String(row['Category'] || row.category || 'General').trim();
@@ -542,7 +692,7 @@ export default function SalesmanPortal() {
         showModal({
           type: 'success',
           title: 'Stock Catalog Synced',
-          message: 'Successfully refreshed live product inventory and pricing from Supabase.',
+          message: 'Successfully refreshed live product inventory and pricing from database.',
           details: [
             { label: 'Total Products', value: `${mapped.length} SKUs`, highlight: true },
             { label: 'Database Status', value: 'Connected & Synced' }
@@ -550,7 +700,7 @@ export default function SalesmanPortal() {
         });
       }
     } catch (err) {
-      console.warn('Supabase inventory call failed, falling back to bundled CSV:', err);
+      console.warn('Inventory fetch failed, falling back to bundled catalog:', err);
       const fallback = loadCsvInventoryFallback();
       setInventory(fallback);
       setIsOffline(true);
@@ -559,7 +709,7 @@ export default function SalesmanPortal() {
         showModal({
           type: 'warning',
           title: 'Offline Catalog Loaded',
-          message: 'Unable to reach the Supabase cloud database. Using local bundled catalog of 3,681 items.',
+          message: 'Unable to reach the live database. Using local bundled catalog of items.',
           details: [
             { label: 'Status', value: 'Offline Fallback Active' },
             { label: 'Items Available', value: `${fallback.length}` }
@@ -575,6 +725,70 @@ export default function SalesmanPortal() {
   const loadCsvDealersFallback = (): DealerRecord[] => {
     return [
       {
+        'Salesman Name': 'ANKIT',
+        'Salesman ID': 'TLY-SLM-001',
+        'Shop Name': 'Ankit Hardware Store',
+        State: 'Delhi',
+        City: 'Delhi',
+        'Customer Code': 'CUST-ANK-01',
+      },
+      {
+        'Salesman Name': 'CHANDRA PRAKASH',
+        'Salesman ID': 'TLY-SLM-002',
+        'Shop Name': 'Prakash Sanitary House',
+        State: 'Uttar Pradesh',
+        City: 'Ghaziabad',
+        'Customer Code': 'CUST-CP-01',
+      },
+      {
+        'Salesman Name': 'NALKA',
+        'Salesman ID': 'TLY-SLM-003',
+        'Shop Name': 'Nalka Central Distributing Co',
+        State: 'Haryana',
+        City: 'Faridabad',
+        'Customer Code': 'CUST-NLK-01',
+      },
+      {
+        'Salesman Name': 'RAVINDER  - NOIDA',
+        'Salesman ID': 'TLY-SLM-004',
+        'Shop Name': 'Ravinder Plumbing & Bath',
+        State: 'Uttar Pradesh',
+        City: 'Noida',
+        'Customer Code': 'CUST-RVN-01',
+      },
+      {
+        'Salesman Name': 'RAVINDER KUMAR',
+        'Salesman ID': 'TLY-SLM-005',
+        'Shop Name': 'Kumar Pipes & Fittings',
+        State: 'Haryana',
+        City: 'Gurugram',
+        'Customer Code': 'CUST-RVK-01',
+      },
+      {
+        'Salesman Name': 'SAURAV',
+        'Salesman ID': 'TLY-SLM-006',
+        'Shop Name': 'Saurav Enterprise Bath Studio',
+        State: 'Delhi',
+        City: 'New Delhi',
+        'Customer Code': 'CUST-SRV-01',
+      },
+      {
+        'Salesman Name': 'YOJIT',
+        'Salesman ID': 'TLY-SLM-007',
+        'Shop Name': 'Yojit Hardware Mart',
+        State: 'Haryana',
+        City: 'Faridabad',
+        'Customer Code': 'CUST-YJT-01',
+      },
+      {
+        'Salesman Name': 'Direct / House Account',
+        'Salesman ID': 'DIRECT',
+        'Shop Name': 'Shree Ram Hardware',
+        State: 'Maharashtra',
+        City: 'Mumbai',
+        'Customer Code': 'CUST-DIR-01',
+      },
+      {
         'Salesman Name': 'Rajesh Sharma',
         'Salesman ID': 'SALES-001',
         'Shop Name': 'Shree Ram Hardware',
@@ -585,13 +799,41 @@ export default function SalesmanPortal() {
     ];
   };
 
-  // Fetch salesmen & customers catalog from Supabase (or fallback to CSV)
+  // Fetch salesmen & customers catalog from Central API (or Supabase / CSV fallback)
   const fetchDealersData = async (isManualOffline: boolean) => {
     if (isManualOffline) {
       setDealers(loadCsvDealersFallback());
       return;
     }
 
+    // 1. Primary: Central Backend Dealers API
+    try {
+      const res = await fetch('/api/dealers');
+      if (res.ok) {
+        const dData = await res.json();
+        const dRows = Array.isArray(dData) ? dData : (dData.dealers || []);
+        if (Array.isArray(dRows) && dRows.length > 0) {
+          const mapped: DealerRecord[] = dRows.map((row: any) => ({
+            'Salesman Name': String(row['Salesman Name'] || row.salesman_name || 'Direct / House Account'),
+            'Salesman ID': String(row['Salesman ID'] || row.salesman_code || row.salesman_id || 'DIRECT'),
+            'Shop Name': String(row['Shop Name'] || row.shop_name || ''),
+            State: String(row.State || row.state || 'Haryana'),
+            City: String(row.City || row.city || 'Faridabad'),
+            'Location ID': row['Location ID'] || row.location_id ? String(row['Location ID'] || row.location_id) : undefined,
+            'Customer Code': row['Customer Code'] || row.customer_code ? String(row['Customer Code'] || row.customer_code) : undefined,
+            'Contact Person': row['Contact Person'] || row.contact_person ? String(row['Contact Person'] || row.contact_person) : undefined,
+            Phone: row.Phone || row.phone ? String(row.Phone || row.phone) : undefined,
+            Address: row.Address || row.address ? String(row.Address || row.address) : undefined,
+          }));
+          setDealers(mapped);
+          return;
+        }
+      }
+    } catch (apiErr) {
+      console.warn('Central API dealers fetch failed, attempting Supabase fallback:', apiErr);
+    }
+
+    // 2. Secondary: Supabase salesman_customer_catalog
     try {
       const { data, error } = await supabase
         .from('salesman_customer_catalog')
@@ -599,7 +841,6 @@ export default function SalesmanPortal() {
         .range(0, 1999);
 
       if (error || !data || data.length === 0) {
-        console.warn('Could not fetch salesman catalog from Supabase, falling back to bundled CSV:', error);
         setDealers(loadCsvDealersFallback());
         return;
       }
@@ -789,15 +1030,6 @@ export default function SalesmanPortal() {
       setSelectedShop('');
     }
   }, [selectedSalesman, availableShops, selectedShop]);
-
-  // Ensure login salesman selection stays valid with real salesmen list
-  useEffect(() => {
-    if (salesmanList.length > 0) {
-      if (!loginSalesman || !salesmanList.includes(loginSalesman)) {
-        setLoginSalesman(salesmanList[0]);
-      }
-    }
-  }, [salesmanList, loginSalesman]);
 
 
   // Matched Dealer Record (Auto-resolved when both fields are selected)
@@ -1387,43 +1619,6 @@ export default function SalesmanPortal() {
       });
     } else {
       resetForm();
-    }
-  };
-
-  // Auth Handlers (Supabase Auth Session Mediated)
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setAuthError(null);
-    setAuthSubmitting(true);
-
-    try {
-      let result;
-      if (loginMode === 'credentials') {
-        if (!loginEmail.trim() || !loginPassword) {
-          setAuthError('Please enter both email address and password.');
-          setAuthSubmitting(false);
-          return;
-        }
-        result = await signInWithEmail(loginEmail.trim(), loginPassword);
-      } else {
-        if (!loginSalesman) {
-          setAuthError('Please select a salesman profile.');
-          setAuthSubmitting(false);
-          return;
-        }
-        result = await signInAsSalesman(loginSalesman, loginPassword || 'password123');
-      }
-
-      if (!result.success) {
-        setAuthError(result.error || 'Authentication failed. Please verify credentials.');
-      } else {
-        setAuthError(null);
-        resetForm();
-      }
-    } catch (err: any) {
-      setAuthError(err?.message || 'Login error occurred.');
-    } finally {
-      setAuthSubmitting(false);
     }
   };
 

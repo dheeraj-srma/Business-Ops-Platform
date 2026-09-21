@@ -112,13 +112,16 @@ export interface OrderPayload {
 export interface UserProfile {
   id: string;
   email: string;
-  role: 'salesman' | 'customer' | 'admin' | 'manager';
-  salesman_id: string;
+  role: 'salesman' | 'customer' | 'admin' | 'manager' | 'stock_manager' | string;
+  salesman_id?: string;
   salesman_name: string;
+  full_name?: string;
   shop_name?: string;
   customer_code?: string;
   phone?: string;
   is_active: boolean;
+  created_at?: string;
+  updated_at?: string;
 }
 
 
