@@ -151,7 +151,7 @@ export const ExportInventoryModal: React.FC<ExportInventoryModalProps> = ({
   });
 
   const [exportScope, setExportScope] = useState<'filtered' | 'all'>('filtered');
-  const [exportFormat, setExportFormat] = useState<'excel' | 'csv'>('excel');
+  const [exportFormat, setExportFormat] = useState<'excel' | 'csv' | 'json'>('excel');
   const [isExporting, setIsExporting] = useState<boolean>(false);
 
   if (!isOpen) return null;
@@ -193,7 +193,7 @@ export const ExportInventoryModal: React.FC<ExportInventoryModalProps> = ({
     setSelectedColIds(next);
   };
 
-  // Generate and download Excel / CSV file
+  // Generate and download Excel / CSV / JSON file
   const handleExport = () => {
     if (activeColumnCount === 0) return;
     if (targetProducts.length === 0) return;
@@ -270,6 +270,39 @@ export const ExportInventoryModal: React.FC<ExportInventoryModalProps> = ({
         const link = document.createElement('a');
         link.href = URL.createObjectURL(blob);
         link.download = `Inventory_Master_Export_${dateStr}.xls`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } else if (exportFormat === 'json') {
+        // Structured JSON Data Exchange format
+        const jsonExport = {
+          system: 'Stock Management System',
+          exportType: 'INVENTORY_CATALOG',
+          schemaVersion: '2.0',
+          exportedAt: new Date().toISOString(),
+          scope: exportScope,
+          totalItems: targetProducts.length,
+          columns: activeColumns.map((c) => ({ id: c.id, label: c.label })),
+          items: targetProducts.map((p) => {
+            const catName =
+              categoryMap.get(p.categoryId || (p as any).category_id) ||
+              (p as any).category_name ||
+              '';
+            const itemRecord: Record<string, any> = {};
+            activeColumns.forEach((col) => {
+              itemRecord[col.id] = col.getValue(p, catName);
+            });
+            return itemRecord;
+          }),
+        };
+
+        const jsonContent = JSON.stringify(jsonExport, null, 2);
+        const blob = new Blob([jsonContent], {
+          type: 'application/json;charset=utf-8;',
+        });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `Inventory_Master_Export_${dateStr}.json`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -485,7 +518,7 @@ export const ExportInventoryModal: React.FC<ExportInventoryModalProps> = ({
             <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-1.5">
               File Format
             </label>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               <label
                 onClick={() => setExportFormat('excel')}
                 className={cn(
@@ -506,8 +539,8 @@ export const ExportInventoryModal: React.FC<ExportInventoryModalProps> = ({
                   {exportFormat === 'excel' && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
                 </div>
                 <div>
-                  <span className="font-semibold block">Excel Sheet (.xls)</span>
-                  <span className="text-[10px] text-slate-400 block">Formattable spreadsheet</span>
+                  <span className="font-semibold block">Excel (.xls)</span>
+                  <span className="text-[10px] text-slate-400 block">Formatted sheet</span>
                 </div>
               </label>
 
@@ -531,8 +564,33 @@ export const ExportInventoryModal: React.FC<ExportInventoryModalProps> = ({
                   {exportFormat === 'csv' && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
                 </div>
                 <div>
-                  <span className="font-semibold block">CSV File (.csv)</span>
-                  <span className="text-[10px] text-slate-400 block">Universal comma-separated</span>
+                  <span className="font-semibold block">CSV (.csv)</span>
+                  <span className="text-[10px] text-slate-400 block">Comma-separated</span>
+                </div>
+              </label>
+
+              <label
+                onClick={() => setExportFormat('json')}
+                className={cn(
+                  'flex items-center gap-2.5 p-2.5 rounded-xl border cursor-pointer transition-all text-xs',
+                  exportFormat === 'json'
+                    ? 'border-amber-600 dark:border-amber-500 bg-amber-50/50 dark:bg-amber-950/30 text-amber-800 dark:text-amber-300 font-medium'
+                    : 'border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/50'
+                )}
+              >
+                <div
+                  className={cn(
+                    'w-3.5 h-3.5 rounded-full border flex items-center justify-center',
+                    exportFormat === 'json'
+                      ? 'border-amber-600 dark:border-amber-500 bg-amber-600 text-white'
+                      : 'border-slate-300 dark:border-slate-600'
+                  )}
+                >
+                  {exportFormat === 'json' && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                </div>
+                <div>
+                  <span className="font-semibold block">JSON (.json)</span>
+                  <span className="text-[10px] text-slate-400 block">Data exchange schema</span>
                 </div>
               </label>
             </div>
@@ -567,7 +625,7 @@ export const ExportInventoryModal: React.FC<ExportInventoryModalProps> = ({
               )}
             >
               <Download className="w-3.5 h-3.5" />
-              <span>Export {exportFormat === 'excel' ? 'Excel' : 'CSV'}</span>
+              <span>Export {exportFormat === 'excel' ? 'Excel' : exportFormat === 'json' ? 'JSON' : 'CSV'}</span>
             </button>
           </div>
         </div>

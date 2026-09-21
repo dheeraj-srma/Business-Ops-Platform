@@ -27,12 +27,14 @@ import {
   Minimize2,
   FileSpreadsheet,
   Download,
+  Upload,
 } from 'lucide-react';
 import { Product, Category, UserRole } from '../../types';
 import { formatDate, formatCurrency, cn } from '../../lib/utils';
 import { api } from '../../lib/api';
 import { useDialog } from '../../context/DialogContext';
 import { ExportInventoryModal } from './ExportInventoryModal';
+import { ImportInventoryModal } from './ImportInventoryModal';
 
 interface InventoryViewProps {
   products: Product[];
@@ -78,6 +80,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   const [pageSize, setPageSize] = useState<number>(50);
   const [isFullScreen, setIsFullScreen] = useState<boolean>(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState<boolean>(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState<boolean>(false);
 
   // Handle ESC key to exit full screen
   useEffect(() => {
@@ -621,11 +624,25 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               id="btn-inventory-export"
               onClick={() => setIsExportModalOpen(true)}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 transition-all cursor-pointer shadow-2xs group"
-              title="Export inventory catalog as an Excel spreadsheet"
+              title="Export inventory catalog as an Excel spreadsheet, CSV, or JSON data exchange"
             >
               <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform" />
               <span>Export Inventory</span>
             </button>
+
+            {/* Import Inventory Button (JSON / CSV Data Exchange) */}
+            {isManager && (
+              <button
+                type="button"
+                id="btn-inventory-import"
+                onClick={() => setIsImportModalOpen(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 transition-all cursor-pointer shadow-2xs group"
+                title="Import inventory data from JSON data exchange or CSV file"
+              >
+                <Upload className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 group-hover:scale-110 transition-transform" />
+                <span>Import Inventory</span>
+              </button>
+            )}
 
             {/* Full Screen Toggle Button */}
             <button
@@ -949,8 +966,19 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
         onExportSuccess={(count, columnCount) => {
           showSuccess({
             title: 'Inventory Exported',
-            message: `Successfully exported ${count} item records with ${columnCount} columns to spreadsheet.`,
+            message: `Successfully exported ${count} item records with ${columnCount} columns.`,
           });
+        }}
+      />
+
+      {/* Import Inventory Modal (JSON / CSV Data Exchange) */}
+      <ImportInventoryModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        products={safeProducts}
+        categories={safeCategories}
+        onImportSuccess={() => {
+          onRefresh();
         }}
       />
     </div>

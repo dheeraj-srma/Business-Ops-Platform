@@ -19,6 +19,7 @@ import {
   Minimize2,
   X,
   FileSpreadsheet,
+  FileCode,
   HelpCircle,
   Eye,
   Edit2,
@@ -365,7 +366,45 @@ export const CatalogPriceManager: React.FC<CatalogPriceManagerProps> = ({
     document.body.removeChild(link);
   };
 
-  // Parse CSV file for import
+  // Export current catalog pricing as structured JSON data exchange
+  const handleExportJson = () => {
+    const catalogData = {
+      system: 'Apex Stock Management System',
+      exportType: 'CATALOG_PRICING',
+      schemaVersion: '2.0',
+      exportedAt: new Date().toISOString(),
+      itemCount: products.length,
+      items: products.map((p) => {
+        const vals = getProductValues(p);
+        const stock = p.currentStock ?? (p as any).current_stock ?? 0;
+        const catName = p.categoryName || categoryMap.get(p.categoryId || (p as any).category_id) || 'General';
+        const val = Math.max(0, stock) * vals.unitCost;
+
+        return {
+          sku: p.sku,
+          name: vals.name,
+          category: catName,
+          unit: vals.unit,
+          unitCost: vals.unitCost,
+          minimumStock: vals.minimumStock,
+          criticalStock: vals.criticalStock,
+          currentStock: stock,
+          totalValuation: Number(val.toFixed(2)),
+        };
+      }),
+    };
+
+    const jsonContent = JSON.stringify(catalogData, null, 2);
+    const blob = new Blob([jsonContent], { type: 'application/json;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `catalog_pricing_master_${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Parse CSV or JSON file for import
   const handleCsvFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -376,7 +415,57 @@ export const CatalogPriceManager: React.FC<CatalogPriceManagerProps> = ({
     const reader = new FileReader();
     reader.onload = (event) => {
       try {
-        const text = event.target?.result as string;
+        const text = (event.target?.result as string) || '';
+
+        // Check if file is JSON Data Exchange
+        if (file.name.toLowerCase().endsWith('.json') || text.trim().startsWith('{') || text.trim().startsWith('[')) {
+          let parsed: any;
+          try {
+            parsed = JSON.parse(text);
+          } catch (jsonErr: any) {
+            setCsvError('Invalid JSON format: ' + jsonErr.message);
+            return;
+          }
+
+          const rawList = Array.isArray(parsed)
+            ? parsed
+            : Array.isArray(parsed.items)
+            ? parsed.items
+            : Array.isArray(parsed.products)
+            ? parsed.products
+            : [parsed];
+
+          const parsedItems: any[] = [];
+          for (const item of rawList) {
+            const sku = (item.sku || item.SKU || item.code || item.Code || item.product_code || item.id || '').toString().trim();
+            if (!sku) continue;
+
+            const cost = item.unitCost ?? item.unit_cost ?? item.price ?? item.Price ?? item.cost ?? item.rate;
+            const min = item.minimumStock ?? item.minimum_stock ?? item.minStock ?? item.min;
+            const crit = item.criticalStock ?? item.critical_stock ?? item.critStock ?? item.crit;
+            const unit = item.unit ?? item.Unit ?? item.uom;
+            const name = item.name ?? item.Name ?? item.productName ?? item.itemName;
+
+            parsedItems.push({
+              sku,
+              unitCost: cost !== undefined && cost !== '' && !isNaN(Number(cost)) ? Number(cost) : undefined,
+              minimumStock: min !== undefined && min !== '' && !isNaN(Number(min)) ? Number(min) : undefined,
+              criticalStock: crit !== undefined && crit !== '' && !isNaN(Number(crit)) ? Number(crit) : undefined,
+              unit: unit ? String(unit).trim() : undefined,
+              name: name ? String(name).trim() : undefined,
+            });
+          }
+
+          if (parsedItems.length === 0) {
+            setCsvError('No valid items with a "sku" property were found in the JSON file.');
+            return;
+          }
+
+          setCsvPreviewItems(parsedItems);
+          return;
+        }
+
+        // Parse standard CSV file
         const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
         if (lines.length < 2) {
           setCsvError('The CSV file does not contain enough data rows.');
@@ -434,7 +523,7 @@ export const CatalogPriceManager: React.FC<CatalogPriceManagerProps> = ({
 
         setCsvPreviewItems(parsedItems);
       } catch (err: any) {
-        setCsvError('Failed to parse CSV file: ' + err.message);
+        setCsvError('Failed to parse file: ' + err.message);
       }
     };
     reader.readAsText(file);
@@ -699,6 +788,18 @@ export const CatalogPriceManager: React.FC<CatalogPriceManagerProps> = ({
             </button>
           )}
 
+          {/* Export JSON */}
+          <button
+            type="button"
+            id="btn-export-pricing-json"
+            onClick={handleExportJson}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold shadow-2xs transition-all cursor-pointer"
+            title="Download pricing catalog as JSON Data Exchange"
+          >
+            <FileCode className="w-3.5 h-3.5 text-amber-500" />
+            <span className="hidden sm:inline">Export JSON</span>
+          </button>
+
           {/* Export CSV */}
           <button
             type="button"
@@ -711,17 +812,17 @@ export const CatalogPriceManager: React.FC<CatalogPriceManagerProps> = ({
             <span className="hidden sm:inline">Export CSV</span>
           </button>
 
-          {/* Import CSV */}
+          {/* Import JSON / CSV */}
           {isManager && (
             <button
               type="button"
               id="btn-import-pricing-csv"
               onClick={() => setIsCsvImportOpen(true)}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold shadow-2xs transition-all cursor-pointer"
-              title="Upload CSV to update product prices in bulk"
+              title="Upload JSON or CSV to update product prices in bulk"
             >
-              <Upload className="w-3.5 h-3.5 text-slate-500" />
-              <span className="hidden sm:inline">Import CSV</span>
+              <Upload className="w-3.5 h-3.5 text-indigo-500" />
+              <span className="hidden sm:inline">Import (JSON / CSV)</span>
             </button>
           )}
 
@@ -1408,14 +1509,14 @@ export const CatalogPriceManager: React.FC<CatalogPriceManagerProps> = ({
               <div className="px-6 py-4 bg-white dark:bg-slate-800 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 rounded-lg">
-                    <FileSpreadsheet className="w-5 h-5" />
+                    <FileCode className="w-5 h-5" />
                   </div>
                   <div>
                     <h3 className="font-bold text-sm text-slate-900 dark:text-slate-100 leading-tight">
-                      Import Catalog Pricing & Thresholds
+                      Import Catalog Pricing & Thresholds (JSON / CSV)
                     </h3>
                     <p className="text-xs text-slate-400 dark:text-slate-500">
-                      Upload CSV with SKU, Unit Cost, and Safety Levels
+                      Upload JSON data exchange file or CSV spreadsheet with SKU, Unit Cost, and Safety Levels
                     </p>
                   </div>
                 </div>
@@ -1436,16 +1537,16 @@ export const CatalogPriceManager: React.FC<CatalogPriceManagerProps> = ({
                   <input
                     ref={fileInputRef}
                     type="file"
-                    accept=".csv,text/csv"
+                    accept=".json,.csv,application/json,text/csv"
                     onChange={handleCsvFileChange}
                     className="hidden"
                   />
                   <Upload className="w-8 h-8 text-indigo-600 dark:text-indigo-400 mx-auto mb-2" />
                   <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">
-                    {csvFile ? csvFile.name : 'Click to browse or drop CSV price sheet'}
+                    {csvFile ? csvFile.name : 'Click to browse or drop JSON or CSV data sheet'}
                   </p>
                   <p className="text-[11px] text-slate-400 mt-0.5">
-                    Expected columns: SKU, Unit Cost (or Price), Min Stock, Critical Stock, Unit
+                    Expected fields: SKU, Unit Cost (or Price), Min Stock, Critical Stock, Unit, Name
                   </p>
                 </div>
 
