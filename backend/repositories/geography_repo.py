@@ -1,7 +1,10 @@
-# backend/repositories/geography_repo.py
 import logging
+import os
+import json
 from typing import List, Dict, Any, Optional
+from datetime import datetime, timedelta
 from config.database import get_db_client
+from repositories.order_repo import OrderRepository
 
 logger = logging.getLogger("geography_repo")
 
@@ -104,16 +107,6 @@ except Exception as _e:
 class GeographyRepository:
 
     @staticmethod
-    def _get_multiplier(time_range: str) -> float:
-        if time_range == '90d':
-            return 2.8
-        elif time_range == 'ytd':
-            return 7.2
-        elif time_range == 'all':
-            return 12.4
-        return 1.0
-
-    @staticmethod
     def _get_dealers() -> List[Dict[str, Any]]:
         client = get_db_client()
         if not client:
@@ -125,61 +118,110 @@ class GeographyRepository:
             logger.error(f"Error fetching dealers: {err}")
             return []
 
+    @staticmethod
+    def _filter_orders_by_range(orders: List[Dict[str, Any]], time_range: str) -> List[Dict[str, Any]]:
+        if not orders:
+            return []
+        today = datetime.now().date()
+        if time_range == 'today':
+            cutoff = today.isoformat()
+            return [o for o in orders if str(o.get("order_date") or o.get("created_at") or "")[:10] == cutoff]
+        elif time_range == '7d':
+            cutoff = (today - timedelta(days=6)).isoformat()
+            return [o for o in orders if str(o.get("order_date") or o.get("created_at") or "")[:10] >= cutoff]
+        elif time_range == '30d':
+            cutoff = (today - timedelta(days=29)).isoformat()
+            return [o for o in orders if str(o.get("order_date") or o.get("created_at") or "")[:10] >= cutoff]
+        elif time_range == '90d':
+            cutoff = (today - timedelta(days=89)).isoformat()
+            return [o for o in orders if str(o.get("order_date") or o.get("created_at") or "")[:10] >= cutoff]
+        elif time_range == 'ytd':
+            cutoff = f"{today.year}-01-01"
+            return [o for o in orders if str(o.get("order_date") or o.get("created_at") or "")[:10] >= cutoff]
+        return orders
+
     @classmethod
     def get_india_summary(cls, time_range: str = '30d') -> Dict[str, Any]:
-        mult = cls._get_multiplier(time_range)
         dealers = cls._get_dealers()
+        all_orders = OrderRepository.get_orders(limit=1000)
+        filtered_orders = cls._filter_orders_by_range(all_orders, time_range)
 
-        # Group dealers by State
+        # Build dealer lookup
+        dealer_map: Dict[str, Dict[str, Any]] = {}
         state_dealers: Dict[str, List[Dict[str, Any]]] = {}
         for d in dealers:
             st = d.get("State") or "Haryana"
             if st not in state_dealers:
                 state_dealers[st] = []
             state_dealers[st].append(d)
+            name_key = str(d.get("Shop Name") or d.get("Name") or "").strip().lower()
+            if name_key:
+                dealer_map[name_key] = {"state": st, "city": d.get("City") or "Faridabad"}
 
-        # Baseline revenue allocations for top states matching Nalka Metals BI core figures
-        state_base_revenues: Dict[str, float] = {
-            'Haryana': 9850000.0,
-            'Delhi': 3840000.0,
-            'NCT of Delhi': 3840000.0,
-            'Uttar Pradesh': 3450000.0,
-            'Rajasthan': 240000.0,
-            'Uttarakhand': 210000.0,
-            'Maharashtra': 195000.0,
-            'Karnataka': 180000.0,
-            'Gujarat': 120000.0,
-            'Bihar': 110000.0,
-            'Himachal Pradesh': 95000.0,
-            'Punjab': 80000.0,
-        }
-
-        total_base_revenue = sum(v for k, v in state_base_revenues.items() if k != 'NCT of Delhi')
-        total_gross_sales = total_base_revenue * mult
-        total_dealers_count = len(dealers) if dealers else 804
-        total_orders_count = round(920 * mult)
-
-        states_list = []
-        for st_name, cfg in STATE_COORDINATES.items():
+        # If orders exist, aggregate real state data
+        state_sales_map: Dict[str, Dict[str, Any]] = {}
+        for st_name in STATE_COORDINATES.keys():
             if st_name == 'NCT of Delhi':
                 continue
-            st_dealers_count = len(state_dealers.get(st_name, []))
-            base_rev = state_base_revenues.get(st_name, 100000.0)
-            st_rev = base_rev * mult
-            st_orders = round((base_rev / total_base_revenue) * total_orders_count)
-            st_share = round((st_rev / total_gross_sales) * 100, 1)
+            state_sales_map[st_name] = {"revenue": 0.0, "orders": 0}
 
-            states_list.append({
-                'name': st_name,
-                'code': cfg['code'],
-                'revenue': round(st_rev, 2),
-                'orders': max(1, st_orders),
-                'dealers': st_dealers_count or (586 if st_name == 'Haryana' else 105 if st_name == 'Delhi' else 102),
-                'share': st_share,
-                'color': cfg['color'],
-                'center': cfg['center'],
-                'zoom': cfg['zoom']
-            })
+        has_matching_orders = False
+        for o in filtered_orders:
+            cust = str(o.get("customer_name") or o.get("customer_id") or o.get("shop_name") or "").strip().lower()
+            matched = dealer_map.get(cust) or {}
+            st = o.get("state") or matched.get("state") or "Haryana"
+            if st in ['Delhi', 'NCT of Delhi']:
+                st = 'Delhi'
+            if st in state_sales_map:
+                amt = float(o.get("total_amount") or 0.0)
+                state_sales_map[st]["revenue"] += amt
+                state_sales_map[st]["orders"] += 1
+                has_matching_orders = True
+
+        total_dealers_count = len(dealers) if dealers else 804
+
+        if has_matching_orders:
+            total_gross_sales = sum(s["revenue"] for s in state_sales_map.values())
+            total_orders_count = sum(s["orders"] for s in state_sales_map.values())
+
+            states_list = []
+            for st_name, s_data in state_sales_map.items():
+                cfg = STATE_COORDINATES.get(st_name, DEFAULT_STATE_CONFIG)
+                st_rev = round(s_data["revenue"], 2)
+                st_share = round((st_rev / total_gross_sales * 100), 1) if total_gross_sales > 0 else 0.0
+                st_dealers_count = len(state_dealers.get(st_name, []))
+                states_list.append({
+                    'name': st_name,
+                    'code': cfg['code'],
+                    'revenue': st_rev,
+                    'orders': s_data["orders"],
+                    'dealers': st_dealers_count,
+                    'share': st_share,
+                    'color': cfg['color'],
+                    'center': cfg['center'],
+                    'zoom': cfg['zoom']
+                })
+        else:
+            # When order collection has no transactions in range, return zero revenue with actual dealer counts
+            total_gross_sales = 0.0
+            total_orders_count = 0
+
+            states_list = []
+            for st_name, cfg in STATE_COORDINATES.items():
+                if st_name == 'NCT of Delhi':
+                    continue
+                st_dealers_count = len(state_dealers.get(st_name, []))
+                states_list.append({
+                    'name': st_name,
+                    'code': cfg['code'],
+                    'revenue': 0.0,
+                    'orders': 0,
+                    'dealers': st_dealers_count,
+                    'share': 0.0,
+                    'color': cfg['color'],
+                    'center': cfg['center'],
+                    'zoom': cfg['zoom']
+                })
 
         states_list.sort(key=lambda s: s['revenue'], reverse=True)
 
@@ -197,65 +239,74 @@ class GeographyRepository:
 
     @classmethod
     def get_state_summary(cls, state_name: str, time_range: str = '30d') -> Dict[str, Any]:
-        mult = cls._get_multiplier(time_range)
         dealers = cls._get_dealers()
+        all_orders = OrderRepository.get_orders(limit=1000)
+        filtered_orders = cls._filter_orders_by_range(all_orders, time_range)
 
         normalized_state = 'Delhi' if state_name in ['Delhi', 'NCT of Delhi'] else state_name
         st_cfg = STATE_COORDINATES.get(normalized_state, DEFAULT_STATE_CONFIG)
-
-        # Filter dealers for this state
         st_dealers = [d for d in dealers if (d.get("State") or "Haryana") in [normalized_state, state_name]]
 
-        state_base_revenues = {
-            'Haryana': 9850000.0,
-            'Delhi': 3840000.0,
-            'Uttar Pradesh': 3450000.0,
-            'Rajasthan': 240000.0,
-            'Uttarakhand': 210000.0,
-            'Maharashtra': 195000.0,
-            'Karnataka': 180000.0,
-            'Gujarat': 120000.0,
-            'Bihar': 110000.0,
-            'Himachal Pradesh': 95000.0,
-            'Punjab': 80000.0,
-        }
+        # Available cities config
+        available_cities = CITIES_BY_STATE.get(normalized_state, [{'name': f"{normalized_state} Central", 'center': st_cfg['center'], 'zoom': 9.0}])
+        city_names = [c['name'] for c in available_cities]
 
-        base_rev = state_base_revenues.get(normalized_state, 500000.0)
-        st_rev = base_rev * mult
-        st_orders = round((base_rev / 13500000.0) * 920 * mult)
-        st_dealers_cnt = len(st_dealers) if st_dealers else (586 if normalized_state == 'Haryana' else 105)
-        st_units = round(st_orders * 14.5)
+        # Calculate city breakdown from real orders if available
+        city_stats: Dict[str, Dict[str, Any]] = {c['name']: {"revenue": 0.0, "orders": 0, "units_sold": 0.0, "dealers": set()} for c in available_cities}
+        st_rev = 0.0
+        st_orders = 0
+        st_units = 0.0
 
-        # Cities breakdown
-        available_cities = CITIES_BY_STATE.get(normalized_state, [{'name': f"{normalized_state} Hub", 'center': st_cfg['center'], 'zoom': 9.0}])
+        for o in filtered_orders:
+            amt = float(o.get("total_amount") or 0.0)
+            qty = float(o.get("total_quantity") or o.get("quantity") or 0.0)
+            c_name = o.get("city")
+            if c_name and c_name in city_stats:
+                city_stats[c_name]["revenue"] += amt
+                city_stats[c_name]["orders"] += 1
+                city_stats[c_name]["units_sold"] += qty
+                cust = o.get("customer_name") or o.get("customer_id")
+                if cust:
+                    city_stats[c_name]["dealers"].add(cust)
+                st_rev += amt
+                st_orders += 1
+                st_units += qty
+
         cities_list = []
-        remaining_rev = st_rev
-        remaining_orders = st_orders
-        remaining_dealers = st_dealers_cnt
+        if st_rev > 0:
+            for c_cfg in available_cities:
+                c_data = city_stats[c_cfg['name']]
+                c_rev = round(c_data["revenue"], 2)
+                c_share = round((c_rev / st_rev * 100), 1) if st_rev > 0 else 0.0
+                cities_list.append({
+                    'name': c_cfg['name'],
+                    'revenue': c_rev,
+                    'orders': c_data["orders"],
+                    'dealers': len(c_data["dealers"]),
+                    'units_sold': round(c_data["units_sold"], 2),
+                    'share': c_share,
+                    'center': c_cfg['center'],
+                    'zoom': c_cfg['zoom']
+                })
+        else:
+            # When state has no orders in active range, return zero revenue
+            st_rev = 0.0
+            st_orders = 0
+            st_units = 0.0
 
-        for idx, c_cfg in enumerate(available_cities):
-            is_last = (idx == len(available_cities) - 1)
-            weight = 0.45 if idx == 0 else (0.25 if idx == 1 else 0.30 / max(1, len(available_cities) - 2))
-            
-            c_rev = round(remaining_rev if is_last else st_rev * weight, 2)
-            c_orders = remaining_orders if is_last else round(st_orders * weight)
-            c_dealers = remaining_dealers if is_last else round(st_dealers_cnt * weight)
-            c_units = round(c_orders * 14.5)
-
-            remaining_rev -= c_rev
-            remaining_orders -= c_orders
-            remaining_dealers -= c_dealers
-
-            cities_list.append({
-                'name': c_cfg['name'],
-                'revenue': max(0.0, c_rev),
-                'orders': max(1, c_orders),
-                'dealers': max(1, c_dealers),
-                'units_sold': max(1, c_units),
-                'share': round((c_rev / max(1.0, st_rev)) * 100, 1),
-                'center': c_cfg['center'],
-                'zoom': c_cfg['zoom']
-            })
+            cities_list = []
+            for c_cfg in available_cities:
+                c_dealers = [d for d in st_dealers if str(d.get("City") or "").lower() == c_cfg['name'].lower()]
+                cities_list.append({
+                    'name': c_cfg['name'],
+                    'revenue': 0.0,
+                    'orders': 0,
+                    'dealers': len(c_dealers),
+                    'units_sold': 0.0,
+                    'share': 0.0,
+                    'center': c_cfg['center'],
+                    'zoom': c_cfg['zoom']
+                })
 
         cities_list.sort(key=lambda c: c['revenue'], reverse=True)
 
@@ -264,9 +315,9 @@ class GeographyRepository:
             'state_name': normalized_state,
             'code': st_cfg['code'],
             'gross_sales': round(st_rev, 2),
-            'orders': max(1, st_orders),
-            'customers': st_dealers_cnt,
-            'units_sold': st_units,
+            'orders': st_orders,
+            'customers': len(st_dealers) or len(dealers),
+            'units_sold': round(st_units, 2),
             'center': st_cfg['center'],
             'zoom': st_cfg['zoom'],
             'color': st_cfg['color'],
@@ -275,8 +326,9 @@ class GeographyRepository:
 
     @classmethod
     def get_city_summary(cls, city_name: str, state_name: Optional[str] = None, time_range: str = '30d') -> Dict[str, Any]:
-        mult = cls._get_multiplier(time_range)
         dealers = cls._get_dealers()
+        all_orders = OrderRepository.get_orders(limit=1000)
+        filtered_orders = cls._filter_orders_by_range(all_orders, time_range)
 
         # Find city config across states
         c_cfg = None
@@ -293,33 +345,33 @@ class GeographyRepository:
         if not c_cfg:
             c_cfg = {'name': city_name, 'center': [77.3178, 28.4089], 'zoom': 9.5}
 
-        # Filter dealers for this state / city
-        st_dealers = [d for d in dealers if (d.get("State") or "Haryana") in [found_state, 'Delhi' if found_state == 'NCT of Delhi' else found_state]]
-        if not st_dealers:
-            st_dealers = dealers[:50]
+        # Match dealers in this city
+        city_dealers = [d for d in dealers if str(d.get("City") or "").lower() == city_name.lower()]
+        if not city_dealers:
+            city_dealers = [d for d in dealers if (d.get("State") or "Haryana") in [found_state, 'Delhi' if found_state == 'NCT of Delhi' else found_state]][:15]
 
-        # Calculate city metrics
-        city_rev = round(9850000.0 * 0.42 * mult, 2) if city_name in ['Faridabad', 'Gurugram'] else round(3840000.0 * 0.35 * mult, 2)
-        city_orders = round(180 * mult)
-        city_dealers_cnt = min(len(st_dealers), 45)
-        city_units = round(city_orders * 14.2)
+        # Aggregate city orders
+        city_orders_list = [o for o in filtered_orders if str(o.get("city") or "").lower() == city_name.lower()]
+        city_rev = sum(float(o.get("total_amount") or 0.0) for o in city_orders_list)
+        city_orders = len(city_orders_list)
+        city_units = sum(float(o.get("total_quantity") or o.get("quantity") or 0.0) for o in city_orders_list)
 
-        # Generate realistic customer points with lat/lng offsets around city center for map pin rendering
         center_lng, center_lat = c_cfg['center']
         customers_list = []
-        for i, d in enumerate(st_dealers[:25]):
-            shop_name = d.get("Shop Name") or f"Customer {i+1}"
+        for i, d in enumerate(city_dealers[:25]):
+            shop_name = d.get("Shop Name") or d.get("Name") or f"Dealer {i+1}"
             salesman_name = d.get("Salesman Name") or "ANKIT"
             phone = d.get("Phone") or "—"
-            cust_id = f"CUST-10{24 + i}"
+            cust_id = str(d.get("Location ID") or d.get("id") or f"CUST-10{24 + i}")
 
-            # Small offset for map positioning around city center
+            # Orders for this customer
+            c_orders_list = [o for o in city_orders_list if str(o.get("customer_name") or o.get("shop_name") or "").lower() == shop_name.lower()]
+            c_rev = round(sum(float(o.get("total_amount") or 0.0) for o in c_orders_list), 2)
+            c_orders = len(c_orders_list)
+            c_units = round(sum(float(o.get("total_quantity") or o.get("quantity") or 0.0) for o in c_orders_list), 2)
+
             offset_lat = ((i * 7 + 3) % 17 - 8) * 0.008
             offset_lng = ((i * 11 + 5) % 19 - 9) * 0.008
-
-            c_rev = round((city_rev / 25) * (1.8 - (i * 0.05)), 2)
-            c_orders = max(1, round(city_orders / 25 * (1.5 - (i * 0.04))))
-            c_units = round(c_orders * 12.8)
 
             customers_list.append({
                 'id': cust_id,
@@ -330,7 +382,7 @@ class GeographyRepository:
                 'phone': phone,
                 'revenue': c_rev,
                 'orders': c_orders,
-                'avg_order': round(c_rev / max(1, c_orders), 2),
+                'avg_order': round(c_rev / c_orders, 2) if c_orders > 0 else 0.0,
                 'units_sold': c_units,
                 'coords': [round(center_lng + offset_lng, 4), round(center_lat + offset_lat, 4)]
             })
@@ -341,10 +393,10 @@ class GeographyRepository:
             'level': 'city',
             'city_name': city_name,
             'state_name': found_state,
-            'gross_sales': city_rev,
+            'gross_sales': round(city_rev, 2),
             'orders': city_orders,
             'customers': len(customers_list),
-            'units_sold': city_units,
+            'units_sold': round(city_units, 2),
             'center': c_cfg['center'],
             'zoom': c_cfg['zoom'],
             'customer_list': customers_list
@@ -352,47 +404,40 @@ class GeographyRepository:
 
     @classmethod
     def get_customer_summary(cls, customer_id: str, time_range: str = '30d') -> Dict[str, Any]:
-        mult = cls._get_multiplier(time_range)
         dealers = cls._get_dealers()
+        all_orders = OrderRepository.get_orders(limit=1000)
+        filtered_orders = cls._filter_orders_by_range(all_orders, time_range)
 
         # Match customer by ID or name
         matched_dealer = None
         for d in dealers:
-            if d.get("Shop Name") == customer_id or d.get("Location ID") == customer_id:
+            if str(d.get("Shop Name") or d.get("Name")) == customer_id or str(d.get("Location ID") or d.get("id")) == customer_id:
                 matched_dealer = d
                 break
         if not matched_dealer and dealers:
             matched_dealer = dealers[0]
 
-        shop_name = matched_dealer.get("Shop Name") if matched_dealer else customer_id
+        shop_name = matched_dealer.get("Shop Name") or matched_dealer.get("Name") if matched_dealer else customer_id
         salesman_name = matched_dealer.get("Salesman Name") if matched_dealer else "Rahul"
         st_name = matched_dealer.get("State") if matched_dealer else "Haryana"
         ct_name = matched_dealer.get("City") if matched_dealer else "Faridabad"
 
-        cust_sales = round(482000.0 * mult, 2)
-        cust_orders = round(64 * mult)
-        avg_order = round(cust_sales / max(1, cust_orders), 2)
-        units_sold = round(492 * mult)
-
-        top_products = [
-            {'name': '1"x6" BRASS CHAAL NIPPLE - TARUN', 'quantity': round(180 * mult), 'revenue': round(142000.0 * mult, 2)},
-            {'name': 'BRASS CONCEALED VALVE 15MM', 'quantity': round(140 * mult), 'revenue': round(118000.0 * mult, 2)},
-            {'name': 'HEAVY DUTY CP TAPS & FITTINGS', 'quantity': round(110 * mult), 'revenue': round(95000.0 * mult, 2)},
-            {'name': 'STAINLESS STEEL SINK COUPLING', 'quantity': round(95 * mult), 'revenue': round(72000.0 * mult, 2)},
-            {'name': 'CHROME EXTENSION NIPPLE 1/2"', 'quantity': round(80 * mult), 'revenue': round(55000.0 * mult, 2)},
-        ]
+        cust_orders = [o for o in filtered_orders if str(o.get("customer_name") or o.get("shop_name") or "").lower() == str(shop_name).lower()]
+        cust_sales = round(sum(float(o.get("total_amount") or 0.0) for o in cust_orders), 2)
+        orders_count = len(cust_orders)
+        avg_order = round(cust_sales / max(1, orders_count), 2) if orders_count > 0 else 0.0
+        units_sold = round(sum(float(o.get("total_quantity") or o.get("quantity") or 0.0) for o in cust_orders), 2)
 
         return {
             'level': 'customer',
-            'customer_id': customer_id if customer_id.startswith("CUST-") else "CUST-1024",
+            'customer_id': customer_id,
             'name': shop_name,
-            'state_name': st_name,
-            'city_name': ct_name,
+            'city': ct_name,
+            'state': st_name,
+            'salesman': salesman_name,
             'gross_sales': cust_sales,
-            'orders': cust_orders,
+            'orders': orders_count,
             'avg_order': avg_order,
             'units_sold': units_sold,
-            'salesman': salesman_name,
-            'last_order': '16 Sep 2026',
-            'top_products': top_products
+            'top_products': []
         }

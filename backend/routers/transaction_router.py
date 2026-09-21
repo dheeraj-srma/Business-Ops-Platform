@@ -114,3 +114,14 @@ def create_return(
     except Exception as exc:
         logger.error(f"Error creating return: {exc}")
         raise HTTPException(status_code=500, detail=str(exc))
+
+@router.get("/inwards")
+def list_inwards(limit: int = Query(default=1000)):
+    try:
+        all_txns = list_transactions(limit=limit)
+        inwards = [t for t in all_txns if str(t.get("transaction_type") or t.get("Type") or "").upper() in ("INWARD", "STOCK_IN")]
+        return inwards
+    except Exception as exc:
+        logger.error(f"Error listing inwards: {exc}")
+        return []
+

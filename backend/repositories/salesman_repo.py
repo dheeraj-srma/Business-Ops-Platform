@@ -4,6 +4,8 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
 from config.database import get_db_client
 
+from repositories.order_repo import OrderRepository
+
 logger = logging.getLogger("salesman_repo")
 
 DEFAULT_SALESMEN_LIST = [
@@ -16,14 +18,14 @@ DEFAULT_SALESMEN_LIST = [
         "role": "salesman",
         "is_active": True,
         "territory": "Gurugram / Haryana North",
-        "sales": 645000.0,
-        "orders": 42,
-        "average_order_value": 15357.14,
-        "units_sold": 4050.0,
-        "customers": 48,
-        "active_days": 24,
-        "cancelled_orders": 1,
-        "sales_contribution_pct": 30.4
+        "sales": 0.0,
+        "orders": 0,
+        "average_order_value": 0.0,
+        "units_sold": 0.0,
+        "customers": 0,
+        "active_days": 0,
+        "cancelled_orders": 0,
+        "sales_contribution_pct": 0.0
     },
     {
         "id": "SLM-102",
@@ -34,14 +36,14 @@ DEFAULT_SALESMEN_LIST = [
         "role": "salesman",
         "is_active": True,
         "territory": "Delhi NCR / East",
-        "sales": 520000.0,
-        "orders": 35,
-        "average_order_value": 14857.14,
-        "units_sold": 3420.0,
-        "customers": 38,
-        "active_days": 22,
-        "cancelled_orders": 1,
-        "sales_contribution_pct": 24.5
+        "sales": 0.0,
+        "orders": 0,
+        "average_order_value": 0.0,
+        "units_sold": 0.0,
+        "customers": 0,
+        "active_days": 0,
+        "cancelled_orders": 0,
+        "sales_contribution_pct": 0.0
     },
     {
         "id": "SLM-103",
@@ -52,14 +54,14 @@ DEFAULT_SALESMEN_LIST = [
         "role": "salesman",
         "is_active": True,
         "territory": "Panipat / Ambala",
-        "sales": 385000.0,
-        "orders": 28,
-        "average_order_value": 13750.0,
-        "units_sold": 2680.0,
-        "customers": 32,
-        "active_days": 19,
+        "sales": 0.0,
+        "orders": 0,
+        "average_order_value": 0.0,
+        "units_sold": 0.0,
+        "customers": 0,
+        "active_days": 0,
         "cancelled_orders": 0,
-        "sales_contribution_pct": 18.2
+        "sales_contribution_pct": 0.0
     },
     {
         "id": "SLM-104",
@@ -70,14 +72,14 @@ DEFAULT_SALESMEN_LIST = [
         "role": "salesman",
         "is_active": True,
         "territory": "Haryana South / Rewari",
-        "sales": 320000.0,
-        "orders": 24,
-        "average_order_value": 13333.33,
-        "units_sold": 2150.0,
-        "customers": 26,
-        "active_days": 18,
+        "sales": 0.0,
+        "orders": 0,
+        "average_order_value": 0.0,
+        "units_sold": 0.0,
+        "customers": 0,
+        "active_days": 0,
         "cancelled_orders": 0,
-        "sales_contribution_pct": 15.1
+        "sales_contribution_pct": 0.0
     },
     {
         "id": "SLM-105",
@@ -88,14 +90,14 @@ DEFAULT_SALESMEN_LIST = [
         "role": "salesman",
         "is_active": True,
         "territory": "Faridabad / Palwal",
-        "sales": 140000.0,
-        "orders": 18,
-        "average_order_value": 7777.78,
-        "units_sold": 1240.0,
-        "customers": 18,
-        "active_days": 15,
-        "cancelled_orders": 1,
-        "sales_contribution_pct": 6.6
+        "sales": 0.0,
+        "orders": 0,
+        "average_order_value": 0.0,
+        "units_sold": 0.0,
+        "customers": 0,
+        "active_days": 0,
+        "cancelled_orders": 0,
+        "sales_contribution_pct": 0.0
     },
     {
         "id": "SLM-106",
@@ -106,14 +108,14 @@ DEFAULT_SALESMEN_LIST = [
         "role": "salesman",
         "is_active": True,
         "territory": "Uttar Pradesh / Noida",
-        "sales": 65000.0,
-        "orders": 12,
-        "average_order_value": 5416.67,
-        "units_sold": 620.0,
-        "customers": 12,
-        "active_days": 10,
+        "sales": 0.0,
+        "orders": 0,
+        "average_order_value": 0.0,
+        "units_sold": 0.0,
+        "customers": 0,
+        "active_days": 0,
         "cancelled_orders": 0,
-        "sales_contribution_pct": 3.1
+        "sales_contribution_pct": 0.0
     },
     {
         "id": "SLM-107",
@@ -124,14 +126,14 @@ DEFAULT_SALESMEN_LIST = [
         "role": "salesman",
         "is_active": True,
         "territory": "Punjab & Chandigarh",
-        "sales": 43515.75,
-        "orders": 8,
-        "average_order_value": 5439.47,
-        "units_sold": 410.0,
-        "customers": 8,
-        "active_days": 8,
+        "sales": 0.0,
+        "orders": 0,
+        "average_order_value": 0.0,
+        "units_sold": 0.0,
+        "customers": 0,
+        "active_days": 0,
         "cancelled_orders": 0,
-        "sales_contribution_pct": 2.1
+        "sales_contribution_pct": 0.0
     }
 ]
 
@@ -185,35 +187,26 @@ class SalesmanRepository:
 
     @staticmethod
     def get_all_orders_filtered(start_date: Optional[str] = None, end_date: Optional[str] = None) -> List[Dict[str, Any]]:
-        client = get_db_client()
-        if not client:
-            return []
         try:
-            query = client.table("orders").select("*").order("created_at", desc=True)
-            res = query.execute()
-            orders = res.data or []
+            orders = OrderRepository.get_orders(limit=1000)
+            if not orders:
+                return []
 
             if not start_date and not end_date:
                 return orders
 
             filtered = []
-            dt_start = SalesmanRepository._parse_date(start_date) if start_date else None
-            dt_end = SalesmanRepository._parse_date(end_date) if end_date else None
-            if dt_end:
-                dt_end = dt_end.replace(hour=23, minute=59, second=59)
+            s_date = start_date[:10] if start_date else None
+            e_date = end_date[:10] if end_date else None
 
             for o in orders:
-                o_date_str = o.get("order_date") or o.get("created_at")
-                if not o_date_str:
+                o_date_str = str(o.get("order_date") or o.get("created_at") or "")[:10]
+                if not o_date_str or len(o_date_str) < 10:
                     filtered.append(o)
                     continue
-                o_dt = SalesmanRepository._parse_date(o_date_str)
-                if not o_dt:
-                    filtered.append(o)
+                if s_date and o_date_str < s_date:
                     continue
-                if dt_start and o_dt < dt_start:
-                    continue
-                if dt_end and o_dt > dt_end:
+                if e_date and o_date_str > e_date:
                     continue
                 filtered.append(o)
 
@@ -251,30 +244,13 @@ class SalesmanRepository:
             if slm:
                 active_salesmen.add(slm)
 
-        if total_sales == 0.0 or total_orders == 0:
-            total_sales = sum(s.get("sales", 0.0) for s in DEFAULT_SALESMEN_LIST)
-            total_orders = sum(s.get("orders", 0) for s in DEFAULT_SALESMEN_LIST)
-            total_units = sum(s.get("units_sold", 0.0) for s in DEFAULT_SALESMEN_LIST)
-            total_cust = sum(s.get("customers", 0) for s in DEFAULT_SALESMEN_LIST)
-            aov = round(total_sales / total_orders, 2)
-            return {
-                "total_team_sales": round(total_sales, 2),
-                "total_orders": total_orders,
-                "total_units_sold": round(total_units, 2),
-                "total_active_salesmen": len(DEFAULT_SALESMEN_LIST),
-                "total_customers_served": total_cust,
-                "average_order_value": aov,
-                "start_date": start_date,
-                "end_date": end_date
-            }
-
         aov = round(total_sales / total_orders, 2) if total_orders > 0 else 0.0
 
         return {
             "total_team_sales": round(total_sales, 2),
             "total_orders": total_orders,
             "total_units_sold": round(total_units, 2),
-            "total_active_salesmen": len(active_salesmen) or len([s for s in salesmen if s.get("is_active")]),
+            "total_active_salesmen": len(active_salesmen) if active_salesmen else len([s for s in salesmen if s.get("is_active")]),
             "total_customers_served": len(unique_customers),
             "average_order_value": aov,
             "start_date": start_date,
@@ -297,7 +273,7 @@ class SalesmanRepository:
         for s in salesmen:
             s_code = (s.get("salesman_code") or "").strip().upper()
             s_name = (s.get("full_name") or s.get("name") or "").strip().upper()
-            s_id = (s.get("id") or "").strip()
+            s_id = str(s.get("id") or "").strip()
 
             item = {
                 "salesman_id": s.get("id"),
@@ -307,13 +283,13 @@ class SalesmanRepository:
                 "phone": s.get("phone"),
                 "territory": s.get("territory", "Northern Region"),
                 "is_active": s.get("is_active", True),
-                "sales": float(s.get("sales", 0.0)),
-                "gross_sales": float(s.get("sales", 0.0)) * 1.02,
-                "orders": int(s.get("orders", 0)),
-                "units_sold": float(s.get("units_sold", 0.0)),
+                "sales": 0.0,
+                "gross_sales": 0.0,
+                "orders": 0,
+                "units_sold": 0.0,
                 "customers_set": set(),
                 "dates_set": set(),
-                "cancelled_orders": int(s.get("cancelled_orders", 0)),
+                "cancelled_orders": 0,
                 "returned_orders": 0,
             }
             if s_code:
@@ -333,7 +309,7 @@ class SalesmanRepository:
             amt = float(o.get("total_amount") or 0.0)
             qty = float(o.get("total_quantity") or o.get("quantity") or 0.0)
             cust = o.get("customer_name") or o.get("customer_id")
-            o_date = (o.get("order_date") or o.get("created_at") or "")[:10]
+            o_date = str(o.get("order_date") or o.get("created_at") or "")[:10]
 
             slm_target["gross_sales"] += amt
 
@@ -349,25 +325,8 @@ class SalesmanRepository:
             if o_date:
                 slm_target["dates_set"].add(o_date)
 
-        # If no live order records exist for salesmen, merge default BI performance metrics
-        default_map_code = {s["salesman_code"]: s for s in DEFAULT_SALESMEN_LIST}
-        default_map_name = {s["full_name"]: s for s in DEFAULT_SALESMEN_LIST}
-
         res_list = []
         salesmen_list_map_values = list(salesman_map.values())
-
-        for item in salesmen_list_map_values:
-            if item["sales"] == 0.0 and item["orders"] == 0:
-                def_s = default_map_code.get(item["salesman_code"]) or default_map_name.get(item["name"])
-                if def_s:
-                    item["sales"] = float(def_s["sales"])
-                    item["gross_sales"] = float(def_s["sales"]) * 1.02
-                    item["orders"] = int(def_s["orders"])
-                    item["units_sold"] = float(def_s["units_sold"])
-                    item["customers_count"] = int(def_s["customers"])
-                    item["active_days_count"] = int(def_s["active_days"])
-                    item["aov_val"] = float(def_s["average_order_value"])
-
         total_team_sales = sum(s["sales"] for s in salesmen_list_map_values)
 
         seen_ids = set()
@@ -379,10 +338,10 @@ class SalesmanRepository:
 
             s_orders = item["orders"]
             s_sales = round(item["sales"], 2)
-            aov = round(s_sales / s_orders, 2) if s_orders > 0 else item.get("aov_val", 0.0)
+            aov = round(s_sales / s_orders, 2) if s_orders > 0 else 0.0
             contrib = round((s_sales / total_team_sales * 100), 1) if total_team_sales > 0 else 0.0
-            cust_count = len(item["customers_set"]) if item["customers_set"] else item.get("customers_count", 12)
-            active_days_count = len(item["dates_set"]) if item["dates_set"] else item.get("active_days_count", 15)
+            cust_count = len(item["customers_set"])
+            active_days_count = len(item["dates_set"])
 
             res_list.append({
                 "salesman_id": item["salesman_id"],
@@ -437,12 +396,11 @@ class SalesmanRepository:
     @staticmethod
     def get_salesman_detail(salesman_id: str, start_date: Optional[str] = None, end_date: Optional[str] = None) -> Dict[str, Any]:
         salesmen = SalesmanRepository.get_salesmen_list()
+        orders = SalesmanRepository.get_all_orders_filtered(start_date, end_date)
         
         target_salesman = None
         if salesman_id and salesman_id.lower() not in ("all", "team", "unassigned"):
-            target_salesman = next((s for s in salesmen if s.get("id") == salesman_id or s.get("salesman_code") == salesman_id), None)
-            if not target_salesman:
-                target_salesman = next((s for s in DEFAULT_SALESMEN_LIST if s.get("id") == salesman_id or s.get("salesman_code") == salesman_id), DEFAULT_SALESMEN_LIST[0])
+            target_salesman = next((s for s in salesmen if s.get("id") == salesman_id or s.get("salesman_code") == salesman_id or (s.get("full_name") or "").lower() == salesman_id.lower()), None)
 
         if target_salesman:
             header_info = {
@@ -455,11 +413,15 @@ class SalesmanRepository:
                 "role": "Senior Sales Executive",
                 "is_active": target_salesman.get("is_active", True)
             }
-            s_sales = float(target_salesman.get("sales") or 645000.0)
-            s_orders = int(target_salesman.get("orders") or 42)
-            s_units = float(target_salesman.get("units_sold") or 4050.0)
-            s_cust = int(target_salesman.get("customers") or 48)
-            s_act = int(target_salesman.get("active_days") or 24)
+            s_name = (target_salesman.get("full_name") or target_salesman.get("name") or "").strip().upper()
+            s_code = (target_salesman.get("salesman_code") or "").strip().upper()
+            s_id = str(target_salesman.get("id") or "").strip()
+
+            matching_orders = []
+            for o in orders:
+                slm_key = (o.get("salesman_name") or o.get("salesman_id") or o.get("salesman_code") or "").strip().upper()
+                if slm_key in (s_name, s_code, s_id):
+                    matching_orders.append(o)
         else:
             header_info = {
                 "salesman_id": "all",
@@ -471,39 +433,62 @@ class SalesmanRepository:
                 "role": "Sales Team",
                 "is_active": True
             }
-            s_sales = 2118515.75
-            s_orders = 167
-            s_units = 14570.0
-            s_cust = 182
-            s_act = 26
+            matching_orders = orders
+
+        # Aggregate real metrics
+        s_sales = 0.0
+        s_orders = 0
+        s_units = 0.0
+        cancelled_orders = 0
+        returned_orders = 0
+        unique_customers = set()
+        active_dates = set()
+        daily_trends_map = {}
+
+        for o in matching_orders:
+            st = str(o.get("status") or "").lower()
+            amt = float(o.get("total_amount") or 0.0)
+            qty = float(o.get("total_quantity") or o.get("quantity") or 0.0)
+            cust = o.get("customer_name") or o.get("customer_id")
+            d_str = str(o.get("order_date") or o.get("created_at") or "")[:10]
+
+            if st in ("cancelled", "rejected"):
+                cancelled_orders += 1
+                continue
+
+            s_sales += amt
+            s_orders += 1
+            s_units += qty
+            if cust:
+                unique_customers.add(cust)
+            if d_str and len(d_str) == 10:
+                active_dates.add(d_str)
+                if d_str not in daily_trends_map:
+                    daily_trends_map[d_str] = {"sales": 0.0, "orders": 0}
+                daily_trends_map[d_str]["sales"] += amt
+                daily_trends_map[d_str]["orders"] += 1
 
         aov = round(s_sales / s_orders, 2) if s_orders > 0 else 0.0
-
-        today = datetime.now()
-        daily_trends = []
-        for i in range(30, 0, -1):
-            d_str = (today - timedelta(days=i)).strftime("%Y-%m-%d")
-            d_sales = round((s_sales / 30) * (0.6 + (i * 17 % 80) / 100), 2)
-            d_orders = max(1, round(d_sales / aov)) if aov > 0 else 2
-            daily_trends.append({"date": d_str, "sales": d_sales, "orders": d_orders})
+        sorted_dates = sorted(daily_trends_map.keys())
+        daily_trends = [{"date": d, "sales": round(daily_trends_map[d]["sales"], 2), "orders": daily_trends_map[d]["orders"]} for d in sorted_dates]
 
         return {
             "header": header_info,
             "metrics": {
-                "total_sales": s_sales,
-                "gross_sales": round(s_sales * 1.02, 2),
-                "cancelled_sales": round(s_sales * 0.02, 2),
-                "cancelled_returned_value": round(s_sales * 0.02, 2),
-                "net_sales": s_sales,
+                "total_sales": round(s_sales, 2),
+                "gross_sales": round(s_sales, 2),
+                "cancelled_sales": 0.0,
+                "cancelled_returned_value": 0.0,
+                "net_sales": round(s_sales, 2),
                 "total_orders": s_orders,
-                "cancelled_orders": 1,
-                "cancelled_returned_orders": 1,
-                "returned_orders": 0,
+                "cancelled_orders": cancelled_orders,
+                "cancelled_returned_orders": cancelled_orders,
+                "returned_orders": returned_orders,
                 "average_order_value": aov,
-                "total_units_sold": s_units,
-                "unique_customers": s_cust,
-                "active_days": s_act,
-                "line_items_count": s_orders * 4
+                "total_units_sold": round(s_units, 2),
+                "unique_customers": len(unique_customers),
+                "active_days": len(active_dates),
+                "line_items_count": s_orders * 3
             },
             "daily_trends": daily_trends
         }
@@ -514,32 +499,62 @@ class SalesmanRepository:
         days_count: int = 365
     ) -> Dict[str, Any]:
         today = datetime.now().date()
-        days_list = []
         is_all = not salesman_id or salesman_id.lower() in ("all", "team")
 
+        # Fetch actual orders
+        all_orders = OrderRepository.get_orders(limit=1000)
+        
+        # Filter for salesman if specified
+        if not is_all:
+            salesman_key = salesman_id.strip().upper()
+            filtered_orders = []
+            for o in all_orders:
+                slm = (o.get("salesman_name") or o.get("salesman_id") or o.get("salesman_code") or "").strip().upper()
+                if slm == salesman_key:
+                    filtered_orders.append(o)
+            orders_to_aggregate = filtered_orders
+        else:
+            orders_to_aggregate = all_orders
+
+        # Group orders by date
+        orders_by_date = {}
+        for o in orders_to_aggregate:
+            d_str = str(o.get("order_date") or o.get("created_at") or "")[:10]
+            if d_str:
+                if d_str not in orders_by_date:
+                    orders_by_date[d_str] = {"orders": 0, "sales": 0.0, "customers": set()}
+                orders_by_date[d_str]["orders"] += 1
+                orders_by_date[d_str]["sales"] += float(o.get("total_amount") or 0.0)
+                cust = o.get("customer_name") or o.get("customer_id")
+                if cust:
+                    orders_by_date[d_str]["customers"].add(cust)
+
+        days_list = []
         for i in range(days_count - 1, -1, -1):
             d = today - timedelta(days=i)
             d_str = d.isoformat()
-            if d.weekday() == 6:  # Sunday off
-                days_list.append({"date": d_str, "orders": 0, "sales": 0, "customers": 0})
-            else:
-                h = (i * 37 + (0 if is_all else len(salesman_id) * 13)) % 100
-                ords = (8 + (h % 22)) if is_all else (1 + (h % 4) if h < 45 else 0)
-                sales_val = ords * 6200
+            data_for_day = orders_by_date.get(d_str)
+            if data_for_day:
                 days_list.append({
                     "date": d_str,
-                    "orders": ords,
-                    "sales": sales_val,
-                    "customers": min(18, max(1, round(ords * 0.7)))
+                    "orders": data_for_day["orders"],
+                    "sales": round(data_for_day["sales"], 2),
+                    "customers": len(data_for_day["customers"])
                 })
+            else:
+                days_list.append({"date": d_str, "orders": 0, "sales": 0.0, "customers": 0})
+
+        total_orders = sum(d["orders"] for d in days_list)
+        active_days = len([d for d in days_list if d["orders"] > 0])
+        avg_per_day = round(total_orders / active_days, 1) if active_days > 0 else 0.0
 
         return {
             "days": days_list,
             "summary": {
-                "total_orders": sum(d["orders"] for d in days_list),
-                "active_days": len([d for d in days_list if d["orders"] > 0]),
-                "avg_orders_per_active_day": 2.1,
-                "total_sales": sum(d["sales"] for d in days_list)
+                "total_orders": total_orders,
+                "active_days": active_days,
+                "avg_orders_per_active_day": avg_per_day,
+                "total_sales": round(sum(d["sales"] for d in days_list), 2)
             }
         }
 
