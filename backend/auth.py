@@ -45,7 +45,7 @@ PERMISSION_MAP: Dict[str, List[str]] = {
         "inventory.view", "orders.process"
     ],
     "salesman": [
-        "orders.create", "orders.view", "customers.view", "products.view"
+        "orders.create", "orders.view", "customers.view", "products.view", "inventory.view"
     ],
     "customer": [
         "orders.create", "orders.view"

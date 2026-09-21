@@ -1,7 +1,7 @@
 # backend/routers/order_router.py
 import logging
 from typing import List, Dict, Any, Optional
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, HTTPException, Depends, Query, Response
 from schemas.orders import (
     OrderCreateSchema,
     BulkOrderCreateSchema,
@@ -27,6 +27,7 @@ from schemas.order_workflow_schemas import (
 )
 from services.order_service import OrderService
 from services.order_read_service import OrderReadService
+from services.snapshot_service import SnapshotService
 from auth import require_role, require_permission
 
 logger = logging.getLogger("order_router")
@@ -42,6 +43,7 @@ def reserve_order(
     payload: OrderReservationRequest,
     current_user: dict = Depends(require_permission("orders.create"))
 ):
+    SnapshotService.assert_writable("order reservation")
     try:
         res = OrderService.reserve_order(payload, current_user)
         return OrderReservationResponse(
@@ -68,6 +70,7 @@ def reserve_order(
     description="Returns paginated order summaries. Supports search, status, salesman, customer, date range filtering, and deterministic sorting."
 )
 def list_orders(
+    response: Response,
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(50, ge=1, le=200, description="Items per page"),
     search: Optional[str] = Query(None, description="Search term for order ID, customer, or salesman"),
@@ -80,6 +83,12 @@ def list_orders(
     sort_dir: str = Query("desc", description="Sort direction (asc, desc)"),
     current_user: dict = Depends(require_permission("orders.view"))
 ):
+    system_mode = SnapshotService.get_system_mode()
+    response.headers["X-Database-Mode"] = system_mode
+    snap = SnapshotService.get_last_known_snapshot("orders")
+    if snap and snap.get("captured_at"):
+        response.headers["X-Snapshot-Time"] = str(snap["captured_at"])
+
     try:
         return OrderReadService.list_orders(
             current_user=current_user,
@@ -131,6 +140,7 @@ def sync_orders_now():
 
 @router.post("/confirm")
 def confirm_order_preview(payload: dict):
+    SnapshotService.assert_writable("order confirmation")
     order_id = payload.get("orderId")
     resolved_items = payload.get("resolvedItems")
     metadata = payload.get("metadata")
@@ -223,6 +233,7 @@ def update_order(
     payload: OrderEditRequest,
     current_user: dict = Depends(require_permission("orders.view"))
 ):
+    SnapshotService.assert_writable("order update")
     try:
         res = OrderService.update_order(order_id, payload, current_user)
         return OrderEditResponse(**res)
@@ -250,6 +261,7 @@ def cancel_order(
     payload: Optional[OrderCancelRequest] = None,
     current_user: dict = Depends(require_permission("orders.view"))
 ):
+    SnapshotService.assert_writable("order cancellation")
     try:
         res = OrderService.cancel_order(order_id, payload, current_user)
         return OrderCancelResponse(**res)
@@ -317,6 +329,7 @@ def create_order(
     order: OrderCreateSchema,
     current_user: dict = Depends(require_role(["admin", "order_manager", "salesman"]))
 ):
+    SnapshotService.assert_writable("order creation")
     try:
         return OrderService.create_single_order(order, current_user)
     except Exception as exc:
@@ -328,6 +341,7 @@ def create_bulk_order(
     payload: BulkOrderCreateSchema,
     current_user: dict = Depends(require_role(["admin", "order_manager", "salesman"]))
 ):
+    SnapshotService.assert_writable("bulk order creation")
     try:
         return OrderService.create_bulk_order(payload, current_user)
     except Exception as exc:
@@ -356,6 +370,7 @@ def process_order(
     payload: Optional[OrderProcessRequest] = None,
     current_user: dict = Depends(require_permission("orders.process"))
 ):
+    SnapshotService.assert_writable("order processing")
     try:
         res = OrderService.process_order(order_id, payload, current_user)
         return OrderProcessResponse(

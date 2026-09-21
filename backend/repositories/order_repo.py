@@ -2,6 +2,7 @@
 import logging
 from typing import List, Dict, Any, Optional, Tuple
 from supabase_client import get_supabase_client
+from services.snapshot_service import SnapshotService
 
 logger = logging.getLogger("order_repo")
 
@@ -22,8 +23,16 @@ class OrderRepository:
                 res = client.table("orders").select("*").order("created_at", desc=True).limit(limit).execute()
                 if res.data:
                     orders.extend(res.data)
-            except Exception:
-                pass
+                    SnapshotService.record_successful_read("orders", res.data)
+            except Exception as err:
+                SnapshotService.record_db_failure("orders", err)
+
+        # Fallback to last known snapshot if DB returned no orders
+        if not orders:
+            snap = SnapshotService.get_last_known_snapshot("orders")
+            if snap and snap.get("data"):
+                orders = list(snap["data"])
+
         # Add in-memory orders avoiding duplicates
         existing_ids = {o.get("id") or o.get("order_code") or o.get("order_id") for o in orders}
         for memo in _IN_MEMORY_ORDERS:
@@ -78,12 +87,15 @@ class OrderRepository:
                 all_candidates = res.data or []
                 
                 if all_candidates or total_count > 0:
+                    SnapshotService.record_successful_read("orders", all_candidates)
                     return all_candidates, total_count
             except Exception as exc:
-                logger.warning(f"Supabase paginated query failed: {exc}, using fallback")
+                logger.warning(f"Supabase paginated query failed: {exc}, using backend snapshot fallback")
+                SnapshotService.record_db_failure("orders", exc)
 
-        # In-memory / fallback filtering
-        fallback_list = OrderRepository.get_orders(limit=1000)
+        # In-memory / snapshot fallback filtering
+        snap = SnapshotService.get_last_known_snapshot("orders")
+        fallback_list = list(snap["data"]) if snap and snap.get("data") else OrderRepository.get_orders(limit=1000)
         filtered = []
         for o in fallback_list:
             o_status = str(o.get("status") or o.get("Status") or "")

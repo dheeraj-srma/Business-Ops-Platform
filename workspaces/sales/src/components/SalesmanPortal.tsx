@@ -239,6 +239,8 @@ export default function SalesmanPortal() {
 
   // Sync / Offline State
   const [isOffline, setIsOffline] = useState<boolean>(false);
+  const [isReadOnlyMode, setIsReadOnlyMode] = useState<boolean>(false);
+  const [snapshotTime, setSnapshotTime] = useState<string | null>(null);
   const [manualOffline, setManualOffline] = useState<boolean>(() => {
     return localStorage.getItem('app_manual_offline') === 'true';
   });
@@ -492,7 +494,11 @@ export default function SalesmanPortal() {
 
             if (mapped.length > 0) {
               setInventory(mapped);
-              setIsOffline(false);
+              const readOnly = res.headers.get('X-Database-Mode') === 'READ_ONLY' || data.system_mode === 'READ_ONLY' || Boolean(data.is_snapshot);
+              const snapTime = res.headers.get('X-Snapshot-Time') || data.snapshot_at || null;
+              setIsReadOnlyMode(readOnly);
+              setSnapshotTime(snapTime);
+              setIsOffline(readOnly);
 
               // Sync system settings for stock override
               try {
@@ -507,15 +513,29 @@ export default function SalesmanPortal() {
               }
 
               if (isManualSync) {
-                showModal({
-                  type: 'success',
-                  title: 'Stock Catalog Synced',
-                  message: 'Successfully refreshed live product inventory and pricing from the central inventory service.',
-                  details: [
-                    { label: 'Total Products', value: `${mapped.length} SKUs`, highlight: true },
-                    { label: 'Database Status', value: 'Connected & Live' }
-                  ]
-                });
+                if (readOnly) {
+                  showModal({
+                    type: 'warning',
+                    title: 'READ-ONLY Snapshot Active',
+                    message: 'PostgreSQL database is temporarily unavailable. Serving authoritative Backend-Owned Last Known Snapshot in READ-ONLY mode.',
+                    details: [
+                      { label: 'Total Products', value: `${mapped.length} SKUs`, highlight: true },
+                      { label: 'Database Status', value: 'Degraded / Unreachable' },
+                      { label: 'Snapshot Time', value: snapTime ? new Date(snapTime).toLocaleTimeString() : 'Recent' },
+                      { label: 'System Mode', value: 'READ-ONLY (Write mutations paused)' }
+                    ]
+                  });
+                } else {
+                  showModal({
+                    type: 'success',
+                    title: 'Stock Catalog Synced',
+                    message: 'Successfully refreshed live product inventory and pricing from the central inventory service.',
+                    details: [
+                      { label: 'Total Products', value: `${mapped.length} SKUs`, highlight: true },
+                      { label: 'Database Status', value: 'Connected & Live' }
+                    ]
+                  });
+                }
               }
               return;
             }
@@ -1757,6 +1777,19 @@ export default function SalesmanPortal() {
       return;
     }
 
+    if (isReadOnlyMode) {
+      showModal({
+        type: 'warning',
+        title: 'System in READ-ONLY Mode',
+        message: 'Database is temporarily unavailable. The platform is serving the authoritative Last Known Snapshot in READ-ONLY mode. Live order bookings are paused to prevent data divergence. You can export this order as a local JSON / PDF receipt or retry once connectivity is restored.',
+        details: [
+          { label: 'System Mode', value: 'READ-ONLY (Snapshot)' },
+          { label: 'Snapshot Captured', value: snapshotTime ? new Date(snapshotTime).toLocaleTimeString() : 'Recent' }
+        ]
+      });
+      return;
+    }
+
     setSubmittingOrder(true);
 
     const pdfData: PDFOrderData = {
@@ -2301,6 +2334,11 @@ export default function SalesmanPortal() {
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-medium bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60 text-[10px]">
                 <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
                 Offline
+              </span>
+            ) : isReadOnlyMode ? (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-medium bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60 text-[10px]" title="Database temporarily unreachable. Serving Backend-Owned Last Known Snapshot in Read-Only mode.">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                Read-Only Snapshot
               </span>
             ) : isOffline ? (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-medium bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60 text-[10px]">

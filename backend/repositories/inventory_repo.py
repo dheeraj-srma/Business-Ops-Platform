@@ -4,6 +4,7 @@ import json
 import logging
 from typing import List, Dict, Any, Optional
 from config.database import get_db_client
+from services.snapshot_service import SnapshotService
 
 logger = logging.getLogger("inventory_repo")
 
@@ -169,6 +170,7 @@ class InventoryRepository:
     def fetch_all_products_with_inventory() -> List[Dict[str, Any]]:
         client = get_db_client()
         prods = []
+        db_fetch_error = None
         if client:
             try:
                 offset = 0
@@ -184,9 +186,25 @@ class InventoryRepository:
                         break
                     offset += 1000
             except Exception as err:
+                db_fetch_error = err
                 logger.warning(f"PostgreSQL products fetch failed: {err}")
+                SnapshotService.record_db_failure("inventory", err)
 
         if not prods:
+            # Check backend-owned last known snapshot before falling back to static disk files
+            snap = SnapshotService.get_last_known_snapshot("inventory")
+            if snap and snap.get("data"):
+                logger.info(
+                    f"PostgreSQL temporarily unavailable. Serving {len(snap['data'])} products from Backend-Owned Last Known Snapshot captured at {snap.get('captured_at')} in READ-ONLY mode."
+                )
+                snap_records = []
+                for it in snap["data"]:
+                    item_copy = dict(it)
+                    item_copy["_source"] = "backend_snapshot"
+                    item_copy["_snapshot_at"] = snap.get("captured_at")
+                    item_copy["_read_only"] = True
+                    snap_records.append(item_copy)
+                return snap_records
             return InventoryRepository._load_master_inventory_from_disk()
 
         inv_map = {}
@@ -267,6 +285,11 @@ class InventoryRepository:
                 "isActive": p.get("is_active") if p.get("is_active") is not None else True,
                 "Updated At": p.get("updated_at"),
             })
+
+        # Successful PostgreSQL read -> update Backend-Owned Last Known Snapshot
+        if records:
+            SnapshotService.record_successful_read("inventory", records)
+
         return records
 
     @staticmethod
@@ -332,9 +355,16 @@ class InventoryRepository:
             try:
                 res = client.table("dealers").select("*").limit(1000).execute()
                 if res.data is not None and len(res.data) > 0:
+                    SnapshotService.record_successful_read("dealers", res.data)
                     return res.data
             except Exception as err:
                 logger.warning(f"Error fetching dealers from DB: {err}")
+                SnapshotService.record_db_failure("dealers", err)
+
+        # Check last known snapshot
+        snap = SnapshotService.get_last_known_snapshot("dealers")
+        if snap and snap.get("data"):
+            return snap["data"]
 
         # Robust master dealer directory mapped to assigned salesmen
         return [
@@ -554,9 +584,15 @@ class InventoryRepository:
             try:
                 res = client.table("locations").select("*").limit(1000).execute()
                 if res.data is not None and len(res.data) > 0:
+                    SnapshotService.record_successful_read("locations", res.data)
                     return res.data
             except Exception as err:
                 logger.warning(f"Error fetching locations: {err}")
+                SnapshotService.record_db_failure("locations", err)
+
+        snap = SnapshotService.get_last_known_snapshot("locations")
+        if snap and snap.get("data"):
+            return snap["data"]
 
         return [
             {
@@ -612,9 +648,15 @@ class InventoryRepository:
             try:
                 res = client.table("suppliers").select("*").limit(500).execute()
                 if res.data is not None and len(res.data) > 0:
+                    SnapshotService.record_successful_read("suppliers", res.data)
                     return res.data
             except Exception as err:
                 logger.warning(f"Error fetching suppliers: {err}")
+                SnapshotService.record_db_failure("suppliers", err)
+
+        snap = SnapshotService.get_last_known_snapshot("suppliers")
+        if snap and snap.get("data"):
+            return snap["data"]
 
         return [
             {"id": "SUP-01", "name": "Jaquar & Company Pvt Ltd", "city": "Gurugram", "state": "Haryana"},

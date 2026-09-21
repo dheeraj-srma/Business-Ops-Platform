@@ -20,6 +20,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from config.settings import settings
 from config.database import get_db_client
+from services.snapshot_service import SnapshotService
 
 from routers import (
     auth_router,
@@ -98,6 +99,7 @@ async def observability_and_rate_limit_middleware(request: Request, call_next):
 
     response.headers["X-Correlation-ID"] = correlation_id
     response.headers["X-Response-Time-MS"] = str(duration_ms)
+    response.headers["X-Database-Mode"] = SnapshotService.get_system_mode()
     return response
 
 # ─── Central Exception Handlers ──────────────────────────────────────────────
@@ -112,7 +114,10 @@ async def http_exception_handler(request: Request, exc: HTTPException):
             "correlation_id": correlation_id,
             "timestamp": datetime.utcnow().isoformat()
         },
-        headers={"X-Correlation-ID": correlation_id}
+        headers={
+            "X-Correlation-ID": correlation_id,
+            "X-Database-Mode": SnapshotService.get_system_mode()
+        }
     )
 
 @app.exception_handler(Exception)
@@ -127,7 +132,10 @@ async def global_exception_handler(request: Request, exc: Exception):
             "correlation_id": correlation_id,
             "timestamp": datetime.utcnow().isoformat()
         },
-        headers={"X-Correlation-ID": correlation_id}
+        headers={
+            "X-Correlation-ID": correlation_id,
+            "X-Database-Mode": SnapshotService.get_system_mode()
+        }
     )
 
 # ─── Mount Modular APIRouters ────────────────────────────────────────────────
@@ -157,6 +165,7 @@ def liveness():
     return {
         "status": "healthy",
         "service": "nalka-metals-api",
+        "mode": SnapshotService.get_system_mode(),
         "architecture": "Service/Repository/Router (Centralized & Admin Control Plane)",
         "timestamp": datetime.utcnow().isoformat(),
     }
@@ -177,12 +186,19 @@ def database_health():
             connected = False
             error_msg = str(exc)
 
+    if connected:
+        SnapshotService.record_db_status(True)
+    else:
+        SnapshotService.record_db_status(False, error=error_msg)
+
     return {
         "status": "ready" if connected else "degraded",
+        "mode": SnapshotService.get_system_mode(),
         "database": {
             "connected": connected,
             "error": error_msg
         },
+        "snapshots": SnapshotService.get_all_snapshots_meta(),
         "timestamp": datetime.utcnow().isoformat(),
     }
 

@@ -39,6 +39,9 @@ class InventoryListResponse(BaseModel):
     page: int = Field(1, description="Current page number (1-indexed)")
     page_size: int = Field(50, description="Page size limit")
     total_pages: int = Field(1, description="Total available pages")
+    system_mode: Optional[str] = Field("LIVE", description="System database mode: LIVE or READ_ONLY")
+    is_snapshot: Optional[bool] = Field(False, description="Whether data is served from backend last-known snapshot")
+    snapshot_at: Optional[str] = Field(None, description="Timestamp when the snapshot was captured")
 
 class StockAdjustmentRequest(BaseModel):
     product_id: str = Field(..., description="Product ID to adjust")

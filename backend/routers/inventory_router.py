@@ -2,7 +2,7 @@
 import math
 import logging
 from typing import List, Dict, Any, Optional
-from fastapi import APIRouter, HTTPException, Depends, Query, status
+from fastapi import APIRouter, HTTPException, Depends, Query, status, Response
 from schemas.inventory import ProductCreateSchema
 from schemas.inventory_schemas import (
     InventoryItemResponse,
@@ -14,6 +14,7 @@ from schemas.inventory_schemas import (
     StockMutationResponse
 )
 from services.inventory_service import InventoryService
+from services.snapshot_service import SnapshotService
 from auth import require_role, require_permission
 
 logger = logging.getLogger("inventory_router")
@@ -43,6 +44,7 @@ def get_restock_plan(
     summary="Process bulk restock consignment"
 )
 def bulk_restock(payload: dict):
+    SnapshotService.assert_writable("bulk restock")
     try:
         return InventoryService.bulk_restock(payload)
     except Exception as exc:
@@ -56,12 +58,19 @@ def bulk_restock(payload: dict):
     description="Retrieves inventory stock levels with permission verification, search, and pagination support."
 )
 def list_inventory(
+    response: Response,
     page: int = Query(1, ge=1, description="Page number"),
     page_size: Optional[int] = Query(None, ge=1, le=10000, description="Items per page"),
     search: Optional[str] = Query(None, description="Search term for SKU, name, or category"),
     status_filter: Optional[str] = Query(None, alias="status", description="Stock health status filter"),
     current_user: dict = Depends(require_permission("inventory.view"))
 ):
+    system_mode = SnapshotService.get_system_mode()
+    response.headers["X-Database-Mode"] = system_mode
+    snap_meta = SnapshotService.get_latest_snapshot_meta()
+    if snap_meta and snap_meta.get("captured_at"):
+        response.headers["X-Snapshot-Time"] = str(snap_meta["captured_at"])
+
     try:
         raw_items = InventoryService.list_inventory()
         
@@ -122,13 +131,19 @@ def list_inventory(
                 isActive=bool(p.get("is_active", p.get("isActive", True))),
             ))
 
+        is_snap = (system_mode == "READ_ONLY") or any(item.get("_source") == "backend_snapshot" for item in paged_batch)
+        snap_time = snap_meta.get("captured_at") if snap_meta else None
+
         return InventoryListResponse(
             items=mapped_items,
             products=mapped_items,
             total_count=total_count,
             page=page,
             page_size=effective_page_size,
-            total_pages=total_pages
+            total_pages=total_pages,
+            system_mode=system_mode,
+            is_snapshot=is_snap,
+            snapshot_at=snap_time
         )
     except Exception as exc:
         logger.error(f"Error listing inventory: {exc}")
@@ -183,6 +198,7 @@ def add_product(
     product: ProductCreateSchema,
     current_user: dict = Depends(require_role(["admin", "stock_manager"]))
 ):
+    SnapshotService.assert_writable("add product")
     try:
         return InventoryService.add_product(product)
     except Exception as exc:
@@ -246,6 +262,7 @@ def adjust_inventory_stock(
     payload: StockAdjustmentRequest,
     current_user: dict = Depends(require_permission("inventory.manage"))
 ):
+    SnapshotService.assert_writable("stock adjustment")
     try:
         res = InventoryService.adjust_stock(
             product_id=payload.product_id,
@@ -273,6 +290,7 @@ def record_stock_inward(
     payload: StockInRequest,
     current_user: dict = Depends(require_permission("inventory.manage"))
 ):
+    SnapshotService.assert_writable("stock inward")
     try:
         res = InventoryService.record_stock_in(
             items=[{
@@ -294,6 +312,7 @@ def record_stock_outward(
     payload: StockOutRequest,
     current_user: dict = Depends(require_permission("orders.process"))
 ):
+    SnapshotService.assert_writable("stock outward")
     try:
         raw_items = payload.items or []
         if not raw_items and payload.product_id and payload.quantity:
