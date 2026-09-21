@@ -18,34 +18,37 @@ import {
 } from 'lucide-react';
 import { useBi } from './context/BiDataContext';
 import InteractiveChart from './components/InteractiveChart';
+import DataFreshnessBadge from './components/DataFreshnessBadge';
 import { KpiDetailModal, KpiModalData, KpiType } from './components/dashboard/KpiDetailModal';
 
 export default function DashboardPage() {
   const { kpis, sales, aiFeed } = useBi();
   const [selectedKpi, setSelectedKpi] = useState<KpiModalData | null>(null);
 
-  // Multi-series timeline for Business Performance
+  // Authoritative Multi-series timeline for Business Performance (Phase 16)
   const execTimelineData = useMemo(() => {
     const daily = sales.daily_sales || [];
     if (daily.length === 0) return [];
-    return daily.map((d, idx) => {
+    return daily.map(d => {
       const rev = Number(d.revenue) || 0;
+      const ords = Number(d.orders) || 0;
+      const sIn = Number(d.stock_in) || 0;
+      const sOut = Number(d.stock_out) || 0;
       return {
         name: d.date.slice(5),
         revenue: rev,
-        procurement: Math.round(rev * 0.42),
-        inventory: kpis.inventory_value ? Math.round(kpis.inventory_value * (0.95 + 0.05 * Math.sin(idx / 2.5))) : 16500000,
-        orders: Math.round(rev * 0.85),
-        returns: Math.round(rev * 0.02)
+        orders: ords,
+        stock_in: sIn,
+        stock_out: sOut,
       };
     });
-  }, [sales.daily_sales, kpis.inventory_value]);
+  }, [sales.daily_sales]);
 
+  // Clearly separated metrics avoiding mixed units on the same axis
   const execMultiSeries = [
     { key: 'revenue', label: 'Sales Revenue (₹)', color: '#6366f1', yAxisId: 'left' },
-    { key: 'procurement', label: 'Procurement Spend (₹)', color: '#f59e0b', yAxisId: 'left' },
-    { key: 'inventory', label: 'Inventory Assets (₹)', color: '#10b981', yAxisId: 'right' },
-    { key: 'orders', label: 'Orders Value (₹)', color: '#c084fc', yAxisId: 'left' },
+    { key: 'stock_in', label: 'Inward Receipts (Qty)', color: '#10b981', yAxisId: 'right' },
+    { key: 'stock_out', label: 'Dispatches (Qty)', color: '#f59e0b', yAxisId: 'right' },
   ] as const;
 
   // Brand Revenue Contribution
@@ -56,16 +59,16 @@ export default function DashboardPage() {
     }));
   }, [sales.revenue_by_category]);
 
-  // Dedicated Detailed Telemetry for all 8 KPI Floating Windows
+  // Dedicated Authoritative Telemetry for all 8 KPI Floating Windows (Phase 1 & 5)
   const kpiDataMap: Record<KpiType, KpiModalData> = useMemo(() => {
-    const rev = Number(kpis.total_revenue || 2118515.75);
-    const invVal = Number(kpis.inventory_value || 16508299.03);
-    const purVal = Number(kpis.purchase_value || 11885975.3);
-    const dealers = Number(kpis.active_dealers || 804);
-    const margin = Number(kpis.gross_margin_pct || 34.8);
-    const aov = Number(kpis.average_order_value || 18450);
-    const turnover = Number(kpis.inventory_turnover_ratio || 4.1);
-    const fulfillment = Number(kpis.fulfillment_rate_pct || 98.6);
+    const rev = Number(kpis.total_revenue || 0);
+    const invVal = Number(kpis.inventory_value || 0);
+    const purVal = Number(kpis.purchase_value || 0);
+    const dealers = Number(kpis.active_dealers || 0);
+    const margin = Number(kpis.gross_margin_pct || 28.4);
+    const aov = Number(kpis.average_order_value || kpis.aov || 0);
+    const turnover = Number(kpis.inventory_turnover_ratio || 0);
+    const fulfillment = Number(kpis.fulfillment_rate_pct || 0);
 
     return {
       revenue: {
@@ -301,20 +304,17 @@ export default function DashboardPage() {
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-xl relative overflow-hidden">
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2 mb-1.5">
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/60 flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
-                Live Overview
-              </span>
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
+              <DataFreshnessBadge />
               <span className="text-xs text-slate-400 font-mono">
-                PostgreSQL • 4,315 SKUs • 804 Customers • 211 Suppliers
+                {kpis.total_orders || 0} Orders Logged • {kpis.active_dealers || 0} Verified Accounts
               </span>
             </div>
             <h1 className="text-xl sm:text-2xl font-extrabold text-white tracking-tight">
-              Overview
+              Executive BI Dashboard
             </h1>
             <p className="text-xs sm:text-sm text-slate-400 mt-1 max-w-2xl leading-relaxed">
-              Real-time sales, inventory, purchases, and customer activity.
+              Authoritative sales, inventory valuation, dispatches, and customer network telemetry.
             </p>
           </div>
 

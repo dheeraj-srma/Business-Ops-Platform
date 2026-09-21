@@ -3,15 +3,16 @@ import React, { useMemo } from 'react';
 import { Activity, Zap, Clock, AlertTriangle } from 'lucide-react';
 import { useBi } from '../context/BiDataContext';
 import InteractiveChart from '../components/InteractiveChart';
+import { calculateABC } from '../utils/metricCalculations';
 
 export default function InventoryVelocityPage() {
-  const { inv, sales, kpis } = useBi();
+  const { inv, sales, kpis, inventoryList } = useBi();
 
   const movementTimelineData = useMemo(() => {
     return (sales.daily_sales || []).map(d => ({
       name: d.date.slice(5),
-      inward: d.stock_in || Math.round(d.orders * 150),
-      outward: d.stock_out || Math.round(d.orders * 110),
+      inward: Number(d.stock_in || 0),
+      outward: Number(d.stock_out || 0),
     }));
   }, [sales.daily_sales]);
 
@@ -27,49 +28,94 @@ export default function InventoryVelocityPage() {
     }));
   }, [inv.top_movers]);
 
+  // Derive slow movers from actual recorded dispatches with lowest positive units sold
   const slowMoversData = useMemo(() => {
-    return [
-      { name: 'O/H SHOWER SONET 6"', value: 12 },
-      { name: 'SOAP DISH WITH TUMBLER', value: 14 },
-      { name: 'TUMBLER HOLDER ROYAL', value: 18 },
-      { name: 'PIPE CLIP 25MM TARUN', value: 24 },
-      { name: 'SG-309 DOUBLE SOAP DISH', value: 32 },
-    ];
-  }, []);
+    const prods = sales.top_products || [];
+    if (!prods || prods.length <= 1) return [];
+    const positiveSold = prods.filter(p => Number(p.qty || 0) > 0);
+    if (positiveSold.length <= 1) return [];
+    // Sort ascending by actual units sold to identify slow movers
+    return [...positiveSold]
+      .sort((a, b) => a.qty - b.qty)
+      .slice(0, 5)
+      .map(p => ({
+        name: p.name.length > 20 ? p.name.slice(0, 20) + '…' : p.name,
+        value: p.qty,
+      }));
+  }, [sales.top_products]);
 
+  // Dead stock: trapped capital (quantity_on_hand * unit_cost) in stagnant stock with zero sales
   const deadStockData = useMemo(() => {
-    return [
-      { name: 'CHANNEL', value: 18500 },
-      { name: 'POP UP WASTE COUPLING 6"', value: 14200 },
-      { name: 'PVC PIPE (RIGID) 12KG', value: 11800 },
-      { name: 'Nalka Table Brochure', value: 4500 },
-      { name: 'SHOWER ARM SQUARE', value: 3800 },
-    ];
-  }, []);
+    if (!inventoryList || inventoryList.length === 0) return [];
+    const activeSkus = new Set((sales.top_products || []).filter(p => Number(p.qty || 0) > 0).map(m => m.sku));
+    const candidates = inventoryList
+      .filter(p => !activeSkus.has(p.SKU || p.sku) && Number(p['Current Stock'] || p.currentStock || 0) > 0)
+      .map(p => {
+        const name = p['Item Name'] || p.name || p.SKU || 'Item';
+        const stock = Number(p['Current Stock'] || p.currentStock || 0);
+        const cost = Number(p['Cost Price'] || p.unitCost || p.Price || 0);
+        return {
+          name: name.length > 22 ? name.slice(0, 22) + '…' : name,
+          value: Math.round(stock * cost),
+        };
+      })
+      .filter(x => x.value > 0)
+      .sort((a, b) => b.value - a.value);
+    return candidates.slice(0, 5);
+  }, [inventoryList, sales.top_products]);
 
   const agingData = useMemo(() => {
+    const total = inventoryList.length;
+    if (total === 0) return [];
+    const healthy = inv.healthy_count || 0;
+    const low = inv.low_stock || 0;
+    const oos = inv.out_of_stock || 0;
+    const stagnant = Math.max(0, total - healthy - low - oos);
     return [
-      { name: '0 - 30 Days (Fresh)', value: 58 },
-      { name: '31 - 60 Days (Normal)', value: 24 },
-      { name: '61 - 90 Days (Slow)', value: 12 },
-      { name: '90+ Days (Stagnant)', value: 6 },
+      { name: '0 - 30 Days (Active Turnover)', value: healthy },
+      { name: '31 - 60 Days (Buffer Buffer)', value: low },
+      { name: '61 - 90 Days (Low Velocity)', value: stagnant },
+      { name: '90+ Days (Stockout/Depleted)', value: oos },
     ];
-  }, []);
+  }, [inventoryList.length, inv.healthy_count, inv.low_stock, inv.out_of_stock]);
 
+  // Authoritative category valuation = quantity × unit cost (Phase 9)
   const categoryValueData = useMemo(() => {
-    return (sales.revenue_by_category || []).map(c => ({
-      name: c.category,
-      value: Math.round(c.revenue * 2.8),
-    }));
-  }, [sales.revenue_by_category]);
+    if (!inventoryList || inventoryList.length === 0) {
+      return (sales.revenue_by_category || []).map(c => ({
+        name: c.category,
+        value: c.revenue,
+      }));
+    }
+    const catMap: Record<string, number> = {};
+    inventoryList.forEach(p => {
+      const cat = p.Category || p.category || p.Brand || 'General';
+      const stock = Math.max(0, Number(p['Current Stock'] || p.currentStock || 0));
+      const cost = Math.max(0, Number(p['Cost Price'] || p.unitCost || p.Price || 0));
+      catMap[cat] = (catMap[cat] || 0) + (stock * cost);
+    });
+    return Object.entries(catMap)
+      .map(([name, value]) => ({ name, value: Math.round(value) }))
+      .sort((a, b) => b.value - a.value);
+  }, [inventoryList, sales.revenue_by_category]);
 
+  // Authoritative ABC classification from cumulative inventory value
   const abcAnalysisData = useMemo(() => {
+    if (!inventoryList || inventoryList.length === 0) return [];
+    const classified = calculateABC(inventoryList, p => {
+      const qty = Number(p['Current Stock'] || p.currentStock || 0);
+      const cost = Number(p['Cost Price'] || p.unitCost || p.Price || 0);
+      return qty * cost;
+    });
+    const aVal = classified.filter(x => x.classification === 'A').reduce((s, x) => s + x.value, 0);
+    const bVal = classified.filter(x => x.classification === 'B').reduce((s, x) => s + x.value, 0);
+    const cVal = classified.filter(x => x.classification === 'C').reduce((s, x) => s + x.value, 0);
     return [
-      { name: 'Class A (High Value 70%)', value: 70 },
-      { name: 'Class B (Moderate 20%)', value: 20 },
-      { name: 'Class C (Low Value 10%)', value: 10 },
+      { name: 'Class A (High Value Tier)', value: Math.round(aVal) },
+      { name: 'Class B (Moderate Value Tier)', value: Math.round(bVal) },
+      { name: 'Class C (Low Value / Bulk Tier)', value: Math.round(cVal) },
     ];
-  }, []);
+  }, [inventoryList]);
 
   return (
     <div className="space-y-6 pb-12">

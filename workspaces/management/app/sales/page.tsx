@@ -6,13 +6,14 @@ import InteractiveChart from '../components/InteractiveChart';
 import SalesmanPerformanceView from '../components/SalesmanPerformanceView';
 
 export default function SalesPage() {
-  const { sales, kpis } = useBi();
+  const { sales, kpis, ordersList, dealersList } = useBi();
   const [activeTab, setActiveTab] = useState<'overview' | 'salesman'>('overview');
 
   const dailySalesData = useMemo(() => {
     return (sales.daily_sales || []).map(d => ({
       name: d.date.slice(5),
       value: d.revenue,
+      date: d.date,
     }));
   }, [sales.daily_sales]);
 
@@ -44,22 +45,65 @@ export default function SalesPage() {
     }));
   }, [sales.salesman_performance]);
 
+  // Derive region revenue from actual orders & dealer state mapping
   const regionRevenueData = useMemo(() => {
-    return [
-      { name: 'Haryana', value: 1250000 },
-      { name: 'Delhi NCR', value: 480000 },
-      { name: 'Uttar Pradesh', value: 240000 },
-      { name: 'Punjab', value: 148515.75 },
-    ];
-  }, []);
+    const dealerStateMap: Record<string, string> = {};
+    dealersList.forEach(d => {
+      const name = (d["Shop Name"] || d.name || d.shop_name || '').trim().toLowerCase();
+      const state = (d.State || d.state || 'Haryana').trim();
+      if (name) dealerStateMap[name] = state;
+    });
 
+    const stateRevMap: Record<string, number> = {};
+    ordersList.forEach(o => {
+      const isApproved = ['approved', 'dispatched', 'delivered'].includes(String(o.status || '').toLowerCase());
+      if (!isApproved) return;
+      const cust = String(o.shop_name || o.customer_name || '').trim().toLowerCase();
+      const st = dealerStateMap[cust] || 'Haryana';
+      stateRevMap[st] = (stateRevMap[st] || 0) + Number(o.total_amount || 0);
+    });
+
+    const list = Object.entries(stateRevMap).map(([name, value]) => ({
+      name,
+      value: Math.round(value),
+    })).sort((a, b) => b.value - a.value);
+
+    if (list.length > 0) return list;
+
+    // If no direct order geography map, aggregate by top dealer regions or default to available state breakdown
+    if (sales.dealer_states && Object.keys(sales.dealer_states).length > 0) {
+      return Object.entries(sales.dealer_states).map(([name, count]) => ({
+        name,
+        value: count,
+      }));
+    }
+
+    return [];
+  }, [ordersList, dealersList, sales.dealer_states]);
+
+  // Derive order size distribution from actual orders
   const orderValueDistribution = useMemo(() => {
+    let large = 0;
+    let medium = 0;
+    let small = 0;
+
+    ordersList.forEach(o => {
+      const amt = Number(o.total_amount || 0);
+      if (amt >= 200000) large++;
+      else if (amt >= 50000) medium++;
+      else if (amt > 0) small++;
+    });
+
+    if (large === 0 && medium === 0 && small === 0 && kpis.total_orders) {
+      return [];
+    }
+
     return [
-      { name: 'Large (>₹2L)', value: 8 },
-      { name: 'Medium (₹50k-₹2L)', value: 18 },
-      { name: 'Small (<₹50k)', value: 42 },
+      { name: 'Large (>₹2L)', value: large },
+      { name: 'Medium (₹50k-₹2L)', value: medium },
+      { name: 'Small (<₹50k)', value: small },
     ];
-  }, []);
+  }, [ordersList, kpis.total_orders]);
 
   return (
     <div className="space-y-6 pb-12">
@@ -71,21 +115,21 @@ export default function SalesPage() {
             <span>Sales</span>
           </div>
           <h1 className="text-xl sm:text-2xl font-extrabold text-white tracking-tight">
-            Sales
+            Sales Performance
           </h1>
           <p className="text-xs text-slate-400 mt-0.5">
-            Sales trends, top products, customer rankings, and salesmen performance.
+            Authoritative sales trends, product dispatches, verified customer rankings, and salesman telemetry.
           </p>
         </div>
 
         <div className="flex items-center gap-3">
           <div className="px-3.5 py-2 bg-slate-800/60 rounded-xl border border-slate-700/50">
             <div className="text-[10px] text-slate-400 uppercase font-semibold">Total Sales</div>
-            <div className="text-base font-extrabold text-sky-400">₹{Number(kpis.total_revenue || 2118515.75).toLocaleString('en-IN')}</div>
+            <div className="text-base font-extrabold text-sky-400">₹{Number(kpis.total_revenue || 0).toLocaleString('en-IN')}</div>
           </div>
           <div className="px-3.5 py-2 bg-slate-800/60 rounded-xl border border-slate-700/50">
             <div className="text-[10px] text-slate-400 uppercase font-semibold">Top Salesman</div>
-            <div className="text-base font-extrabold text-indigo-600 dark:text-indigo-400">{sales.top_salesman || 'RAVINDER KUMAR'}</div>
+            <div className="text-base font-extrabold text-indigo-600 dark:text-indigo-400">{sales.top_salesman || 'N/A'}</div>
           </div>
         </div>
       </div>
@@ -158,6 +202,7 @@ export default function SalesPage() {
               data={dealerRankData}
               defaultChartType="area"
               unit="₹"
+              showLegend={false}
             />
 
             <InteractiveChart

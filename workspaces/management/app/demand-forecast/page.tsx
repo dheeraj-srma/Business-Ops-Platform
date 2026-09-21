@@ -34,7 +34,7 @@ export default function DemandForecastPage() {
         <div>
           <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400 font-bold text-lg mb-1">
             <Sparkles size={22} className="text-indigo-600 dark:text-indigo-400" />
-            <span>AI Demand Forecast & Predictive Modeling</span>
+            <span>AI Demand Forecast & Scenario Simulator</span>
           </div>
           <p className="text-xs md:text-sm text-slate-400">
             Multi-variate predictive demand modeling, dynamic safety buffer calculations, simulated stockout probabilities, and automated PO reordering proposals.
@@ -44,11 +44,11 @@ export default function DemandForecastPage() {
         <div className="flex items-center gap-3 self-start md:self-auto">
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 border border-cyan-800/40 text-xs text-indigo-700 dark:text-indigo-300 font-mono">
             <Brain size={14} className="text-indigo-600 dark:text-indigo-400" />
-            <span>Model: Prophet + Holt-Winters v2.4</span>
+            <span>Engine: Scenario Forecast Simulator</span>
           </div>
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-xs text-slate-300">
             <Cpu size={14} className="text-indigo-600 dark:text-indigo-400" />
-            <span>Live Inference Engine</span>
+            <span>Heuristic Demand Projection</span>
           </div>
         </div>
       </div>

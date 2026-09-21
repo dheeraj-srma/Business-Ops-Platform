@@ -5,78 +5,65 @@ import { useBi } from '../context/BiDataContext';
 import InteractiveChart from '../components/InteractiveChart';
 
 export default function ProcurementPage() {
-  const { proc, sales, kpis } = useBi();
+  const { proc, sales, kpis, inwardsList } = useBi();
 
+  // Authoritative inward spend trend from actual inward consignments
   const spendTrendData = useMemo(() => {
-    return (sales.daily_sales || []).map(d => ({
-      name: d.date.slice(5),
-      value: Math.round(d.revenue * 0.56),
+    if (!inwardsList || inwardsList.length === 0) return [];
+    const dateMap: Record<string, number> = {};
+    inwardsList.forEach(t => {
+      const d = String(t.Date || t.Timestamp || t.created_at || '').slice(0, 10);
+      if (!d) return;
+      const cost = Number(t["Total Cost"] || t.total_cost || (Number(t.Quantity || 0) * Number(t["Unit Cost"] || 0)));
+      dateMap[d] = (dateMap[d] || 0) + cost;
+    });
+    return Object.keys(dateMap).sort().map(d => ({
+      name: d.slice(5),
+      value: Math.round(dateMap[d]),
     }));
-  }, [sales.daily_sales]);
+  }, [inwardsList]);
 
+  // Authoritative supplier spend from inwards & procurement intelligence
   const supplierSpendData = useMemo(() => {
+    if (inwardsList && inwardsList.length > 0) {
+      const supMap: Record<string, number> = {};
+      inwardsList.forEach(t => {
+        const sup = String(t.supplier_or_recipient || t.Supplier || 'General Supplier').trim();
+        const cost = Number(t["Total Cost"] || t.total_cost || (Number(t.Quantity || 0) * Number(t["Unit Cost"] || 0)));
+        supMap[sup] = (supMap[sup] || 0) + cost;
+      });
+      return Object.entries(supMap)
+        .map(([name, value]) => ({
+          name: name.length > 20 ? name.slice(0, 20) + '…' : name,
+          value: Math.round(value),
+        }))
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 20);
+    }
     return (proc.top_suppliers || []).map(s => ({
       name: s.supplier.length > 20 ? s.supplier.slice(0, 20) + '…' : s.supplier,
       value: s.value,
     }));
-  }, [proc.top_suppliers]);
+  }, [inwardsList, proc.top_suppliers]);
 
-  const qualityScoreData = useMemo(() => {
-    const suppliers = proc.top_suppliers || [];
-    if (suppliers.length > 0) {
-      return suppliers.map((s, idx) => {
-        const score = 99.5 - (idx * 0.22);
-        return {
-          name: s.supplier.length > 20 ? s.supplier.slice(0, 20) + '…' : s.supplier,
-          value: parseFloat(Math.max(94.0, score).toFixed(1)),
-        };
-      });
-    }
-    return [
-      { name: 'FINOLEX PIPES', value: 99.2 },
-      { name: 'HAHN BRASS', value: 98.6 },
-      { name: 'FLOTO SANITARY', value: 97.8 },
-      { name: 'UNIK FITTINGS', value: 98.1 },
-      { name: 'ADVANCE METALS', value: 96.5 },
-    ];
-  }, [proc.top_suppliers]);
-
+  // Category inward spend from real transactions
   const categoryPurchData = useMemo(() => {
-    return [
-      { name: 'CPVC & PVC Pipes', value: 4250000 },
-      { name: 'Brass Valves & Fittings', value: 3650000 },
-      { name: 'Sanitaryware Goods', value: 2100000 },
-      { name: 'Galvanized Iron (GI)', value: 1885975.3 },
-    ];
-  }, []);
+    if (!inwardsList || inwardsList.length === 0) return [];
+    const catMap: Record<string, number> = {};
+    inwardsList.forEach(t => {
+      const cat = String(t.Category || t.categoryName || 'General').trim();
+      const cost = Number(t["Total Cost"] || t.total_cost || (Number(t.Quantity || 0) * Number(t["Unit Cost"] || 0)));
+      catMap[cat] = (catMap[cat] || 0) + cost;
+    });
+    return Object.entries(catMap)
+      .map(([name, value]) => ({ name, value: Math.round(value) }))
+      .sort((a, b) => b.value - a.value);
+  }, [inwardsList]);
 
-  const leadTimeData = useMemo(() => {
-    const suppliers = proc.top_suppliers || [];
-    if (suppliers.length > 0) {
-      return suppliers.map((s, idx) => {
-        const days = 1.8 + (idx * 0.14);
-        return {
-          name: s.supplier.length > 20 ? s.supplier.slice(0, 20) + '…' : s.supplier,
-          value: parseFloat(Math.min(5.0, days).toFixed(1)),
-        };
-      });
-    }
-    return [
-      { name: 'FINOLEX PIPES', value: 2.1 },
-      { name: 'HAHN BRASS', value: 2.8 },
-      { name: 'FLOTO SANITARY', value: 3.4 },
-      { name: 'UNIK FITTINGS', value: 3.8 },
-      { name: 'ADVANCE METALS', value: 4.2 },
-    ];
-  }, [proc.top_suppliers]);
-
-  const onTimeDeliveryData = useMemo(() => {
-    return [
-      { name: 'Jul 26', value: 94.2 },
-      { name: 'Aug 26', value: 96.0 },
-      { name: 'Sep 26', value: 97.5 },
-    ];
-  }, []);
+  // SLA quality and lead time: Explicitly empty until gate telemetry is committed (Phase 11)
+  const qualityScoreData: Array<{ name: string; value: number }> = useMemo(() => [], []);
+  const leadTimeData: Array<{ name: string; value: number }> = useMemo(() => [], []);
+  const onTimeDeliveryData: Array<{ name: string; value: number }> = useMemo(() => [], []);
 
   return (
     <div className="space-y-6 pb-12">
@@ -91,18 +78,18 @@ export default function ProcurementPage() {
             Procurement & Vendor Intelligence
           </h1>
           <p className="text-xs text-slate-400 mt-0.5">
-            Purchase spend volume, supplier performance scorecards, factory lead times, and SLA compliance across 211 manufacturing vendors.
+            Authoritative inward purchase spend volume and supplier consignment capital allocation.
           </p>
         </div>
 
         <div className="flex items-center gap-3">
           <div className="px-3.5 py-2 bg-slate-800/60 rounded-xl border border-slate-700/50">
             <div className="text-[10px] text-slate-400 uppercase font-semibold">Total Sourcing Spend</div>
-            <div className="text-base font-extrabold text-amber-400">₹{Number(kpis.purchase_value || 11885975.3).toLocaleString('en-IN')}</div>
+            <div className="text-base font-extrabold text-amber-400">₹{Number(kpis.purchase_value || 0).toLocaleString('en-IN')}</div>
           </div>
           <div className="px-3.5 py-2 bg-slate-800/60 rounded-xl border border-slate-700/50">
             <div className="text-[10px] text-slate-400 uppercase font-semibold">Connected Vendors</div>
-            <div className="text-base font-extrabold text-sky-400">{kpis.active_suppliers || 211} Certified</div>
+            <div className="text-base font-extrabold text-sky-400">{kpis.active_suppliers || 0} Vendors</div>
           </div>
         </div>
       </div>

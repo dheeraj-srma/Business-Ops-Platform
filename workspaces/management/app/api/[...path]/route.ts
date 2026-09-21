@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const BACKEND_URL = 'http://127.0.0.1:8000';
+const BACKEND_URL = process.env.BACKEND_INTERNAL_URL || process.env.NEXT_PUBLIC_BACKEND_URL || 'http://127.0.0.1:8000';
 
 async function handler(req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
   try {
@@ -31,12 +31,18 @@ async function handler(req: NextRequest, { params }: { params: Promise<{ path: s
     const res = await fetch(targetUrl, init);
     const data = await res.text();
 
+    const responseHeaders: Record<string, string> = {
+      'content-type': res.headers.get('content-type') || 'application/json',
+      'cache-control': 'no-store',
+    };
+    ['x-database-mode', 'x-snapshot-captured-at', 'x-correlation-id', 'x-response-time-ms'].forEach(h => {
+      const val = res.headers.get(h);
+      if (val) responseHeaders[h] = val;
+    });
+
     return new NextResponse(data, {
       status: res.status,
-      headers: {
-        'content-type': res.headers.get('content-type') || 'application/json',
-        'cache-control': 'no-store',
-      },
+      headers: responseHeaders,
     });
   } catch (error: any) {
     return NextResponse.json({ error: error?.message || 'Proxy Error' }, { status: 502 });

@@ -5,15 +5,28 @@ import { useBi } from '../context/BiDataContext';
 import InteractiveChart from '../components/InteractiveChart';
 
 export default function QualityReturnsPage() {
-  const { ret, sales, kpis } = useBi();
+  const { ret, sales, kpis, returnsList } = useBi();
 
+  // Authoritative returns timeline from actual return timestamps
   const returnsTimelineData = useMemo(() => {
-    return (sales.daily_sales || []).map(d => ({
-      name: d.date.slice(5),
-      defective: Math.max(0, Math.round(d.orders * 0.08)),
-      reusable: Math.max(0, Math.round(d.orders * 0.05)),
-    }));
-  }, [sales.daily_sales]);
+    if (!returnsList || returnsList.length === 0) return [];
+    const dateMap: Record<string, { name: string; defective: number; reusable: number }> = {};
+    returnsList.forEach(r => {
+      const ts = String(r.Timestamp || r.created_at || '').slice(0, 10);
+      if (!ts) return;
+      if (!dateMap[ts]) {
+        dateMap[ts] = { name: ts.slice(5), defective: 0, reusable: 0 };
+      }
+      const cond = String(r.Condition || r.condition || '').toLowerCase();
+      const qty = Number(r.Quantity || r.quantity || 1);
+      if (cond.includes('defect') || cond.includes('scrap') || cond.includes('damage')) {
+        dateMap[ts].defective += qty;
+      } else {
+        dateMap[ts].reusable += qty;
+      }
+    });
+    return Object.keys(dateMap).sort().map(k => dateMap[k]);
+  }, [returnsList]);
 
   const returnsTimelineSeries = [
     { key: 'defective', label: 'Defective (Scrapped)', color: '#ef4444' },
@@ -21,47 +34,81 @@ export default function QualityReturnsPage() {
   ];
 
   const returnReasonsData = useMemo(() => {
+    if (returnsList && returnsList.length > 0) {
+      const reasonsMap: Record<string, number> = {};
+      returnsList.forEach(r => {
+        const rsn = String(r.Reason || r.reason || 'Transit Impact Damage').trim();
+        reasonsMap[rsn] = (reasonsMap[rsn] || 0) + 1;
+      });
+      return Object.entries(reasonsMap).map(([name, value]) => ({ name, value }));
+    }
     const reasons = ret.return_reasons || ret.reasons || {};
     return Object.entries(reasons).map(([reason, count]) => ({
       name: reason,
       value: count,
     }));
-  }, [ret]);
+  }, [returnsList, ret]);
 
   const topReturnedProducts = useMemo(() => {
-    return [
-      { name: 'POP UP WASTE COUPLING 6"', value: 6 },
-      { name: 'HARLEY SEAT COVER WHITE', value: 4 },
-      { name: 'G.I REDUCING ELBOW 3/4"', value: 2 },
-      { name: 'O/H SHOWER SONET 6"', value: 2 },
-    ];
-  }, []);
+    if (!returnsList || returnsList.length === 0) return [];
+    const prodMap: Record<string, number> = {};
+    returnsList.forEach(r => {
+      const name = String(r["Item Name"] || r.item_name || r.SKU || 'Item').trim();
+      const qty = Number(r.Quantity || r.quantity || 1);
+      prodMap[name] = (prodMap[name] || 0) + qty;
+    });
+    return Object.entries(prodMap)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 6);
+  }, [returnsList]);
 
   const supplierDefectRate = useMemo(() => {
-    return [
-      { name: 'ADVANCE METALS', value: 2.4 },
-      { name: 'FLOTO SANITARY', value: 1.8 },
-      { name: 'HAHN BRASS', value: 1.1 },
-      { name: 'FINOLEX PIPES', value: 0.6 },
-    ];
-  }, []);
+    if (!returnsList || returnsList.length === 0) return [];
+    const brandDefects: Record<string, number> = {};
+    returnsList.forEach(r => {
+      const cat = String(r.Category || r.category || 'General').trim();
+      brandDefects[cat] = (brandDefects[cat] || 0) + 1;
+    });
+    return Object.entries(brandDefects)
+      .map(([name, count]) => ({
+        name,
+        value: Number(((count / (returnsList.length || 1)) * 100).toFixed(1)),
+      }))
+      .sort((a, b) => b.value - a.value);
+  }, [returnsList]);
 
   const geographicReturnData = useMemo(() => {
-    return [
-      { name: 'Gurugram Central', value: 6 },
-      { name: 'Faridabad Depot', value: 4 },
-      { name: 'Panipat Hub', value: 2 },
-      { name: 'Noida Hub', value: 2 },
-    ];
-  }, []);
+    if (!returnsList || returnsList.length === 0) return [];
+    const locMap: Record<string, number> = {};
+    returnsList.forEach(r => {
+      const loc = String(r.Location || r.location || 'Main Depot').trim();
+      const qty = Number(r.Quantity || r.quantity || 1);
+      locMap[loc] = (locMap[loc] || 0) + qty;
+    });
+    return Object.entries(locMap)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value);
+  }, [returnsList]);
 
   const returnsLossData = useMemo(() => {
+    if (!returnsList || returnsList.length === 0) return [];
+    let salvaged = 0;
+    let scrapped = 0;
+    returnsList.forEach(r => {
+      const val = Number(r.Price || r.price || 0) * Number(r.Quantity || r.quantity || 1);
+      const cond = String(r.Condition || r.condition || '').toLowerCase();
+      if (cond.includes('defect') || cond.includes('scrap')) {
+        scrapped += val;
+      } else {
+        salvaged += val;
+      }
+    });
     return [
-      { name: 'Salvaged & Restocked Value', value: 48000 },
-      { name: 'Scrap & Write-off Loss', value: 24500 },
-      { name: 'Freight & Handling Overhead', value: 8500 },
+      { name: 'Salvaged & Restocked Value', value: Math.round(salvaged) },
+      { name: 'Scrap & Write-off Loss', value: Math.round(scrapped) },
     ];
-  }, []);
+  }, [returnsList]);
 
   return (
     <div className="space-y-6 pb-12">

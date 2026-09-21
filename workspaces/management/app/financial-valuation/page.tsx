@@ -18,7 +18,7 @@ import {
 export default function FinancialValuationPage() {
   const { kpis, sales, inventoryList, loading } = useBi();
 
-  // 1. Revenue vs Cost vs Profit Timeline
+  // 1. Revenue vs Cost vs Profit Timeline [MODELLED: 64% COGS Assumption]
   const finPerformanceData = useMemo(() => {
     return (sales.daily_sales || []).map((d) => {
       const rev = Number(d.revenue) || 0;
@@ -34,41 +34,25 @@ export default function FinancialValuationPage() {
   }, [sales.daily_sales]);
 
   const finPerformanceSeries = [
-    { key: 'revenue', label: 'Gross Revenue (₹)', color: '#6366f1' },
-    { key: 'cost', label: 'Cost of Goods Sold (₹)', color: '#ef4444' },
-    { key: 'profit', label: 'Gross Profit Margin (₹)', color: '#10b981' }
+    { key: 'revenue', label: 'Gross Revenue (₹) [ACTUAL]', color: '#6366f1' },
+    { key: 'cost', label: 'Est. COGS (₹) [MODELLED]', color: '#ef4444' },
+    { key: 'profit', label: 'Est. Gross Margin (₹) [MODELLED]', color: '#10b981' }
   ];
 
-  // 2. Stock Valuation by Segment / Brand
+  // 2. Stock Valuation by Segment / Brand [ACTUAL: Real inventory records]
   const stockValuationByGroup = useMemo(() => {
     const map: Record<string, number> = {};
     inventoryList.forEach(p => {
       const b = p.Brand || p.Category || 'General';
-      const cost = Number(p['Cost Price'] || p.unitCost || p.Price || 35.0);
+      const cost = Number(p['Cost Price'] || p.unitCost || p.Price || 0);
       const stock = Math.max(0, Number(p['Current Stock'] || p.currentStock || 0));
       map[b] = (map[b] || 0) + (cost * stock);
     });
     const sorted = Object.entries(map).sort((a, b) => b[1] - a[1]);
-    if (sorted.length > 0 && sorted.some(s => s[1] > 0)) {
-      return sorted.map(([name, value]) => ({ name, value: Math.round(value) }));
-    }
-    return [
-      { name: 'FINOLEX CPVC Pipes', value: 4850000 },
-      { name: 'HAHN Brass Fittings', value: 3950000 },
-      { name: 'FLOTO Bathware', value: 2980000 },
-      { name: 'GRAVITY Faucets', value: 2450000 },
-      { name: 'UNIK Cast Reducers', value: 2278299 },
-      { name: 'ASTRAL Plumbing Systems', value: 1950000 },
-      { name: 'SUPREME Fittings', value: 1680000 },
-      { name: 'ASHIRVAD FlowGuard', value: 1420000 },
-      { name: 'PRINCE Pipes', value: 1180000 },
-      { name: 'HINDWARE Sanitary', value: 950000 },
-      { name: 'PARRYWARE Fixtures', value: 780000 },
-      { name: 'JAQUAR Brass Valves', value: 650000 },
-    ];
+    return sorted.map(([name, value]) => ({ name, value: Math.round(value) }));
   }, [inventoryList]);
 
-  // 3. Gross Margin % by Category
+  // 3. Gross Margin % by Category [MODELLED Baseline]
   const grossMarginCategoryData = useMemo(() => {
     return [
       { name: 'HAHN Brass Fittings', value: 38.2 },
@@ -81,19 +65,17 @@ export default function FinancialValuationPage() {
       { name: 'ASHIRVAD FlowGuard', value: 21.4 },
       { name: 'PRINCE Pipes', value: 19.8 },
       { name: 'HINDWARE Sanitary', value: 18.5 },
-      { name: 'PARRYWARE Fixtures', value: 17.2 },
-      { name: 'JAQUAR Brass Valves', value: 16.0 },
     ];
   }, []);
 
-  // 4. Working Capital Allocation
+  // 4. Working Capital Allocation [MODELLED: Receivables 45d DSO + Physical Stock]
   const workingCapitalData = useMemo(() => {
-    const invVal = kpis.inventory_value || 16508299;
-    const rev = kpis.total_revenue || 2118515.75;
+    const invVal = Number(kpis.inventory_value || 0);
+    const rev = Number(kpis.total_revenue || 0);
     return [
-      { name: 'Inventory Asset Stock', value: invVal },
-      { name: 'Customer Receivables', value: Math.round(rev * 1.85) },
-      { name: 'Operational Liquidity', value: Math.round(invVal * 0.22) }
+      { name: 'Physical Inventory Asset [ACTUAL]', value: invVal },
+      { name: 'Est. Customer Receivables [MODELLED: 45d DSO]', value: Math.round(rev * 1.5) },
+      { name: 'Est. Operational Buffer [MODELLED]', value: Math.round(invVal * 0.15) }
     ];
   }, [kpis.inventory_value, kpis.total_revenue]);
 
@@ -101,27 +83,30 @@ export default function FinancialValuationPage() {
   const purchaseVsSalesData = useMemo(() => {
     return (sales.daily_sales || []).map((d) => ({
       name: d.date.slice(5),
-      sales: d.revenue,
-      purchase: Math.round(d.revenue * 0.55)
+      sales: Number(d.revenue || 0),
+      purchase: Number(d.stock_in || 0) * 85, // [MODELLED unit cost proxy]
     }));
   }, [sales.daily_sales]);
 
   const purchaseVsSalesSeries = [
-    { key: 'sales', label: 'Sales Revenue', color: '#10b981' },
-    { key: 'purchase', label: 'Procurement Spend', color: '#6366f1' }
+    { key: 'sales', label: 'Sales Realization (₹) [ACTUAL]', color: '#10b981' },
+    { key: 'purchase', label: 'Est. Consignment Value (₹) [MODELLED]', color: '#6366f1' }
   ];
 
   // 6. Net Profit Contribution
   const profitContributionData = useMemo(() => {
-    const totalRev = kpis.total_revenue || 2118515.75;
+    const totalRev = Number(kpis.total_revenue || 0);
+    if (totalRev <= 0) return [];
     return [
-      { name: 'HAHN Brass', value: Math.round(totalRev * 0.35 * 0.382) },
-      { name: 'FLOTO Ware', value: Math.round(totalRev * 0.25 * 0.320) },
-      { name: 'FINOLEX CPVC', value: Math.round(totalRev * 0.22 * 0.245) },
-      { name: 'GRAVITY Metal', value: Math.round(totalRev * 0.12 * 0.295) },
-      { name: 'UNIK Fittings', value: Math.round(totalRev * 0.06 * 0.268) }
+      { name: 'HAHN Brass [MODELLED]', value: Math.round(totalRev * 0.35 * 0.382) },
+      { name: 'FLOTO Ware [MODELLED]', value: Math.round(totalRev * 0.25 * 0.320) },
+      { name: 'FINOLEX CPVC [MODELLED]', value: Math.round(totalRev * 0.22 * 0.245) },
     ];
   }, [kpis.total_revenue]);
+
+  const totalAssetVal = Number(kpis.inventory_value || 0);
+  const netMarginEstimate = Math.round(Number(kpis.total_revenue || 0) * ((Number(kpis.gross_margin_pct || 28.4)) / 100));
+  const annualCarrying = Math.round(totalAssetVal * 0.15);
 
   // 7. Carrying Cost Breakdown
   const carryingCostData = useMemo(() => {
@@ -135,9 +120,6 @@ export default function FinancialValuationPage() {
     ];
   }, [kpis.inventory_value]);
 
-  const totalAssetVal = kpis.inventory_value || 16508299;
-  const annualCarrying = Math.round(totalAssetVal * 0.15);
-  const netMarginEstimate = Math.round((kpis.total_revenue || 2118515.75) * 0.36);
 
   if (loading) {
     return (
