@@ -207,7 +207,7 @@ export interface StockTransaction {
 }
 
 export type ExportType = 'FULL' | 'INCREMENTAL' | 'CUSTOM_RANGE';
-export type ExportFormat = 'JSON' | 'XML';
+export type ExportFormat = 'JSON' | 'XML' | 'EXCEL' | 'CSV';
 export type ExportStatus = 'COMPLETED' | 'FAILED';
 
 export interface TallyExportRecord {

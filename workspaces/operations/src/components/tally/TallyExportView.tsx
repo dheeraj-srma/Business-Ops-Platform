@@ -27,18 +27,22 @@ import {
   ExportFormat,
   PreExportValidationReport,
   TallyExportRecord,
+  Product,
+  Category,
 } from '../../types';
 import { api } from '../../lib/api';
 import { formatDate, formatShortDate, cn } from '../../lib/utils';
 import confetti from 'canvas-confetti';
 
 interface TallyExportViewProps {
+  products?: Product[];
+  categories?: Category[];
   onGoBack?: () => void;
 }
 
-export const TallyExportView: React.FC<TallyExportViewProps> = ({ onGoBack }) => {
+export const TallyExportView: React.FC<TallyExportViewProps> = ({ products = [], categories = [], onGoBack }) => {
   const [exportType, setExportType] = useState<ExportType>('FULL');
-  const [exportFormat, setExportFormat] = useState<ExportFormat>('XML');
+  const [exportFormat, setExportFormat] = useState<ExportFormat>('JSON');
   const [dateFrom, setDateFrom] = useState<string>('');
   const [dateTo, setDateTo] = useState<string>('');
 
@@ -136,6 +140,101 @@ export const TallyExportView: React.FC<TallyExportViewProps> = ({ onGoBack }) =>
     try {
       setIsExporting(true);
       setErrorMsg(null);
+
+      // Client-side formatted Excel or CSV export
+      if (exportFormat === 'EXCEL' || exportFormat === 'CSV') {
+        const dateStr = new Date().toISOString().slice(0, 10);
+        let content = '';
+        let fileName = '';
+        const exportProducts = products || [];
+
+        if (exportFormat === 'EXCEL') {
+          fileName = `Inventory_Master_Export_${dateStr}.xls`;
+          const xmlHeader = `<?xml version="1.0"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:o="urn:schemas-microsoft-com:office:office"
+ xmlns:x="urn:schemas-microsoft-com:office:excel"
+ xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:html="http://www.w3.org/TR/REC-html40">
+ <Styles>
+  <Style ss:ID="Header"><Font ss:Bold="1" ss:Color="#FFFFFF"/><Interior ss:Color="#1E293B" ss:Pattern="Solid"/></Style>
+ </Styles>
+ <Worksheet ss:Name="Inventory Catalog">
+  <Table>
+   <Row>
+    <Cell ss:StyleID="Header"><Data ss:Type="String">SKU</Data></Cell>
+    <Cell ss:StyleID="Header"><Data ss:Type="String">Item Name</Data></Cell>
+    <Cell ss:StyleID="Header"><Data ss:Type="String">Category</Data></Cell>
+    <Cell ss:StyleID="Header"><Data ss:Type="String">Current Stock</Data></Cell>
+    <Cell ss:StyleID="Header"><Data ss:Type="String">Unit Cost (INR)</Data></Cell>
+    <Cell ss:StyleID="Header"><Data ss:Type="String">Valuation (INR)</Data></Cell>
+    <Cell ss:StyleID="Header"><Data ss:Type="String">Min Level</Data></Cell>
+   </Row>`;
+          const xmlRows = exportProducts.map((p) => {
+            const stock = p.currentStock ?? (p as any).current_stock ?? 0;
+            const cost = p.unitCost ?? (p as any).unit_cost ?? 0;
+            const val = stock * cost;
+            const min = p.minimumStock ?? (p as any).min_stock ?? 0;
+            return `   <Row>
+    <Cell><Data ss:Type="String">${(p.sku || '').replace(/&/g, '&amp;').replace(/</g, '&lt;')}</Data></Cell>
+    <Cell><Data ss:Type="String">${(p.name || '').replace(/&/g, '&amp;').replace(/</g, '&lt;')}</Data></Cell>
+    <Cell><Data ss:Type="String">${(p.categoryName || (p as any).category_name || '').replace(/&/g, '&amp;').replace(/</g, '&lt;')}</Data></Cell>
+    <Cell><Data ss:Type="Number">${stock}</Data></Cell>
+    <Cell><Data ss:Type="Number">${cost}</Data></Cell>
+    <Cell><Data ss:Type="Number">${val}</Data></Cell>
+    <Cell><Data ss:Type="Number">${min}</Data></Cell>
+   </Row>`;
+          }).join('\n');
+          content = `${xmlHeader}\n${xmlRows}\n  </Table>\n </Worksheet>\n</Workbook>`;
+        } else {
+          fileName = `Inventory_Master_Export_${dateStr}.csv`;
+          const rows = [
+            ['SKU', 'Item Name', 'Category', 'Current Stock', 'Unit Cost', 'Valuation', 'Min Level'],
+            ...exportProducts.map((p) => {
+              const stock = p.currentStock ?? (p as any).current_stock ?? 0;
+              const cost = p.unitCost ?? (p as any).unit_cost ?? 0;
+              return [
+                p.sku || '',
+                p.name || '',
+                p.categoryName || (p as any).category_name || '',
+                String(stock),
+                String(cost),
+                String(stock * cost),
+                String(p.minimumStock ?? (p as any).min_stock ?? 0),
+              ];
+            }),
+          ];
+          content = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
+        }
+
+        const localRecord: any = {
+          id: `exp_${Date.now()}`,
+          exportType,
+          exportFormat,
+          fileName,
+          productCount: exportProducts.length,
+          totalItems: exportProducts.length,
+          status: 'COMPLETED',
+          exportedByName: 'System User',
+          createdAt: new Date().toISOString(),
+        };
+
+        setGeneratedResult({
+          record: localRecord,
+          content,
+        });
+
+        try {
+          confetti({
+            particleCount: 50,
+            spread: 60,
+            origin: { y: 0.7 },
+          });
+        } catch (e) {}
+        return;
+      }
+
       const res = await api.executeTallyExport({
         exportType,
         exportFormat,
@@ -167,8 +266,16 @@ export const TallyExportView: React.FC<TallyExportViewProps> = ({ onGoBack }) =>
 
   const handleDownloadGenerated = () => {
     if (!generatedResult) return;
+    const mimeType =
+      exportFormat === 'XML'
+        ? 'application/xml'
+        : exportFormat === 'EXCEL'
+        ? 'application/vnd.ms-excel'
+        : exportFormat === 'CSV'
+        ? 'text/csv'
+        : 'application/json';
     const blob = new Blob([generatedResult.content], {
-      type: exportFormat === 'XML' ? 'application/xml' : 'application/json',
+      type: mimeType,
     });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -341,31 +448,12 @@ export const TallyExportView: React.FC<TallyExportViewProps> = ({ onGoBack }) =>
             </label>
           </div>
 
-          {/* Format Selection */}
+          {/* Format Selection (JSON, XML, Excel, CSV) */}
           <div className="pt-3 border-t border-slate-100 dark:border-slate-700/70">
             <h3 className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider mb-2">
               2. Target Format & Integration Method
             </h3>
-            <div className="grid grid-cols-2 gap-3 text-xs">
-              <button
-                type="button"
-                onClick={() => setExportFormat('XML')}
-                className={cn(
-                  'p-3 rounded-lg border text-left transition-all cursor-pointer',
-                  exportFormat === 'XML'
-                    ? 'border-indigo-600 dark:border-indigo-500 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-900 dark:text-indigo-200 font-bold shadow-xs'
-                    : 'border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50'
-                )}
-              >
-                <div className="flex items-center gap-1.5 font-bold mb-1">
-                  <FileCode className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-                  <span>Tally XML Envelope</span>
-                </div>
-                <p className="text-[10px] font-normal text-slate-500 dark:text-slate-400">
-                  Compliant with TallyPrime & Tally.ERP 9 "Import of Data" master parser.
-                </p>
-              </button>
-
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
               <button
                 type="button"
                 onClick={() => setExportFormat('JSON')}
@@ -381,7 +469,64 @@ export const TallyExportView: React.FC<TallyExportViewProps> = ({ onGoBack }) =>
                   <span>JSON Payload</span>
                 </div>
                 <p className="text-[10px] font-normal text-slate-500 dark:text-slate-400">
-                  Standard structured schema for REST sync connectors and webhooks.
+                  Standard structured schema for REST sync connectors and data exchanges.
+                </p>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setExportFormat('XML')}
+                className={cn(
+                  'p-3 rounded-lg border text-left transition-all cursor-pointer',
+                  exportFormat === 'XML'
+                    ? 'border-indigo-600 dark:border-indigo-500 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-900 dark:text-indigo-200 font-bold shadow-xs'
+                    : 'border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50'
+                )}
+              >
+                <div className="flex items-center gap-1.5 font-bold mb-1">
+                  <FileCode className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                  <span>Tally XML</span>
+                </div>
+                <p className="text-[10px] font-normal text-slate-500 dark:text-slate-400">
+                  Compliant with TallyPrime & Tally.ERP 9 "Import of Data" master parser.
+                </p>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setExportFormat('EXCEL')}
+                className={cn(
+                  'p-3 rounded-lg border text-left transition-all cursor-pointer',
+                  exportFormat === 'EXCEL'
+                    ? 'border-indigo-600 dark:border-indigo-500 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-900 dark:text-indigo-200 font-bold shadow-xs'
+                    : 'border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50'
+                )}
+              >
+                <div className="flex items-center gap-1.5 font-bold mb-1">
+                  <FileSpreadsheet className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                  <span>Excel Workbook</span>
+                </div>
+                <p className="text-[10px] font-normal text-slate-500 dark:text-slate-400">
+                  Formatted spreadsheet (.xls) with valuations, categories, and stock numbers.
+                </p>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setExportFormat('CSV')}
+                className={cn(
+                  'p-3 rounded-lg border text-left transition-all cursor-pointer',
+                  exportFormat === 'CSV'
+                    ? 'border-indigo-600 dark:border-indigo-500 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-900 dark:text-indigo-200 font-bold shadow-xs'
+                    : 'border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50'
+                )}
+              >
+                <div className="flex items-center gap-1.5 font-bold mb-1">
+                  <FileSpreadsheet className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                  <span>CSV Flat File</span>
+                </div>
+                <p className="text-[10px] font-normal text-slate-500 dark:text-slate-400">
+                  Universal comma-delimited export for ERP systems and database ingestion.
                 </p>
               </button>
             </div>

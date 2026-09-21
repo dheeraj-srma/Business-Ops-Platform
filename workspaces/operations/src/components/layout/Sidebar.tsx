@@ -24,6 +24,7 @@ import {
   X,
   Ticket,
   RotateCcw,
+  ArrowUpDown,
 } from 'lucide-react';
 import { UserRole } from '../../types';
 import { cn } from '../../lib/utils';
@@ -37,6 +38,7 @@ export type NavigationTab =
   | 'stock-out'
   | 'adjustment'
   | 'transactions'
+  | 'data-exchange'
   | 'tally-sync'
   | 'tally-import'
   | 'tally-export'
@@ -168,8 +170,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
     const isCategoriesActive = currentTab === 'categories' && !isCreateActive;
     const isCouponsActive = currentTab === 'coupons' && !isCreateActive;
     const isTallySyncActive = currentTab === 'tally-sync' && !isCreateActive;
-    const isTallyImportActive = (currentTab === 'tally-import' || currentTab === 'tally_import') && !isCreateActive;
-    const isTallyExportActive = (currentTab === 'tally' || currentTab === 'tally-export') && !isCreateActive;
+    const isDataExchangeActive =
+      (currentTab === 'data-exchange' ||
+        currentTab === 'data_exchange' ||
+        currentTab === 'tally-import' ||
+        currentTab === 'tally_import' ||
+        currentTab === 'tally' ||
+        currentTab === 'tally-export') &&
+      !isCreateActive;
     const isHelpActive = (currentTab === 'help' || currentTab === 'manual') && !isCreateActive;
     const isSettingsActive = currentTab === 'settings' && !isCreateActive;
 
@@ -709,66 +717,38 @@ export const Sidebar: React.FC<SidebarProps> = ({
             )}
           </button>
 
-          {/* 9. Tally Import & Coordination */}
+          {/* 9. Dedicated Data Exchange Section (Capsulates JSON, XML, Excel, CSV Import & Export) */}
           <button
-            id="nav-tab-tally-import"
-            onClick={() => handleTabClick('tally-import')}
-            data-tooltip={collapsed ? 'Tally Import (Accountant Stock Reconciliation & Master Import)' : undefined}
+            id="nav-tab-data-exchange"
+            onClick={() => handleTabClick('data-exchange')}
+            data-tooltip={
+              collapsed
+                ? 'Data Exchange (Import & Export JSON, XML, Excel, CSV)'
+                : undefined
+            }
             data-tooltip-position="right"
             className={cn(
               'w-full flex items-center rounded-lg text-xs font-medium transition-colors duration-150 text-left cursor-pointer group relative border border-transparent',
               collapsed ? 'justify-center p-2.5' : 'justify-between px-3 py-2.5',
-              isTallyImportActive
+              isDataExchangeActive
                 ? 'bg-indigo-50/90 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 font-semibold shadow-2xs border border-indigo-100/80 dark:border-indigo-800/40'
                 : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-slate-100'
             )}
           >
             <div className={cn('flex items-center', collapsed ? 'justify-center' : 'gap-3')}>
-              <UploadCloud
+              <ArrowUpDown
                 className={cn(
-                  'w-4 h-4 shrink-0 transition-transform duration-200 group-hover:scale-110 group-hover:-translate-y-0.5',
-                  isTallyImportActive
+                  'w-4 h-4 shrink-0 transition-transform duration-200 group-hover:scale-110 group-hover:rotate-180',
+                  isDataExchangeActive
                     ? 'text-indigo-600 dark:text-indigo-400'
                     : 'text-slate-400 dark:text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-200'
                 )}
               />
-              {!collapsed && <span>Tally Import</span>}
+              {!collapsed && <span>Data Exchange</span>}
             </div>
             {!collapsed && (
               <span className="text-[9px] px-1.5 py-0.5 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 rounded font-bold border border-indigo-200 dark:border-indigo-800/60">
-                IMPORT
-              </span>
-            )}
-          </button>
-
-          {/* 10. Tally Export */}
-          <button
-            id="nav-tab-tally-export"
-            onClick={() => handleTabClick('tally')}
-            data-tooltip={collapsed ? 'Tally Export (Generate XML & JSON for Accountant)' : undefined}
-            data-tooltip-position="right"
-            className={cn(
-              'w-full flex items-center rounded-lg text-xs font-medium transition-colors duration-150 text-left cursor-pointer group relative border border-transparent',
-              collapsed ? 'justify-center p-2.5' : 'justify-between px-3 py-2.5',
-              isTallyExportActive
-                ? 'bg-indigo-50/90 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 font-semibold shadow-2xs border border-indigo-100/80 dark:border-indigo-800/40'
-                : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-slate-100'
-            )}
-          >
-            <div className={cn('flex items-center', collapsed ? 'justify-center' : 'gap-3')}>
-              <FileSpreadsheet
-                className={cn(
-                  'w-4 h-4 shrink-0 transition-transform duration-200 group-hover:scale-110 group-hover:rotate-6',
-                  isTallyExportActive
-                    ? 'text-indigo-600 dark:text-indigo-400'
-                    : 'text-slate-400 dark:text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-200'
-                )}
-              />
-              {!collapsed && <span>Tally Export</span>}
-            </div>
-            {!collapsed && (
-              <span className="text-[10px] px-1.5 py-0.5 bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 rounded font-semibold border border-indigo-100 dark:border-indigo-800/60">
-                XML
+                EXCHANGE
               </span>
             )}
           </button>

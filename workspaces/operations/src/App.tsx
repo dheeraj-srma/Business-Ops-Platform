@@ -10,6 +10,7 @@ import { RestockPlannerView } from './components/inventory/RestockPlannerView';
 import { TallyExportView } from './components/tally/TallyExportView';
 import { TallySyncDashboard } from './components/tally/TallySyncDashboard';
 import { TallyImportPanel } from './components/tally/sync/TallyImportPanel';
+import { DataExchangeView } from './components/data-exchange/DataExchangeView';
 import { HelpManualView } from './components/help/HelpManualView';
 import { SettingsView } from './components/settings/SettingsView';
 import { CouponsView } from './components/coupons/CouponsView';
@@ -393,6 +394,10 @@ export default function App() {
       title: 'Tally Live Synchronization Engine',
       subtitle: 'Bi-directional live integration, stock reservations & idempotent event ledger',
     },
+    'data-exchange': {
+      title: 'Data Exchange & Master Sync Hub',
+      subtitle: 'Bi-directional catalog exchange: import & export JSON, XML, Excel spreadsheets, and Tally masters',
+    },
     tally: {
       title: 'Tally & TallyPrime Export',
       subtitle: 'Generate compliant XML envelopes and JSON payload exports',
@@ -570,16 +575,24 @@ export default function App() {
                   />
                 )}
 
-                {(activeContentTab === 'tally-import' || activeContentTab === 'tally_import') && (
-                  <div className="w-full px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
-                    <TallyImportPanel
-                      products={products}
-                      onRefreshAll={fetchData}
-                    />
-                  </div>
+                {(activeContentTab === 'data-exchange' ||
+                  activeContentTab === 'data_exchange' ||
+                  activeContentTab === 'tally-import' ||
+                  activeContentTab === 'tally_import' ||
+                  activeContentTab === 'tally' ||
+                  activeContentTab === 'tally-export') && (
+                  <DataExchangeView
+                    products={products}
+                    categories={categories}
+                    initialMode={
+                      activeContentTab === 'tally' || activeContentTab === 'tally-export'
+                        ? 'export'
+                        : 'import'
+                    }
+                    onRefreshAll={fetchData}
+                    onGoBack={handleGoBack}
+                  />
                 )}
-
-                {activeContentTab === 'tally' && <TallyExportView onGoBack={handleGoBack} />}
 
                 {(activeContentTab === 'help' || activeContentTab === 'manual') && <HelpManualView />}
 

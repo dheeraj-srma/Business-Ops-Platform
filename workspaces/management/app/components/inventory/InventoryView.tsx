@@ -29,13 +29,13 @@ import {
   FileSpreadsheet,
   Download,
   Upload,
+  ArrowUpDown,
 } from 'lucide-react';
 import { Product, Category, UserRole } from '../../types';
 import { formatDate, formatCurrency, cn } from '../../lib/utils';
 import { api } from '../../lib/api';
 import { useDialog } from '../../context/DialogContext';
-import { ExportInventoryModal } from './ExportInventoryModal';
-import { ImportInventoryModal } from './ImportInventoryModal';
+import { DataExchangeModal } from './DataExchangeModal';
 
 interface InventoryViewProps {
   products: Product[];
@@ -110,8 +110,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [pageSize, setPageSize] = useState<number>(50);
   const [isFullScreen, setIsFullScreen] = useState<boolean>(false);
-  const [isExportModalOpen, setIsExportModalOpen] = useState<boolean>(false);
-  const [isImportModalOpen, setIsImportModalOpen] = useState<boolean>(false);
+  const [isDataExchangeModalOpen, setIsDataExchangeModalOpen] = useState<boolean>(false);
 
   // Safe guarded arrays with deduplication to prevent key collisions in React
   const safeProducts = useMemo(() => {
@@ -635,31 +634,20 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               </div>
             )}
 
-            {/* Export Inventory Button (Excel, CSV, JSON) */}
+            {/* Dedicated Data Exchange Button (JSON, XML, Excel, CSV) */}
             <button
               type="button"
-              id="btn-inventory-export"
-              onClick={() => setIsExportModalOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 transition-all cursor-pointer shadow-2xs group"
-              title="Export inventory catalog as an Excel spreadsheet, CSV, or JSON data exchange"
+              id="btn-inventory-data-exchange"
+              onClick={() => setIsDataExchangeModalOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 transition-all cursor-pointer shadow-2xs group"
+              title="Open Data Exchange: Import and Export catalog in JSON, XML, Excel, and CSV formats"
             >
-              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform" />
-              <span>Export Inventory</span>
+              <ArrowUpDown className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 group-hover:scale-110 transition-transform" />
+              <span>Data Exchange</span>
+              <span className="text-[10px] py-0.2 px-1 bg-white dark:bg-slate-800 rounded text-indigo-600 dark:text-indigo-400 font-mono text-[9px] ml-0.5 font-bold border border-indigo-100 dark:border-indigo-900/60">
+                JSON • XML • XLS
+              </span>
             </button>
-
-            {/* Import Inventory Button (JSON / CSV Data Exchange) */}
-            {isManager && (
-              <button
-                type="button"
-                id="btn-inventory-import"
-                onClick={() => setIsImportModalOpen(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 transition-all cursor-pointer shadow-2xs group"
-                title="Import inventory data from JSON data exchange or CSV file"
-              >
-                <Upload className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 group-hover:scale-110 transition-transform" />
-                <span>Import Inventory</span>
-              </button>
-            )}
 
             {/* Full Screen Toggle Button */}
             <button
@@ -966,28 +954,14 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
         )}
       </div>
 
-      {/* Export Inventory Modal */}
-      <ExportInventoryModal
-        isOpen={isExportModalOpen}
-        onClose={() => setIsExportModalOpen(false)}
+      {/* Dedicated Data Exchange Modal */}
+      <DataExchangeModal
+        isOpen={isDataExchangeModalOpen}
+        onClose={() => setIsDataExchangeModalOpen(false)}
         filteredProducts={filteredProducts}
         allProducts={products}
         categories={categories}
-        onExportSuccess={(count, columnCount) => {
-          showSuccess({
-            title: 'Inventory Exported',
-            message: `Successfully exported ${count} item records with ${columnCount} columns.`,
-          });
-        }}
-      />
-
-      {/* Import Inventory Modal (JSON / CSV Data Exchange) */}
-      <ImportInventoryModal
-        isOpen={isImportModalOpen}
-        onClose={() => setIsImportModalOpen(false)}
-        products={safeProducts}
-        categories={safeCategories}
-        onImportSuccess={() => {
+        onSuccess={() => {
           onRefresh();
         }}
       />
