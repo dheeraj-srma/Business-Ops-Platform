@@ -10,7 +10,7 @@
 export interface UserProfile {
   id: string;
   email: string;
-  role: 'admin' | 'stock_manager' | 'order_manager' | 'manager' | 'salesman' | 'customer' | 'viewer' | string;
+  role: 'admin' | 'stock_manager' | 'warehouse_manager' | 'order_manager' | 'manager' | 'salesman' | 'customer' | 'viewer' | string;
   full_name: string;
   salesman_id?: string;
   is_active?: boolean;
@@ -43,8 +43,7 @@ export function setAuthSession(token: string, user: UserProfile, isDevClientToke
   try {
     if (typeof window !== 'undefined') {
       // Set client auth cookies for Edge middleware and client-side UI inspection.
-      // Only set nalka_token via document.cookie if it's a dev client-generated token (not set by backend HttpOnly Set-Cookie)
-      if (isDevClientToken) {
+      if (token) {
         document.cookie = `nalka_token=${token}; path=/; max-age=86400; SameSite=Lax`;
       }
       document.cookie = `nalka_user=${encodeURIComponent(JSON.stringify(user))}; path=/; max-age=86400; SameSite=Lax`;
@@ -162,9 +161,9 @@ export function hasWorkspaceAccess(
 
   switch (workspace) {
     case 'sales':
-      return ['salesman', 'stock_manager', 'order_manager', 'manager', 'admin', 'customer', 'viewer'].includes(normalizedRole);
+      return ['salesman', 'stock_manager', 'warehouse_manager', 'order_manager', 'manager', 'admin', 'customer', 'viewer'].includes(normalizedRole);
     case 'operations':
-      return ['stock_manager', 'order_manager', 'manager', 'admin'].includes(normalizedRole);
+      return ['stock_manager', 'warehouse_manager', 'order_manager', 'manager', 'admin'].includes(normalizedRole);
     case 'management':
       return ['admin'].includes(normalizedRole);
     default:
@@ -178,7 +177,7 @@ export function hasWorkspaceAccess(
 export function getDefaultWorkspace(role?: string): string {
   const normalizedRole = (role || '').toLowerCase();
   if (normalizedRole === 'admin') return '/management';
-  if (['stock_manager', 'order_manager', 'manager'].includes(normalizedRole)) return '/operations';
+  if (['stock_manager', 'warehouse_manager', 'order_manager', 'manager'].includes(normalizedRole)) return '/operations';
   return '/sales';
 }
 

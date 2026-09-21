@@ -15,7 +15,7 @@ class AdminRepository:
         if not client:
             raise RuntimeError("Database connection unavailable.")
         try:
-            query = client.table("users").select("id, email, full_name, role, is_active, phone, created_at, updated_at")
+            query = client.table("users").select("id, email, full_name, username, role, is_active, phone, created_at, updated_at")
             if role_filter:
                 db_role = "stock_manager" if role_filter.lower() == "warehouse_manager" else role_filter.lower()
                 query = query.eq("role", db_role)
@@ -87,7 +87,7 @@ class AdminRepository:
             payload["email"] = str(payload["email"]).strip().lower()
 
         # Filter only valid columns for users table
-        valid_cols = {"id", "email", "full_name", "role", "is_active", "phone", "password_hash", "created_at", "updated_at"}
+        valid_cols = {"id", "email", "full_name", "role", "is_active", "phone", "password_hash", "username", "created_at", "updated_at"}
         clean_payload = {k: v for k, v in payload.items() if k in valid_cols and v is not None}
 
         try:
@@ -124,7 +124,7 @@ class AdminRepository:
 
         payload["updated_at"] = datetime.utcnow().isoformat()
 
-        valid_cols = {"email", "full_name", "role", "is_active", "phone", "password_hash", "updated_at"}
+        valid_cols = {"email", "full_name", "role", "is_active", "phone", "password_hash", "username", "updated_at"}
         clean_payload = {k: v for k, v in payload.items() if k in valid_cols and v is not None}
 
         try:

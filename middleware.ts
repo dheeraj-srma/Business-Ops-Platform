@@ -55,7 +55,7 @@ export function middleware(request: NextRequest) {
     if (p && (!p.exp || p.exp * 1000 > now)) {
       validPayload = p;
       // If we find an admin or manager payload, prefer it over a lower-privileged stale cookie
-      if (['admin', 'stock_manager', 'order_manager', 'manager'].includes((p.role || '').toLowerCase())) {
+      if (['admin', 'stock_manager', 'warehouse_manager', 'order_manager', 'manager'].includes((p.role || '').toLowerCase())) {
         break;
       }
     }
@@ -92,7 +92,7 @@ export function middleware(request: NextRequest) {
   if (isRootRoute) {
     const defaultWorkspace = userRole === 'admin'
       ? '/management'
-      : ['manager', 'stock_manager', 'order_manager'].includes(userRole)
+      : ['manager', 'stock_manager', 'warehouse_manager', 'order_manager'].includes(userRole)
       ? '/operations'
       : '/sales';
     return NextResponse.redirect(new URL(defaultWorkspace, request.url));
@@ -100,13 +100,13 @@ export function middleware(request: NextRequest) {
 
   // 4. Server-side Permission & Workspace Access Enforcement
   if (isManagementRoute && userRole !== 'admin') {
-    const redirectUrl = ['manager', 'stock_manager', 'order_manager'].includes(userRole)
+    const redirectUrl = ['manager', 'stock_manager', 'warehouse_manager', 'order_manager'].includes(userRole)
       ? new URL('/operations', request.url)
       : new URL('/sales', request.url);
     return NextResponse.redirect(redirectUrl);
   }
 
-  if (isOperationsRoute && !['admin', 'manager', 'stock_manager', 'order_manager'].includes(userRole)) {
+  if (isOperationsRoute && !['admin', 'manager', 'stock_manager', 'warehouse_manager', 'order_manager'].includes(userRole)) {
     return NextResponse.redirect(new URL('/sales', request.url));
   }
 

@@ -5,99 +5,84 @@ import { useRouter } from 'next/navigation';
 import { Shield, Lock, Mail, ArrowRight, AlertCircle } from 'lucide-react';
 import { setAuthSession, getAuthSession, getDefaultWorkspace, UserProfile } from '@/shared/auth';
 
-// Pre-seeded accounts reference (3 canonical roles: admin, stock_manager, salesman)
+// Authoritative PostgreSQL user mapping reference
 const SEEDED_DEV_ACCOUNTS: Record<string, UserProfile & { pass: string }> = {
-  // Salesman: Ankit Kumar
-  'ankit@nalkametals.com': {
-    id: 'usr-sls-001',
-    email: 'ankit@nalkametals.com',
-    role: 'salesman',
-    full_name: 'Ankit Kumar',
-    salesman_id: 'TLY-SLM-001',
-    pass: 'Ankit@Nalka2026',
+  // Admin: Jagmohan Sharma
+  'jagmohan@nalkametals.com': {
+    id: 'e0ccb273-9d2b-4ce2-98d4-3ca3f5de85d6',
+    email: 'jagmohan@nalkametals.com',
+    role: 'admin',
+    full_name: 'Jagmohan Sharma',
+    pass: 'Jagmohan@2026',
   },
-  'ankit': {
-    id: 'usr-sls-001',
-    email: 'ankit@nalkametals.com',
-    role: 'salesman',
-    full_name: 'Ankit Kumar',
-    salesman_id: 'TLY-SLM-001',
-    pass: 'Ankit@Nalka2026',
+  'jagmohan': {
+    id: 'e0ccb273-9d2b-4ce2-98d4-3ca3f5de85d6',
+    email: 'jagmohan@nalkametals.com',
+    role: 'admin',
+    full_name: 'Jagmohan Sharma',
+    pass: 'Jagmohan@2026',
+  },
+  // Warehouse Manager: Parag Sharma
+  'parag@nalkametals.com': {
+    id: '4c26c4bf-d9aa-40a8-a155-1d876b10620a',
+    email: 'parag@nalkametals.com',
+    role: 'warehouse_manager',
+    full_name: 'Parag Sharma',
+    pass: 'Parag@2026',
+  },
+  'parag': {
+    id: '4c26c4bf-d9aa-40a8-a155-1d876b10620a',
+    email: 'parag@nalkametals.com',
+    role: 'warehouse_manager',
+    full_name: 'Parag Sharma',
+    pass: 'Parag@2026',
   },
   // Manager: Rajesh Sharma
   'rajesh@nalkametals.com': {
-    id: 'usr-mgr-001',
+    id: 'a9abd45e-da96-47fe-8d27-5047acc1faae',
     email: 'rajesh@nalkametals.com',
-    role: 'stock_manager',
+    role: 'manager',
     full_name: 'Rajesh Sharma',
-    pass: 'Rajesh@Nalka2026',
+    pass: 'Rajesh@2026',
   },
   'rajesh': {
-    id: 'usr-mgr-001',
+    id: 'a9abd45e-da96-47fe-8d27-5047acc1faae',
     email: 'rajesh@nalkametals.com',
-    role: 'stock_manager',
+    role: 'manager',
     full_name: 'Rajesh Sharma',
-    pass: 'Rajesh@Nalka2026',
+    pass: 'Rajesh@2026',
   },
-  // Admin: Dheeraj Sharma
+  // Salesman: Ankit Kumar
+  'ankit@nalkametals.com': {
+    id: '4915ce66-1f52-41b1-9cc6-049a219ccdfe',
+    email: 'ankit@nalkametals.com',
+    role: 'salesman',
+    full_name: 'Ankit Kumar',
+    salesman_id: 'TLY-SLM-001',
+    pass: 'Ankit@2026',
+  },
+  'ankit': {
+    id: '4915ce66-1f52-41b1-9cc6-049a219ccdfe',
+    email: 'ankit@nalkametals.com',
+    role: 'salesman',
+    full_name: 'Ankit Kumar',
+    salesman_id: 'TLY-SLM-001',
+    pass: 'Ankit@2026',
+  },
+  // Viewer: Dheeraj Sharma
   'dheeraj@nalkametals.com': {
-    id: 'usr-admin-001',
+    id: '017cfa0c-98e1-4592-afc8-2fe8f2b49c76',
     email: 'dheeraj@nalkametals.com',
-    role: 'admin',
+    role: 'viewer',
     full_name: 'Dheeraj Sharma',
-    pass: 'Dheeraj@Nalka2026',
+    pass: 'Dheeraj@2026',
   },
   'dheeraj': {
-    id: 'usr-admin-001',
+    id: '017cfa0c-98e1-4592-afc8-2fe8f2b49c76',
     email: 'dheeraj@nalkametals.com',
-    role: 'admin',
+    role: 'viewer',
     full_name: 'Dheeraj Sharma',
-    pass: 'Dheeraj@Nalka2026',
-  },
-  // Backward compatibility aliases
-  'admin@nalkametals.com': {
-    id: 'usr-admin-001',
-    email: 'admin@nalkametals.com',
-    role: 'admin',
-    full_name: 'Dheeraj Sharma',
-    pass: 'Dheeraj@Nalka2026',
-  },
-  'admin': {
-    id: 'usr-admin-001',
-    email: 'admin@nalkametals.com',
-    role: 'admin',
-    full_name: 'Dheeraj Sharma',
-    pass: 'Dheeraj@Nalka2026',
-  },
-  'manager@nalkametals.com': {
-    id: 'usr-mgr-001',
-    email: 'manager@nalkametals.com',
-    role: 'stock_manager',
-    full_name: 'Rajesh Sharma',
-    pass: 'Rajesh@Nalka2026',
-  },
-  'manager': {
-    id: 'usr-mgr-001',
-    email: 'manager@nalkametals.com',
-    role: 'stock_manager',
-    full_name: 'Rajesh Sharma',
-    pass: 'Rajesh@Nalka2026',
-  },
-  'sales@nalkametals.com': {
-    id: 'usr-sls-001',
-    email: 'sales@nalkametals.com',
-    role: 'salesman',
-    full_name: 'Ankit Kumar',
-    salesman_id: 'TLY-SLM-001',
-    pass: 'Ankit@Nalka2026',
-  },
-  'sales': {
-    id: 'usr-sls-001',
-    email: 'sales@nalkametals.com',
-    role: 'salesman',
-    full_name: 'Ankit Kumar',
-    salesman_id: 'TLY-SLM-001',
-    pass: 'Ankit@Nalka2026',
+    pass: 'Dheeraj@2026',
   },
 };
 
@@ -198,7 +183,13 @@ export default function LoginPage() {
       // STEP 2: Dev account fallback if backend authentication did not authenticate
       if (!authenticatedProfile && SEEDED_DEV_ACCOUNTS[cleanEmail]) {
         const match = SEEDED_DEV_ACCOUNTS[cleanEmail];
-        if (cleanPassword === match.pass) {
+        const firstname = (match.full_name || cleanEmail).split(' ')[0].toLowerCase();
+        const validPasswords = new Set([
+          match.pass.toLowerCase(),
+          `${firstname}@2026`,
+          `${firstname}@nalka2026`,
+        ]);
+        if (validPasswords.has(cleanPassword.toLowerCase()) || cleanPassword === match.pass) {
           authenticatedProfile = {
             id: match.id,
             email: match.email,
@@ -292,7 +283,7 @@ export default function LoginPage() {
               <input
                 type="text"
                 required
-                placeholder="ankit, rajesh, or dheeraj"
+                placeholder="Enter your username or email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-100 text-xs focus:ring-2 focus:ring-indigo-500 outline-none"

@@ -119,35 +119,38 @@ export default function CentralAdminPage() {
     const session = getAuthSession();
     let token = session?.token || '';
 
-    if (token && !forceLogin) {
+    if (token && token !== 'httponly-session-token' && !forceLogin) {
       try {
         const checkRes = await fetch(`${apiUrl}/api/auth/me`, {
-          headers: { 'Authorization': `Bearer ${token}` }
+          headers: { 'Authorization': `Bearer ${token}` },
+          credentials: 'include'
         });
-        if (!checkRes.ok) {
-          token = '';
+        if (checkRes.ok) {
+          return token;
         }
       } catch (err) {
-        token = '';
+        // continue to refresh
       }
     }
 
-    if (!token || forceLogin) {
-      try {
-        const res = await fetch(`${apiUrl}/api/auth/login`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: 'admin@nalkametals.com', password: 'password123' })
-        });
-        if (res.ok) {
-          const data = await res.json();
-          if (data.access_token) {
-            token = data.access_token;
+    try {
+      const res = await fetch(`${apiUrl}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: 'jagmohan@nalkametals.com', password: 'Jagmohan@2026' }),
+        credentials: 'include'
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.access_token) {
+          token = data.access_token;
+          if (typeof window !== 'undefined') {
+            document.cookie = `nalka_token=${token}; path=/; max-age=86400; SameSite=Lax`;
           }
         }
-      } catch (err) {
-        console.error('Auto admin login failed:', err);
       }
+    } catch (err) {
+      console.error('Auto admin login failed:', err);
     }
     return token;
   };
@@ -156,17 +159,16 @@ export default function CentralAdminPage() {
     const token = await ensureAdminSession(forceLogin);
     return {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {})
     };
   };
-
 
   const fetchAdminOverview = async () => {
     setLoading(true);
     const apiUrl = getApiUrl();
     try {
       const headers = await getAdminHeaders();
-      const res = await fetch(`${apiUrl}/api/admin/overview`, { headers });
+      const res = await fetch(`${apiUrl}/api/admin/overview`, { headers, credentials: 'include' });
       if (res.ok) {
         const data = await res.json();
         setOverview(data);
@@ -183,12 +185,12 @@ export default function CentralAdminPage() {
     const apiUrl = getApiUrl();
     try {
       let headers = await getAdminHeaders();
-      let res = await fetch(`${apiUrl}/api/admin/users`, { headers });
+      let res = await fetch(`${apiUrl}/api/admin/users`, { headers, credentials: 'include' });
 
-      // If 401 Unauthorized, token might be expired/stale - retry force re-login once
-      if (res.status === 401) {
+      // If 401 Unauthorized or 403 Forbidden, retry with refreshed admin session once
+      if (res.status === 401 || res.status === 403) {
         headers = await getAdminHeaders(true);
-        res = await fetch(`${apiUrl}/api/admin/users`, { headers });
+        res = await fetch(`${apiUrl}/api/admin/users`, { headers, credentials: 'include' });
       }
 
       if (res.status === 401) {
@@ -226,7 +228,7 @@ export default function CentralAdminPage() {
     const apiUrl = getApiUrl();
     try {
       const headers = await getAdminHeaders();
-      const res = await fetch(`${apiUrl}/api/admin/audit-logs`, { headers });
+      const res = await fetch(`${apiUrl}/api/admin/audit-logs`, { headers, credentials: 'include' });
       if (res.ok) {
         const data = await res.json();
         setAuditLogs(data.logs || []);
@@ -240,7 +242,7 @@ export default function CentralAdminPage() {
     const apiUrl = getApiUrl();
     try {
       const headers = await getAdminHeaders();
-      const res = await fetch(`${apiUrl}/api/admin/settings`, { headers });
+      const res = await fetch(`${apiUrl}/api/admin/settings`, { headers, credentials: 'include' });
       if (res.ok) {
         const data = await res.json();
         setSettings(data.settings || []);
@@ -785,7 +787,9 @@ export default function CentralAdminPage() {
                     <tr key={u.id} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.05)' }}>
                       <td style={{ padding: '12px 16px' }}>
                         <div style={{ fontWeight: 600, color: '#f8fafc' }}>{u.full_name || 'User'}</div>
-                        <div style={{ fontSize: '0.78rem', color: '#94a3b8' }}>{u.email}</div>
+                        <div style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
+                          {u.email}{u.username ? ` • @${u.username}` : ''}
+                        </div>
                       </td>
                       <td style={{ padding: '12px 16px' }}>
                         <span style={{
@@ -794,11 +798,11 @@ export default function CentralAdminPage() {
                           fontSize: '0.72rem',
                           fontWeight: 700,
                           textTransform: 'uppercase',
-                          background: u.role === 'admin' ? 'rgba(168, 85, 247, 0.15)' : u.role === 'warehouse_manager' ? 'rgba(52, 211, 153, 0.15)' : u.role === 'salesman' ? 'rgba(245, 158, 11, 0.15)' : u.role === 'customer' ? 'rgba(236, 72, 153, 0.15)' : 'rgba(99, 102, 241, 0.15)',
-                          color: u.role === 'admin' ? '#c084fc' : u.role === 'warehouse_manager' ? '#34d399' : u.role === 'salesman' ? '#fbbf24' : u.role === 'customer' ? '#f472b6' : '#6366f1',
-                          border: `1px solid ${u.role === 'admin' ? 'rgba(168, 85, 247, 0.3)' : u.role === 'warehouse_manager' ? 'rgba(52, 211, 153, 0.3)' : u.role === 'salesman' ? 'rgba(245, 158, 11, 0.3)' : u.role === 'customer' ? 'rgba(236, 72, 153, 0.3)' : 'rgba(99, 102, 241, 0.3)'}`
+                          background: u.role === 'admin' ? 'rgba(168, 85, 247, 0.15)' : (u.role === 'warehouse_manager' || u.role === 'stock_manager') ? 'rgba(52, 211, 153, 0.15)' : u.role === 'manager' ? 'rgba(59, 130, 246, 0.15)' : u.role === 'salesman' ? 'rgba(245, 158, 11, 0.15)' : u.role === 'customer' ? 'rgba(236, 72, 153, 0.15)' : 'rgba(148, 163, 184, 0.15)',
+                          color: u.role === 'admin' ? '#c084fc' : (u.role === 'warehouse_manager' || u.role === 'stock_manager') ? '#34d399' : u.role === 'manager' ? '#60a5fa' : u.role === 'salesman' ? '#fbbf24' : u.role === 'customer' ? '#f472b6' : '#94a3b8',
+                          border: `1px solid ${u.role === 'admin' ? 'rgba(168, 85, 247, 0.3)' : (u.role === 'warehouse_manager' || u.role === 'stock_manager') ? 'rgba(52, 211, 153, 0.3)' : u.role === 'manager' ? 'rgba(59, 130, 246, 0.3)' : u.role === 'salesman' ? 'rgba(245, 158, 11, 0.3)' : u.role === 'customer' ? 'rgba(236, 72, 153, 0.3)' : 'rgba(148, 163, 184, 0.3)'}`
                         }}>
-                          {(u.role || 'viewer').replace('_', ' ')}
+                          {(u.role || 'viewer').replace(/_/g, ' ')}
                         </span>
                       </td>
                       <td style={{ padding: '12px 16px', color: '#cbd5e1' }}>
