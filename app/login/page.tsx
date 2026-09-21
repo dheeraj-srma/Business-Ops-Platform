@@ -5,36 +5,99 @@ import { useRouter } from 'next/navigation';
 import { Shield, Lock, Mail, ArrowRight, AlertCircle } from 'lucide-react';
 import { setAuthSession, getAuthSession, getDefaultWorkspace, UserProfile } from '@/shared/auth';
 
-// Pre-seeded development accounts reference (3 canonical roles: admin, stock_manager, salesman)
+// Pre-seeded accounts reference (3 canonical roles: admin, stock_manager, salesman)
 const SEEDED_DEV_ACCOUNTS: Record<string, UserProfile & { pass: string }> = {
+  // Salesman: Ankit Kumar
+  'ankit@nalkametals.com': {
+    id: 'usr-sls-001',
+    email: 'ankit@nalkametals.com',
+    role: 'salesman',
+    full_name: 'Ankit Kumar',
+    salesman_id: 'TLY-SLM-001',
+    pass: 'Ankit@Nalka2026',
+  },
+  'ankit': {
+    id: 'usr-sls-001',
+    email: 'ankit@nalkametals.com',
+    role: 'salesman',
+    full_name: 'Ankit Kumar',
+    salesman_id: 'TLY-SLM-001',
+    pass: 'Ankit@Nalka2026',
+  },
+  // Manager: Rajesh Sharma
+  'rajesh@nalkametals.com': {
+    id: 'usr-mgr-001',
+    email: 'rajesh@nalkametals.com',
+    role: 'stock_manager',
+    full_name: 'Rajesh Sharma',
+    pass: 'Rajesh@Nalka2026',
+  },
+  'rajesh': {
+    id: 'usr-mgr-001',
+    email: 'rajesh@nalkametals.com',
+    role: 'stock_manager',
+    full_name: 'Rajesh Sharma',
+    pass: 'Rajesh@Nalka2026',
+  },
+  // Admin: Dheeraj Sharma
+  'dheeraj@nalkametals.com': {
+    id: 'usr-admin-001',
+    email: 'dheeraj@nalkametals.com',
+    role: 'admin',
+    full_name: 'Dheeraj Sharma',
+    pass: 'Dheeraj@Nalka2026',
+  },
+  'dheeraj': {
+    id: 'usr-admin-001',
+    email: 'dheeraj@nalkametals.com',
+    role: 'admin',
+    full_name: 'Dheeraj Sharma',
+    pass: 'Dheeraj@Nalka2026',
+  },
+  // Backward compatibility aliases
   'admin@nalkametals.com': {
     id: 'usr-admin-001',
     email: 'admin@nalkametals.com',
     role: 'admin',
-    full_name: 'System Administrator',
-    pass: 'password123',
+    full_name: 'Dheeraj Sharma',
+    pass: 'Dheeraj@Nalka2026',
+  },
+  'admin': {
+    id: 'usr-admin-001',
+    email: 'admin@nalkametals.com',
+    role: 'admin',
+    full_name: 'Dheeraj Sharma',
+    pass: 'Dheeraj@Nalka2026',
   },
   'manager@nalkametals.com': {
     id: 'usr-mgr-001',
     email: 'manager@nalkametals.com',
     role: 'stock_manager',
-    full_name: 'Operations & Stock Manager',
-    pass: 'password123',
+    full_name: 'Rajesh Sharma',
+    pass: 'Rajesh@Nalka2026',
   },
-  'stock@nalkametals.com': {
-    id: 'usr-stk-001',
-    email: 'stock@nalkametals.com',
+  'manager': {
+    id: 'usr-mgr-001',
+    email: 'manager@nalkametals.com',
     role: 'stock_manager',
-    full_name: 'Operations & Stock Manager',
-    pass: 'password123',
+    full_name: 'Rajesh Sharma',
+    pass: 'Rajesh@Nalka2026',
   },
   'sales@nalkametals.com': {
-    id: 'usr-slm-001',
+    id: 'usr-sls-001',
     email: 'sales@nalkametals.com',
     role: 'salesman',
-    full_name: 'ANKIT (Sales Rep)',
-    salesman_id: 'TLY-SLM-003',
-    pass: 'password123',
+    full_name: 'Ankit Kumar',
+    salesman_id: 'TLY-SLM-001',
+    pass: 'Ankit@Nalka2026',
+  },
+  'sales': {
+    id: 'usr-sls-001',
+    email: 'sales@nalkametals.com',
+    role: 'salesman',
+    full_name: 'Ankit Kumar',
+    salesman_id: 'TLY-SLM-001',
+    pass: 'Ankit@Nalka2026',
   },
 };
 
@@ -80,7 +143,7 @@ export default function LoginPage() {
     const cleanPassword = targetPass.trim();
 
     if (!cleanEmail || !cleanPassword) {
-      setError('Please enter both email and password.');
+      setError('Please enter both username/email and password.');
       setLoading(false);
       return;
     }
@@ -223,13 +286,13 @@ export default function LoginPage() {
         {/* Credentials Form */}
         <form onSubmit={handleFormSubmit} className="space-y-4">
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-slate-300">Email Address</label>
+            <label className="text-xs font-semibold text-slate-300">Username or Email</label>
             <div className="relative">
               <Mail className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
               <input
-                type="email"
+                type="text"
                 required
-                placeholder="user@nalkametals.com"
+                placeholder="ankit, rajesh, or dheeraj"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-100 text-xs focus:ring-2 focus:ring-indigo-500 outline-none"

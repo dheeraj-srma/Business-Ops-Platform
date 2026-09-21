@@ -40,45 +40,124 @@ def login(credentials: LoginRequestSchema, response: Response):
                 detail="Email and password are required."
             )
 
-        # 1. Fast path: Pre-seeded development / testing accounts (strictly validated against known password)
+        # 1. Fast path: Specific named accounts (strictly validated against known passwords)
         SEED_USERS = {
-            "admin@nalkametals.com": {
+            # Salesman: Ankit Kumar
+            "ankit@nalkametals.com": {
+                "id": "usr-sls-001",
+                "email": "ankit@nalkametals.com",
+                "full_name": "Ankit Kumar",
+                "role": "salesman",
+                "is_active": True,
+                "salesman_id": "TLY-SLM-001",
+                "password": "Ankit@Nalka2026"
+            },
+            "ankit": {
+                "id": "usr-sls-001",
+                "email": "ankit@nalkametals.com",
+                "full_name": "Ankit Kumar",
+                "role": "salesman",
+                "is_active": True,
+                "salesman_id": "TLY-SLM-001",
+                "password": "Ankit@Nalka2026"
+            },
+            # Manager: Rajesh Sharma
+            "rajesh@nalkametals.com": {
+                "id": "usr-mgr-001",
+                "email": "rajesh@nalkametals.com",
+                "full_name": "Rajesh Sharma",
+                "role": "stock_manager",
+                "is_active": True,
+                "salesman_id": None,
+                "password": "Rajesh@Nalka2026"
+            },
+            "rajesh": {
+                "id": "usr-mgr-001",
+                "email": "rajesh@nalkametals.com",
+                "full_name": "Rajesh Sharma",
+                "role": "stock_manager",
+                "is_active": True,
+                "salesman_id": None,
+                "password": "Rajesh@Nalka2026"
+            },
+            # Admin: Dheeraj Sharma
+            "dheeraj@nalkametals.com": {
                 "id": "usr-admin-001",
-                "email": "admin@nalkametals.com",
-                "full_name": "System Administrator",
+                "email": "dheeraj@nalkametals.com",
+                "full_name": "Dheeraj Sharma",
                 "role": "admin",
                 "is_active": True,
                 "salesman_id": None,
-                "password": "password123"
+                "password": "Dheeraj@Nalka2026"
+            },
+            "dheeraj": {
+                "id": "usr-admin-001",
+                "email": "dheeraj@nalkametals.com",
+                "full_name": "Dheeraj Sharma",
+                "role": "admin",
+                "is_active": True,
+                "salesman_id": None,
+                "password": "Dheeraj@Nalka2026"
+            },
+            # Backward compatibility aliases
+            "admin@nalkametals.com": {
+                "id": "usr-admin-001",
+                "email": "admin@nalkametals.com",
+                "full_name": "Dheeraj Sharma",
+                "role": "admin",
+                "is_active": True,
+                "salesman_id": None,
+                "password": "Dheeraj@Nalka2026"
+            },
+            "admin": {
+                "id": "usr-admin-001",
+                "email": "admin@nalkametals.com",
+                "full_name": "Dheeraj Sharma",
+                "role": "admin",
+                "is_active": True,
+                "salesman_id": None,
+                "password": "Dheeraj@Nalka2026"
             },
             "manager@nalkametals.com": {
                 "id": "usr-mgr-001",
                 "email": "manager@nalkametals.com",
-                "full_name": "Operations & Stock Manager",
+                "full_name": "Rajesh Sharma",
                 "role": "stock_manager",
                 "is_active": True,
                 "salesman_id": None,
-                "password": "password123"
+                "password": "Rajesh@Nalka2026"
             },
-            "stock@nalkametals.com": {
-                "id": "usr-stk-001",
-                "email": "stock@nalkametals.com",
-                "full_name": "Operations & Stock Manager",
+            "manager": {
+                "id": "usr-mgr-001",
+                "email": "manager@nalkametals.com",
+                "full_name": "Rajesh Sharma",
                 "role": "stock_manager",
                 "is_active": True,
                 "salesman_id": None,
-                "password": "password123"
+                "password": "Rajesh@Nalka2026"
             },
             "sales@nalkametals.com": {
                 "id": "usr-sls-001",
                 "email": "sales@nalkametals.com",
-                "full_name": "Sales Representative",
+                "full_name": "Ankit Kumar",
                 "role": "salesman",
                 "is_active": True,
-                "salesman_id": "TLY-SLM-003",
-                "password": "password123"
+                "salesman_id": "TLY-SLM-001",
+                "password": "Ankit@Nalka2026"
+            },
+            "sales": {
+                "id": "usr-sls-001",
+                "email": "sales@nalkametals.com",
+                "full_name": "Ankit Kumar",
+                "role": "salesman",
+                "is_active": True,
+                "salesman_id": "TLY-SLM-001",
+                "password": "Ankit@Nalka2026"
             }
         }
+
+        authenticated = False
+        user_data = None
 
         if email_clean in SEED_USERS:
             seed = SEED_USERS[email_clean]
@@ -88,7 +167,7 @@ def login(credentials: LoginRequestSchema, response: Response):
             else:
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Invalid email or password.",
+                    detail="Invalid email/username or password.",
                     headers={"WWW-Authenticate": "Bearer"}
                 )
 
