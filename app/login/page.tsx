@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Shield, Lock, Mail, ArrowRight, AlertCircle, KeyRound } from 'lucide-react';
+import { Shield, Lock, Mail, ArrowRight, AlertCircle } from 'lucide-react';
 import { setAuthSession, getAuthSession, getDefaultWorkspace, UserProfile } from '@/shared/auth';
 
 // Pre-seeded development accounts reference (3 canonical roles: admin, stock_manager, salesman)
@@ -201,14 +201,6 @@ export default function LoginPage() {
     executeLogin(email, password);
   };
 
-  const triggerQuickLogin = (accEmail: string) => {
-    const acc = SEEDED_DEV_ACCOUNTS[accEmail];
-    if (acc) {
-      setEmail(acc.email);
-      setPassword(acc.pass);
-      executeLogin(acc.email, acc.pass);
-    }
-  };
 
   return (
     <div className="min-h-[calc(100vh-3.5rem)] flex items-center justify-center p-4 bg-slate-950">
@@ -269,37 +261,6 @@ export default function LoginPage() {
             <ArrowRight className="w-4 h-4" />
           </button>
         </form>
-
-        {/* Development Quick-Fill & Direct Login Accounts */}
-        <div className="pt-4 border-t border-slate-800/80 space-y-2">
-          <div className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-400">
-            <KeyRound className="w-3.5 h-3.5 text-indigo-400" />
-            <span>Development Quick-Login:</span>
-          </div>
-          <div className="grid grid-cols-3 gap-2">
-            <button
-              type="button"
-              onClick={() => triggerQuickLogin('admin@nalkametals.com')}
-              className="py-2 px-2 rounded-lg bg-slate-950 hover:bg-slate-800 border border-slate-800 text-slate-300 text-xs font-mono text-center cursor-pointer transition-colors"
-            >
-              Admin
-            </button>
-            <button
-              type="button"
-              onClick={() => triggerQuickLogin('manager@nalkametals.com')}
-              className="py-2 px-2 rounded-lg bg-slate-950 hover:bg-slate-800 border border-slate-800 text-slate-300 text-xs font-mono text-center cursor-pointer transition-colors"
-            >
-              Manager
-            </button>
-            <button
-              type="button"
-              onClick={() => triggerQuickLogin('sales@nalkametals.com')}
-              className="py-2 px-2 rounded-lg bg-slate-950 hover:bg-slate-800 border border-slate-800 text-slate-300 text-xs font-mono text-center cursor-pointer transition-colors"
-            >
-              Sales
-            </button>
-          </div>
-        </div>
       </div>
     </div>
   );
