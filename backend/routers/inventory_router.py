@@ -9,6 +9,8 @@ from schemas.inventory_schemas import (
     InventoryListResponse,
     StockAdjustmentRequest,
     StockInRequest,
+    StockOutRequest,
+    StockOutItemSchema,
     StockMutationResponse
 )
 from services.inventory_service import InventoryService
