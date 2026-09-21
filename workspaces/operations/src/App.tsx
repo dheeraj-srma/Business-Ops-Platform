@@ -338,7 +338,7 @@ export default function App() {
 
     try {
       const res = await api.setStockOverride(enabled);
-      const isAllowed = res?.allow_negative_orders ?? res?.allowNegativeOrders ?? enabled;
+      const isAllowed = res?.allow_negative_orders ?? (res as any)?.allowNegativeOrders ?? enabled;
       setSettings((prev) => ({
         ...prev,
         ...(res?.settings || {}),
@@ -662,7 +662,7 @@ export default function App() {
               onOpenStockAdjustment={handleOpenStockAdjustment}
               onOpenEditProduct={handleOpenEditProduct}
               onRefresh={fetchData}
-              isManager={role === 'manager' || role === 'admin'}
+              isManager={role === 'manager' || (role as string) === 'admin'}
             />
 
             <CategoryModal

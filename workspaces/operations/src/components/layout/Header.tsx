@@ -12,7 +12,7 @@ import {
 import { UserRole } from '../../types';
 import { cn } from '../../lib/utils';
 import { useTheme } from '../../context/ThemeContext';
-import { clearAuthSession } from '@/shared/auth';
+import { clearAuthSession, getAuthSession } from '@/shared/auth';
 
 interface HeaderProps {
   currentTabTitle?: string;

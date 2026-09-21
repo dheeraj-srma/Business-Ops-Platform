@@ -887,7 +887,7 @@ export const PendingOrdersView: React.FC<PendingOrdersViewProps> = ({
                 </span>
                 <span className={cn(
                   'px-1.5 py-0.5 rounded text-[10px] font-bold uppercase',
-                  mostRecentProcessed.status === 'CONFIRMED' || mostRecentProcessed.status === 'Accepted'
+                  mostRecentProcessed.status === 'CONFIRMED'
                     ? 'bg-emerald-50 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/30'
                     : 'bg-rose-50 dark:bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-500/30'
                 )}>
@@ -917,10 +917,10 @@ export const PendingOrdersView: React.FC<PendingOrdersViewProps> = ({
             {/* Export PDF Button (Available only for Accepted / Confirmed orders) */}
             <button
               onClick={() => exportOrderAsPDF(mostRecentProcessed)}
-              disabled={mostRecentProcessed.status !== 'CONFIRMED' && mostRecentProcessed.status !== 'Accepted'}
+              disabled={mostRecentProcessed.status !== 'CONFIRMED'}
               className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-cyan-50 hover:bg-cyan-100 dark:bg-cyan-950/70 dark:hover:bg-cyan-900 disabled:opacity-40 disabled:cursor-not-allowed text-cyan-700 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-700/60 text-[11px] font-semibold transition-all cursor-pointer shadow-2xs"
               title={
-                mostRecentProcessed.status === 'CONFIRMED' || mostRecentProcessed.status === 'Accepted'
+                mostRecentProcessed.status === 'CONFIRMED'
                   ? 'Download Official Confirmation PDF'
                   : 'PDF invoice is restricted to accepted/confirmed orders'
               }
@@ -932,10 +932,10 @@ export const PendingOrdersView: React.FC<PendingOrdersViewProps> = ({
             {/* Export JSON Button (Available only for Accepted / Confirmed orders) */}
             <button
               onClick={() => exportOrderAsJSON(mostRecentProcessed)}
-              disabled={mostRecentProcessed.status !== 'CONFIRMED' && mostRecentProcessed.status !== 'Accepted'}
+              disabled={mostRecentProcessed.status !== 'CONFIRMED'}
               className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 text-[11px] font-semibold transition-all cursor-pointer shadow-2xs"
               title={
-                mostRecentProcessed.status === 'CONFIRMED' || mostRecentProcessed.status === 'Accepted'
+                mostRecentProcessed.status === 'CONFIRMED'
                   ? 'Download Official JSON Payload'
                   : 'JSON payload is restricted to accepted/confirmed orders'
               }
@@ -1732,7 +1732,7 @@ export const PendingOrdersView: React.FC<PendingOrdersViewProps> = ({
                                   type="text"
                                   inputMode="numeric"
                                   pattern="[0-9]*"
-                                  value={item.quantity === '' ? '' : item.quantity}
+                                  value={(item.quantity as any) === '' ? '' : item.quantity}
                                   onChange={(e) => {
                                     const raw = e.target.value;
                                     if (raw === '') {

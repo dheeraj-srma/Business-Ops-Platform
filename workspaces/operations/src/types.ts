@@ -27,20 +27,34 @@ export interface Product {
   sku: string;
   name: string;
   categoryId: string;
+  category_id?: string;
   categoryName?: string;
+  category_name?: string;
+  stock_group?: string;
   description: string;
   unit: string;
   currentStock: number; // Physical Stock
+  current_stock?: number;
   reservedStock?: number; // Open Tally Sales Order reservations
+  reserved_stock?: number;
   availableStock?: number; // Physical - Reserved
+  available_stock?: number;
   physicalStock?: number; // Current physical
+  physical_stock?: number;
   minimumStock: number;
+  minimum_stock?: number;
+  min_stock_level?: number;
   criticalStock: number;
+  critical_stock?: number;
   unitCost: number;
+  unit_cost?: number;
   isActive: boolean;
+  is_active?: boolean;
   status: StockStatus;
   createdAt: string;
+  created_at?: string;
   updatedAt: string;
+  updated_at?: string;
 }
 
 export type TransactionType =

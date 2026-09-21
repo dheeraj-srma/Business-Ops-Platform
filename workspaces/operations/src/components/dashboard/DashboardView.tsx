@@ -661,7 +661,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
                     const stockIn = payload.find((p: any) => p.dataKey === 'stockIn')?.value || 0;
                     const stockOut = payload.find((p: any) => p.dataKey === 'stockOut')?.value || 0;
-                    const totalMovement = stockIn + stockOut;
+                    const totalMovement = Number(stockIn) + Number(stockOut);
 
                     return (
                       <div className="bg-[#0b1329] text-white rounded-2xl p-3.5 px-4 shadow-2xl border border-slate-700/70 ring-1 ring-white/10 min-w-[190px] animate-in zoom-in-95 duration-100 select-none">
