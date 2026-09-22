@@ -54,13 +54,18 @@ export default function CustomerPerformanceView() {
   // Authoritative Customer Catalog: Primary source is backend historical customer analytics (Rule 18)
   const customersData: CustomerRecord[] = useMemo(() => {
     if (customersAnalyticsList && customersAnalyticsList.length > 0) {
+      const seenIds = new Set<string>();
       return customersAnalyticsList.map((c: any, idx: number) => {
         const name = c.customer_name || 'Counter Customer';
         const city = c.city || 'Gurugram';
         const state = c.state || 'Haryana';
         const salesman = c.salesman || 'Unassigned';
         const phone = c.gstin ? `GST: ${c.gstin}` : '-';
-        const code = c.customer_id || `CUST-${1001 + idx}`;
+        let code = c.customer_id || `CUST-${1001 + idx}`;
+        if (seenIds.has(code)) {
+          code = `${code}-${idx + 1}`;
+        }
+        seenIds.add(code);
         const rev = Math.round(Number(c.revenue || 0));
         const ords = Number(c.voucher_count || 0);
         const avgOrd = Number(c.aov || (ords > 0 ? Math.round(rev / ords) : 0));
@@ -102,12 +107,17 @@ export default function CustomerPerformanceView() {
     };
 
     if (dealersList && dealersList.length > 0) {
+      const seenDealerIds = new Set<string>();
       return dealersList.map((d: any, idx: number) => {
         const rawName = d["Shop Name"] || d.name || d.shop_name || `Customer ${idx + 1}`;
         const { name, city, state } = cleanDealerNameAndCity(rawName, d.City || d.city, d.State || d.state);
         const salesman = d["Salesman Name"] || d.salesman || 'Unassigned';
         const phone = d.Phone || d.phone || '-';
-        const code = d["Customer Code"] || d.customer_code || `CUST-${1001 + idx}`;
+        let code = d["Customer Code"] || d.customer_code || `CUST-${1001 + idx}`;
+        if (seenDealerIds.has(code)) {
+          code = `${code}-${idx + 1}`;
+        }
+        seenDealerIds.add(code);
         return {
           id: code,
           name,
@@ -370,8 +380,8 @@ export default function CustomerPerformanceView() {
               className="w-full appearance-none bg-slate-800/80 border border-slate-700/60 rounded-xl px-4 py-2.5 pr-9 text-xs font-bold text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-600 dark:border-indigo-500/50 cursor-pointer transition-all truncate"
             >
               <option value="all">👥 All Customers ({customersData.length} Accounts)</option>
-              {filteredCustomerOptions.map((c) => (
-                <option key={c.id} value={c.id}>
+              {filteredCustomerOptions.map((c, idx) => (
+                <option key={`${c.id}-${idx}`} value={c.id}>
                   {c.name} — {c.city} ({c.state})
                 </option>
               ))}
@@ -647,8 +657,8 @@ export default function CustomerPerformanceView() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/50 font-medium">
-              {filteredCustomerOptions.slice((page - 1) * pageSize, page * pageSize).map((c) => (
-                <tr key={c.id} className="hover:bg-slate-800/30 transition-colors">
+              {filteredCustomerOptions.slice((page - 1) * pageSize, page * pageSize).map((c, idx) => (
+                <tr key={`${c.id}-${(page - 1) * pageSize + idx}`} className="hover:bg-slate-800/30 transition-colors">
                   <td className="py-3 px-4">
                     <div className="font-bold text-slate-100">{c.name}</div>
                     <div className="text-[10px] text-slate-400 font-mono">{c.id}</div>
