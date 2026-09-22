@@ -828,40 +828,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         )}
 
-        {/* User Profile Badge at bottom */}
-        <div className={cn('mt-auto border-t border-slate-200 dark:border-slate-800', collapsed ? 'p-3' : 'p-3.5')}>
-          <div
-            className={cn(
-              'flex items-center',
-              collapsed ? 'justify-center' : 'gap-3 justify-between'
-            )}
-            data-tooltip={collapsed ? `${isManager ? 'Rajesh Kumar (Manager)' : 'Amit Verma (Staff)'}` : undefined}
-            data-tooltip-position="right"
-          >
-            <div className="flex items-center gap-2.5 min-w-0">
-              <div
-                className={cn(
-                  'w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs',
-                  isManager
-                    ? 'bg-indigo-50 dark:bg-indigo-950/70 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/80'
-                    : 'bg-emerald-50 dark:bg-emerald-950/70 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/80'
-                )}
-              >
-                {isManager ? 'RK' : 'AV'}
-              </div>
-              {!collapsed && (
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs font-semibold text-slate-900 dark:text-slate-200 truncate leading-tight">
-                    {isManager ? 'Rajesh Kumar' : 'Amit Verma'}
-                  </p>
-                  <p className="text-[10px] text-slate-400 dark:text-slate-500 uppercase font-bold tracking-wider mt-0.5 truncate">
-                    {isManager ? 'Manager' : 'Staff'}
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
+        {/* Bottom space reserved for Workspace Switcher */}
+        <div className="mt-auto h-14 shrink-0 border-t border-slate-200/80 dark:border-slate-800/80" />
       </div>
     );
   };

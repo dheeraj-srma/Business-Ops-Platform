@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
-import PlatformHeader from '@/shared/PlatformHeader';
+import WorkspaceSwitcher from '@/shared/components/WorkspaceSwitcher';
 
 export const metadata: Metadata = {
   title: 'Business Ops Platform',
@@ -10,11 +10,11 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
-      <body suppressHydrationWarning className="min-h-screen bg-slate-950 text-slate-100 antialiased selection:bg-indigo-500 selection:text-white flex flex-col">
-        <PlatformHeader />
-        <main className="flex-1 w-full">
+      <body suppressHydrationWarning className="min-h-screen bg-slate-950 text-slate-100 antialiased selection:bg-indigo-500 selection:text-white flex flex-col relative">
+        <main className="flex-1 w-full relative">
           {children}
         </main>
+        <WorkspaceSwitcher />
       </body>
     </html>
   );

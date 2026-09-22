@@ -227,26 +227,25 @@ export default function App() {
     return null;
   }, []);
 
-  // Fetch initial data
+  // Fetch initial data with fast dashboard render and background catalog streaming
   const fetchData = useCallback(async () => {
     try {
       setIsLoading(true);
 
-      const [productsRes, categoriesRes, statsRes, settingsRes, ordersRes, tallyStatusRes] = await Promise.all([
-        fetchWithRetry(() => api.getProducts(), 3, 500),
-        fetchWithRetry(() => api.getCategories(), 3, 500),
-        fetchWithRetry(() => api.getDashboardStats(), 2, 300),
-        fetchWithRetry(() => api.getSettings(), 2, 300),
+      // 1. Fast-path: Load dashboard KPIs, settings, orders, and Tally status in parallel
+      const [statsRes, settingsRes, ordersRes, tallyStatusRes] = await Promise.all([
+        api.getDashboardStats().catch((err) => {
+          console.warn('Dashboard stats fallback:', err);
+          return null;
+        }),
+        api.getSettings().catch((err) => {
+          console.warn('Settings fetch fallback:', err);
+          return null;
+        }),
         api.getPendingOrders().catch(() => ({ orders: [] })),
         api.getTallySyncStatus().catch(() => null),
       ]);
 
-      if (productsRes && Array.isArray(productsRes.products) && productsRes.products.length > 0) {
-        setProducts(productsRes.products);
-      }
-      if (categoriesRes && Array.isArray(categoriesRes.categories) && categoriesRes.categories.length > 0) {
-        setCategories(categoriesRes.categories);
-      }
       if (statsRes) {
         setStats((statsRes as any).stats || statsRes);
       }
@@ -259,12 +258,33 @@ export default function App() {
 
       setPendingOrdersCount((ordersRes as any)?.orders?.length || 0);
       setTallyConnected(tallyStatusRes?.connection?.connection_status === 'CONNECTED');
+
+      // Unblock UI immediately so dashboard is interactive within milliseconds
+      setIsLoading(false);
+
+      // 2. Stream products and categories in background for catalog tabs
+      Promise.all([
+        api.getProducts().catch((err) => {
+          console.warn('Products fetch fallback:', err);
+          return null;
+        }),
+        api.getCategories().catch((err) => {
+          console.warn('Categories fetch fallback:', err);
+          return null;
+        }),
+      ]).then(([productsRes, categoriesRes]) => {
+        if (productsRes && Array.isArray(productsRes.products) && productsRes.products.length > 0) {
+          setProducts(productsRes.products);
+        }
+        if (categoriesRes && Array.isArray(categoriesRes.categories) && categoriesRes.categories.length > 0) {
+          setCategories(categoriesRes.categories);
+        }
+      });
     } catch (err: any) {
       console.error('Failed to load application data:', err);
-    } finally {
       setIsLoading(false);
     }
-  }, [fetchWithRetry]);
+  }, []);
 
   useEffect(() => {
     fetchData();
