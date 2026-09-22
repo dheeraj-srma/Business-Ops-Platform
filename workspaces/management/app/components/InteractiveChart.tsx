@@ -255,7 +255,7 @@ export default function InteractiveChart({
     if (filtered.length > 31) {
       const keysToAggregate = multiSeries && multiSeries.length > 0
         ? multiSeries.map(s => s.key)
-        : ['value', 'revenue', 'orders', 'qty', 'units', 'stock_in', 'stock_out', 'defective', 'reusable', 'inward', 'outward', 'cost', 'profit'];
+        : ['value', 'revenue', 'orders', 'qty', 'units', 'stock_in', 'stock_out', 'defective', 'reusable', 'inward', 'outward', 'cost', 'profit', 'Sales', 'sales', 'Orders', 'amount'];
       return aggregateTimeSeriesData(filtered, keysToAggregate);
     }
     return filtered;
@@ -264,12 +264,44 @@ export default function InteractiveChart({
   // Dynamic Chart Summaries (Phase 8): Calculate latest, average, and peak from real data
   const timeSeriesSummary = useMemo(() => {
     if (!isTimeSeries || filteredData.length === 0) return null;
-    const primaryKey = multiSeries && multiSeries.length > 0 ? multiSeries[0].key : 'value';
-    const values = filteredData.map(d => {
-      const v = d[primaryKey] !== undefined ? d[primaryKey] : (d.value ?? d.revenue ?? 0);
-      return Number(v) || 0;
-    });
+
+    const extractMetricValue = (d: any): number => {
+      if (multiSeries && multiSeries.length > 0 && d[multiSeries[0].key] !== undefined) {
+        return Number(d[multiSeries[0].key]) || 0;
+      }
+      if (d.value !== undefined && d.value !== null && !isNaN(Number(d.value))) {
+        return Number(d.value) || 0;
+      }
+      if (d.Sales !== undefined && d.Sales !== null && !isNaN(Number(d.Sales))) {
+        return Number(d.Sales) || 0;
+      }
+      if (d.sales !== undefined && d.sales !== null && !isNaN(Number(d.sales))) {
+        return Number(d.sales) || 0;
+      }
+      if (d.revenue !== undefined && d.revenue !== null && !isNaN(Number(d.revenue))) {
+        return Number(d.revenue) || 0;
+      }
+      if (d.amount !== undefined && d.amount !== null && !isNaN(Number(d.amount))) {
+        return Number(d.amount) || 0;
+      }
+      if (d.orders !== undefined && d.orders !== null && !isNaN(Number(d.orders))) {
+        return Number(d.orders) || 0;
+      }
+      if (d.Orders !== undefined && d.Orders !== null && !isNaN(Number(d.Orders))) {
+        return Number(d.Orders) || 0;
+      }
+      if (d.qty !== undefined || d.quantity !== undefined) {
+        return Number(d.qty ?? d.quantity) || 0;
+      }
+      const numKey = Object.keys(d).find(
+        k => k !== 'name' && k !== 'id' && k !== 'date' && typeof d[k] === 'number'
+      );
+      return numKey ? (Number(d[numKey]) || 0) : 0;
+    };
+
+    const values = filteredData.map(extractMetricValue);
     if (values.length === 0) return null;
+
     const latest = values[values.length - 1];
     const sum = values.reduce((a, b) => a + b, 0);
     const avg = Math.round(sum / values.length);
@@ -282,7 +314,7 @@ export default function InteractiveChart({
       }
     }
     const peakItem = filteredData[peakIdx];
-    const peakDate = peakItem?.date || peakItem?.name || '';
+    const peakDate = peakItem?.name || (peakItem?.date ? peakItem.date.slice(5) : '');
     return { latest, avg, peak, peakDate };
   }, [isTimeSeries, filteredData, multiSeries]);
 
