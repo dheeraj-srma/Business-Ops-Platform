@@ -1,29 +1,30 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import type { Session, User } from '@supabase/supabase-js';
-import { supabase } from '../lib/supabaseClient';
 import type { UserProfile } from '../types';
 import { getAuthSession, clearAuthSession } from '@/shared/auth';
+import type { AuthStatus } from '@/shared/auth';
 
-export const VALID_SALESMEN_SEED = [
-  { id: 'TLY-SLM-001', name: 'ANKIT', email: 'ankit@nalkametals.com' },
-  { id: 'TLY-SLM-002', name: 'CHANDRA PRAKASH', email: 'chandraprakash@nalkametals.com' },
-  { id: 'TLY-SLM-003', name: 'NALKA', email: 'sales@nalkametals.com' },
-  { id: 'TLY-SLM-004', name: 'RAVINDER  - NOIDA', email: 'ravinder.noida@nalkametals.com' },
-  { id: 'TLY-SLM-005', name: 'RAVINDER KUMAR', email: 'ravinder.kumar@nalkametals.com' },
-  { id: 'TLY-SLM-006', name: 'SAURAV', email: 'saurav@nalkametals.com' },
-  { id: 'TLY-SLM-007', name: 'YOJIT', email: 'yojit@nalkametals.com' },
-  { id: 'DIRECT', name: 'Direct / House Account', email: 'direct@nalkametals.com' },
-];
+/**
+ * Sales workspace authentication context.
+ *
+ * SECURITY: This context does NOT provide login functionality.
+ * Authentication is handled exclusively by the canonical /login page.
+ * This context reads auth state from the shared cookie-based auth system (getAuthSession).
+ *
+ * CRITICAL RULES:
+ * - NEVER create/invent/fallback to a default user identity.
+ * - NEVER use localStorage as an auth source.
+ * - NEVER use Supabase sessions as an auth source.
+ * - If no valid cookie session exists, the user is UNAUTHENTICATED. Period.
+ * - authStatus must be 'loading' → 'authenticated' | 'unauthenticated'. Never skip to render.
+ */
 
 interface AuthContextType {
-  session: Session | null;
-  user: User | null;
+  user: any;
   profile: UserProfile | null;
   isAuthenticated: boolean;
+  authStatus: AuthStatus;
   loading: boolean;
   error: string | null;
-  signInWithEmail: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
-  signInAsSalesman: (salesmanId: string, password?: string) => Promise<{ success: boolean; error?: string }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
@@ -31,23 +32,33 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [session, setSession] = useState<Session | null>(null);
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<any>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [authStatus, setAuthStatus] = useState<AuthStatus>('loading');
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Synchronize state with central platform session (nalka_terminal_session / nalka_token)
-  const syncPlatformAuth = useCallback(() => {
+  /**
+   * Synchronize state from canonical platform cookie session.
+   * Returns true if a valid session was found, false otherwise.
+   * NEVER returns a fallback user. NEVER invents identity.
+   */
+  const syncPlatformAuth = useCallback((): boolean => {
     try {
       const platformSession = getAuthSession();
-      if (platformSession && platformSession.user) {
+      if (platformSession && platformSession.user && platformSession.user.role) {
         const u = platformSession.user;
+        const validRoles = ['admin', 'accountant', 'stock_manager', 'salesman', 'viewer'];
+        const userRole = (u.role || '').toLowerCase();
+        if (!validRoles.includes(userRole)) {
+          return false;
+        }
+
         const p: UserProfile = {
           id: u.id,
           email: u.email,
-          role: (u.role || 'salesman') as any,
-          salesman_id: u.salesman_id || 'DIRECT',
+          role: userRole as any,
+          salesman_id: u.salesman_id,
           salesman_name: u.full_name || u.email,
           is_active: u.is_active ?? true,
         };
@@ -56,23 +67,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           id: u.id,
           email: u.email,
           aud: 'authenticated',
-          role: u.role,
+          role: userRole,
           user_metadata: {
-            salesman_id: u.salesman_id || 'DIRECT',
+            salesman_id: u.salesman_id,
             salesman_name: u.full_name || u.email,
-            role: u.role,
+            role: userRole,
           },
         };
 
-        const synthSession: any = {
-          access_token: platformSession.token,
-          token_type: 'bearer',
-          user: synthUser,
-        };
-
-        setSession(synthSession);
         setUser(synthUser);
         setProfile(p);
+        setAuthStatus('authenticated');
         setLoading(false);
         return true;
       }
@@ -82,173 +87,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return false;
   }, []);
 
-  // Clean up legacy localStorage authority keys immediately
+  // Clean up legacy localStorage auth keys on mount — these must NEVER be used as auth sources
   useEffect(() => {
     try {
       localStorage.removeItem('app_auth');
       localStorage.removeItem('app_role');
       localStorage.removeItem('app_salesman');
-    } catch (e) {
+      localStorage.removeItem('nalka_terminal_session');
+      localStorage.removeItem('nalka_access_token');
+      localStorage.removeItem('nalka_auth_token');
+    } catch {
       // ignore
     }
   }, []);
 
-  const fetchProfile = async (userId: string, userEmail?: string): Promise<UserProfile | null> => {
-    try {
-      const { data, error: profileErr } = await supabase
-        .from('user_profiles')
-        .select('*')
-        .eq('id', userId)
-        .maybeSingle();
-
-      if (profileErr) {
-        console.warn('Error querying user_profiles:', profileErr);
-      }
-
-      if (data) {
-        return {
-          id: data.id,
-          email: data.email || userEmail || '',
-          role: data.role || 'salesman',
-          salesman_id: data.salesman_id || 'DIRECT',
-          salesman_name: data.salesman_name || 'Salesman',
-          shop_name: data.shop_name,
-          customer_code: data.customer_code,
-          phone: data.phone,
-          is_active: data.is_active ?? true,
-        };
-      }
-
-      // If user profile table has not been populated for this user yet, infer from email or metadata
-      const matchedSalesman = VALID_SALESMEN_SEED.find(
-        s => s.email.toLowerCase() === (userEmail || '').toLowerCase()
-      );
-
-      if (matchedSalesman) {
-        return {
-          id: userId,
-          email: userEmail || matchedSalesman.email,
-          role: 'salesman',
-          salesman_id: matchedSalesman.id,
-          salesman_name: matchedSalesman.name,
-          is_active: true,
-        };
-      }
-
-      const derivedRole = userEmail?.includes('admin')
-        ? 'admin'
-        : userEmail?.includes('stock') || userEmail?.includes('mgr') || userEmail?.includes('manager')
-        ? 'stock_manager'
-        : 'salesman';
-
-      // Default fallback profile for authenticated user
-      return {
-        id: userId,
-        email: userEmail || 'user@nalkametals.com',
-        role: derivedRole as any,
-        salesman_id: derivedRole === 'salesman' ? 'TLY-SLM-003' : undefined,
-        salesman_name: derivedRole === 'salesman' ? 'Sales Representative' : (userEmail?.split('@')[0].toUpperCase() || 'User'),
-        is_active: true,
-      };
-    } catch (err) {
-      console.error('Exception fetching profile:', err);
-      return null;
-    }
-  };
-
-  const refreshProfile = async () => {
-    if (!user) return;
-    const p = await fetchProfile(user.id, user.email);
-    if (p) setProfile(p);
-  };
-
-  const persistTerminalSession = (sess: any, usr: any, prof: UserProfile) => {
-    try {
-      localStorage.setItem(
-        'nalka_terminal_session',
-        JSON.stringify({ session: sess, user: usr, profile: prof, token: sess?.access_token })
-      );
-    } catch (e) {}
-  };
-
-  const getSavedTerminalSession = (): { session: any; user: any; profile: UserProfile } | null => {
-    try {
-      const saved = localStorage.getItem('nalka_terminal_session');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed?.user && parsed?.profile) {
-          return {
-            session: parsed.session || { access_token: parsed.token || 'terminal-token' },
-            user: parsed.user,
-            profile: parsed.profile,
-          };
-        }
-      }
-    } catch (e) {}
-    return null;
-  };
-
-  const clearSavedTerminalSession = () => {
-    try {
-      localStorage.removeItem('nalka_terminal_session');
-      localStorage.removeItem('app_auth');
-      localStorage.removeItem('app_role');
-      localStorage.removeItem('app_salesman');
-    } catch (e) {}
-  };
-
   useEffect(() => {
-    let mounted = true;
-
-    async function initAuth() {
-      // 1. Try central platform session first
-      const hasPlatformSession = syncPlatformAuth();
-      if (hasPlatformSession && mounted) {
-        setLoading(false);
-        return;
-      }
-
-      // 2. Supabase fallback check
-      try {
-        const { data, error: sessionErr } = await supabase.auth.getSession();
-        if (sessionErr) throw sessionErr;
-
-        if (mounted) {
-          if (data.session?.user) {
-            setSession(data.session);
-            setUser(data.session.user);
-            const p = await fetchProfile(data.session.user.id, data.session.user.email);
-            if (mounted) {
-              setProfile(p);
-              if (p) persistTerminalSession(data.session, data.session.user, p);
-            }
-          } else {
-            const saved = getSavedTerminalSession();
-            if (saved && mounted) {
-              setSession(saved.session);
-              setUser(saved.user);
-              setProfile(saved.profile);
-            }
-          }
-        }
-      } catch (err: any) {
-        console.warn('Supabase getSession failed:', err);
-        const saved = getSavedTerminalSession();
-        if (saved && mounted) {
-          setSession(saved.session);
-          setUser(saved.user);
-          setProfile(saved.profile);
-        }
-      } finally {
-        if (mounted) setLoading(false);
-      }
+    // Auth initialization: check canonical cookie session ONLY
+    const hasPlatformSession = syncPlatformAuth();
+    if (!hasPlatformSession) {
+      // No valid session → UNAUTHENTICATED. FAIL CLOSED.
+      // Do NOT try Supabase. Do NOT try localStorage. Do NOT create a default user.
+      setUser(null);
+      setProfile(null);
+      setAuthStatus('unauthenticated');
+      setLoading(false);
     }
 
-    initAuth();
-
-    // Event listeners for platform auth state change
+    // Event listeners for platform auth state changes (logout, workspace switch)
     const handleAuthChange = () => {
-      syncPlatformAuth();
+      const stillValid = syncPlatformAuth();
+      if (!stillValid) {
+        setUser(null);
+        setProfile(null);
+        setAuthStatus('unauthenticated');
+        setLoading(false);
+      }
     };
 
     if (typeof window !== 'undefined') {
@@ -256,192 +129,50 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       window.addEventListener('storage', handleAuthChange);
     }
 
-    const { data: authListener } = supabase.auth.onAuthStateChange(
-      async (_event, currentSession) => {
-        if (syncPlatformAuth()) return;
-
-        if (currentSession?.user) {
-          setSession(currentSession);
-          setUser(currentSession.user);
-          const p = await fetchProfile(currentSession.user.id, currentSession.user.email);
-          setProfile(p);
-          if (p) persistTerminalSession(currentSession, currentSession.user, p);
-        } else {
-          const saved = getSavedTerminalSession();
-          if (saved) {
-            setSession(saved.session);
-            setUser(saved.user);
-            setProfile(saved.profile);
-          } else {
-            setSession(null);
-            setUser(null);
-            setProfile(null);
-          }
-        }
-        setLoading(false);
-      }
-    );
-
     return () => {
-      mounted = false;
       if (typeof window !== 'undefined') {
         window.removeEventListener('nalka_auth_change', handleAuthChange);
         window.removeEventListener('storage', handleAuthChange);
       }
-      authListener?.subscription.unsubscribe();
     };
   }, [syncPlatformAuth]);
 
-
-  const signInWithEmail = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
-    setError(null);
-    try {
-      const { data, error: signInErr } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
-        password,
-      });
-
-      if (signInErr) {
-        setError(signInErr.message);
-        return { success: false, error: signInErr.message };
-      }
-
-      setSession(data.session);
-      setUser(data.user);
-      if (data.user) {
-        const p = await fetchProfile(data.user.id, data.user.email);
-        setProfile(p);
-        if (p) persistTerminalSession(data.session, data.user, p);
-      }
-
-      return { success: true };
-    } catch (err: any) {
-      const msg = err?.message || 'Login failed. Check your network or credentials.';
-      setError(msg);
-      return { success: false, error: msg };
-    }
-  };
-
-  const signInAsSalesman = async (salesmanId: string, password = 'password123'): Promise<{ success: boolean; error?: string }> => {
-    const matched = VALID_SALESMEN_SEED.find(s => s.id === salesmanId || s.name === salesmanId);
-    const email = matched ? matched.email : `${salesmanId.toLowerCase().replace(/[^a-z0-9]/g, '')}@nalkametals.com`;
-
-    // Attempt real sign-in first
-    const result = await signInWithEmail(email, password);
-    if (result.success) {
-      return result;
-    }
-
-    // If Supabase Auth returns 'Email not confirmed' or account isn't confirmed/seeded yet,
-    // establish a valid authenticated salesman terminal session for the selected profile.
-    if (
-      result.error &&
-      (result.error.toLowerCase().includes('email not confirmed') ||
-        result.error.toLowerCase().includes('invalid login credentials'))
-    ) {
-      const syntheticUser: any = {
-        id: matched?.id || `usr-slm-${Date.now()}`,
-        email: email,
-        aud: 'authenticated',
-        role: 'authenticated',
-        user_metadata: {
-          salesman_id: matched?.id || salesmanId,
-          salesman_name: matched?.name || salesmanId,
-          role: 'salesman',
-        },
-        created_at: new Date().toISOString(),
-      };
-
-      const syntheticSession: any = {
-        access_token: 'terminal-salesman-session-token',
-        token_type: 'bearer',
-        user: syntheticUser,
-      };
-
-      const syntheticProfile: UserProfile = {
-        id: syntheticUser.id,
-        email: email,
-        role: 'salesman',
-        salesman_id: matched?.id || 'DIRECT',
-        salesman_name: matched?.name || salesmanId,
-        shop_name: '',
-        is_active: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-
-      setSession(syntheticSession);
-      setUser(syntheticUser);
-      setProfile(syntheticProfile);
-      persistTerminalSession(syntheticSession, syntheticUser, syntheticProfile);
-      setError(null);
-      return { success: true };
-    }
-
-    // If auto-signup fails, try Supabase signup
-    try {
-      const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            salesman_id: matched?.id || salesmanId,
-            salesman_name: matched?.name || salesmanId,
-            role: 'salesman'
-          }
-        }
-      });
-
-      if (!signUpErr && signUpData?.session) {
-        setSession(signUpData.session);
-        setUser(signUpData.user);
-        const p = await fetchProfile(signUpData.user!.id, signUpData.user!.email);
-        setProfile(p);
-        if (p) persistTerminalSession(signUpData.session, signUpData.user!, p);
-        return { success: true };
-      }
-
-      if (signUpErr) {
-        return { success: false, error: result.error || signUpErr.message };
-      }
-
-      return result;
-    } catch (err: any) {
-      return { success: false, error: err?.message || result.error };
-    }
+  const refreshProfile = async () => {
+    syncPlatformAuth();
   };
 
   const signOut = async () => {
     try {
-      await supabase.auth.signOut();
+      // 1. Clear all server + client auth state
+      await clearAuthSession();
     } catch (e) {
       console.warn('Sign out error:', e);
     } finally {
-      clearSavedTerminalSession();
-      setSession(null);
+      // 2. Clear React state
       setUser(null);
       setProfile(null);
+      setAuthStatus('unauthenticated');
       setError(null);
-      clearAuthSession();
+      setLoading(false);
+
+      // 3. Navigate to login — full page load to ensure clean state
       if (typeof window !== 'undefined') {
         window.location.href = '/login';
       }
     }
   };
 
-  const isAuthenticated = !!session?.user && !!profile;
+  const isAuthenticated = authStatus === 'authenticated' && !!profile;
 
   return (
     <AuthContext.Provider
       value={{
-        session,
         user,
         profile,
         isAuthenticated,
+        authStatus,
         loading,
         error,
-        signInWithEmail,
-        signInAsSalesman,
         signOut,
         refreshProfile,
       }}

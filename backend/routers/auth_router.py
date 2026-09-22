@@ -1,9 +1,11 @@
 # backend/routers/auth_router.py
 import uuid
 import logging
+from datetime import timedelta
 from fastapi import APIRouter, HTTPException, Depends, status, Response
 from schemas.auth import LoginRequestSchema, TokenResponseSchema, UserProfileSchema
 from auth import create_access_token, get_current_user
+from config.settings import settings
 from supabase_client import get_supabase_client
 
 logger = logging.getLogger("auth_router")
@@ -77,10 +79,6 @@ def login(credentials: LoginRequestSchema, response: Response):
                        password_clean.lower() == f"{firstname}@2026":
                         authenticated = True
                         user_data = candidate
-                        
-                        # Map stock_manager to warehouse_manager for frontend / token compatibility
-                        if user_data.get("role") == "stock_manager":
-                            user_data["role"] = "warehouse_manager"
 
                         # Retrieve linked salesman_id from salesmen table
                         try:
@@ -136,16 +134,26 @@ def login(credentials: LoginRequestSchema, response: Response):
                 detail="User account is deactivated. Please contact an administrator."
             )
 
+        # Determine token lifetime based on remember_me
+        remember_me = getattr(credentials, 'remember_me', False)
+        if remember_me:
+            token_expiry = timedelta(minutes=settings.PERSISTENT_TOKEN_EXPIRE_MINUTES)
+            cookie_max_age = settings.PERSISTENT_TOKEN_EXPIRE_MINUTES * 60  # seconds
+        else:
+            token_expiry = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+            cookie_max_age = settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60  # seconds
+
         # Mint JWT access token
+        canonical_role = user_data.get("role", "viewer").lower()
         token_payload = {
             "user_id": user_data["id"],
             "email": user_data["email"],
-            "role": user_data.get("role", "viewer").lower(),
+            "role": canonical_role,
             "full_name": user_data.get("full_name", "User"),
             "salesman_id": user_data.get("salesman_id")
         }
 
-        token = create_access_token(token_payload)
+        token = create_access_token(token_payload, expires_delta=token_expiry)
 
         # Set secure HttpOnly cookie for server-side Next.js Edge Middleware inspection
         response.set_cookie(
@@ -153,7 +161,7 @@ def login(credentials: LoginRequestSchema, response: Response):
             value=token,
             httponly=True,
             samesite="lax",
-            max_age=86400,
+            max_age=cookie_max_age,
             path="/"
         )
 
@@ -161,7 +169,7 @@ def login(credentials: LoginRequestSchema, response: Response):
         user_profile_data = {
             "id": user_data["id"],
             "email": user_data["email"],
-            "role": user_data.get("role", "viewer").lower(),
+            "role": canonical_role,
             "full_name": user_data.get("full_name", "User"),
             "salesman_id": user_data.get("salesman_id")
         }
@@ -172,7 +180,7 @@ def login(credentials: LoginRequestSchema, response: Response):
             value=urllib.parse.quote(json.dumps(user_profile_data)),
             httponly=False,
             samesite="lax",
-            max_age=86400,
+            max_age=cookie_max_age,
             path="/"
         )
 
@@ -182,7 +190,7 @@ def login(credentials: LoginRequestSchema, response: Response):
             user=UserProfileSchema(
                 id=user_data["id"],
                 email=user_data["email"],
-                role=user_data.get("role", "viewer").lower(),
+                role=canonical_role,
                 full_name=user_data.get("full_name", "User"),
                 salesman_id=user_data.get("salesman_id")
             )
@@ -196,8 +204,8 @@ def login(credentials: LoginRequestSchema, response: Response):
 @router.post("/logout")
 def logout(response: Response):
     """Clears HttpOnly auth cookie and client profile cookie upon logout."""
-    response.delete_cookie(key="nalka_token", path="/", httponly=True, samesite="lax")
-    response.delete_cookie(key="nalka_user", path="/", httponly=False, samesite="lax")
+    response.set_cookie(key="nalka_token", value="", path="/", httponly=True, samesite="lax", max_age=0)
+    response.set_cookie(key="nalka_user", value="", path="/", httponly=False, samesite="lax", max_age=0)
     return {"message": "Logged out successfully."}
 
 @router.get("/me")
@@ -242,8 +250,7 @@ def get_auth_me(response: Response, current_user: dict = Depends(get_current_use
                 current_user["full_name"] = db_user.get("full_name") or current_user.get("full_name")
                 current_user["email"] = db_user.get("email") or current_user.get("email")
                 current_user["username"] = db_user.get("username")
-                raw_role = db_user.get("role", "").lower()
-                current_user["role"] = "warehouse_manager" if raw_role == "stock_manager" else raw_role
+                current_user["role"] = db_user.get("role", "viewer").lower()
                 current_user["is_active"] = db_user.get("is_active", True)
                 
                 # Fetch salesman code if linked

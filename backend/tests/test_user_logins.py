@@ -13,8 +13,8 @@ client = TestClient(app)
 users = [
     ("jagmohan@nalkametals.com", "Jagmohan@2026", "admin", "Jagmohan Sardhana"),
     ("jagmohan", "jagmohan@2026", "admin", "Jagmohan Sardhana"),
-    ("parag@nalkametals.com", "Parag@2026", "warehouse_manager", "Parag Sharma"),
-    ("parag", "parag@2026", "warehouse_manager", "Parag Sharma"),
+    ("parag@nalkametals.com", "Parag@2026", "stock_manager", "Parag Sharma"),
+    ("parag", "parag@2026", "stock_manager", "Parag Sharma"),
     ("rajesh@nalkametals.com", "Rajesh@2026", "manager", "Rajesh Sharma"),
     ("rajesh", "rajesh@2026", "manager", "Rajesh Sharma"),
     ("ankit@nalkametals.com", "Ankit@2026", "salesman", "Ankit Kumar"),

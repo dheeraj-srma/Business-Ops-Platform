@@ -33,13 +33,11 @@ class AdminRepository:
                 for u in users:
                     u_id = u.get("id")
                     u["salesman_ref"] = salesmen_by_user_id.get(u_id) or "—"
-                    if u.get("role") == "stock_manager":
-                        u["role"] = "warehouse_manager"
             except Exception as sm_err:
                 logger.warning(f"Could not map salesmen records: {sm_err}")
             ROLE_PRIORITY = {
                 "admin": 1,
-                "warehouse_manager": 2,
+                "accountant": 1,
                 "stock_manager": 2,
                 "manager": 3,
                 "salesman": 4,
@@ -93,8 +91,6 @@ class AdminRepository:
         try:
             res = client.table("users").insert(clean_payload).execute()
             rec = res.data[0] if res.data else clean_payload
-            if rec.get("role") == "stock_manager":
-                rec["role"] = "warehouse_manager"
             return rec
         except Exception as err:
             err_str = str(err)
@@ -130,8 +126,6 @@ class AdminRepository:
         try:
             res = client.table("users").update(clean_payload).eq("id", user_id).execute()
             rec = res.data[0] if res.data else None
-            if rec and rec.get("role") == "stock_manager":
-                rec["role"] = "warehouse_manager"
             return rec
         except Exception as err:
             err_str = str(err)

@@ -19,7 +19,10 @@ export function middleware(request: NextRequest) {
       const parts = jwtStr.split('.');
       if (parts.length !== 3) return null;
       const base64Url = parts[1];
-      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      let base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      while (base64.length % 4) {
+        base64 += '=';
+      }
       let jsonPayload = '';
       try {
         jsonPayload = decodeURIComponent(
@@ -37,7 +40,7 @@ export function middleware(request: NextRequest) {
     }
   };
 
-  // 2. Extract and decode all available candidate tokens (HttpOnly cookie, duplicate cookies, Bearer header)
+  // 2. Extract JWT from nalka_token cookie(s) and Authorization header — THESE are the only auth sources
   const tokenCookies = request.cookies.getAll('nalka_token');
   const authHeader = request.headers.get('authorization');
   const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : null;
@@ -47,6 +50,7 @@ export function middleware(request: NextRequest) {
     ...(bearerToken ? [bearerToken] : []),
   ].filter(Boolean);
 
+  // 3. Find the first valid (non-expired) token — no preference logic, just first valid one
   let validPayload: any = null;
   const now = Date.now();
 
@@ -54,26 +58,16 @@ export function middleware(request: NextRequest) {
     const p = decodeJwtPayload(tokenStr);
     if (p && (!p.exp || p.exp * 1000 > now)) {
       validPayload = p;
-      // If we find an admin or manager payload, prefer it over a lower-privileged stale cookie
-      if (['admin', 'stock_manager', 'warehouse_manager', 'order_manager', 'manager'].includes((p.role || '').toLowerCase())) {
-        break;
-      }
+      break; // Use first valid token — no role-based preference
     }
   }
 
-  // Also check nalka_user cookie as fallback hint if tokens were stripped/proxying
-  let userProfileFromCookie: any = null;
-  const userCookieRaw = request.cookies.get('nalka_user')?.value;
-  if (userCookieRaw) {
-    try {
-      userProfileFromCookie = JSON.parse(decodeURIComponent(userCookieRaw));
-    } catch {
-      // ignore
-    }
-  }
+  // SECURITY: nalka_user cookie is NOT an authentication source.
+  // It is a UI hint set alongside the token. If the token is missing/invalid, the user is unauthenticated.
+  // NEVER fall back to nalka_user or any client-side state to determine identity.
 
   // Unauthenticated -> Server Redirect to /login
-  if (!validPayload && !userProfileFromCookie) {
+  if (!validPayload) {
     const loginUrl = new URL('/login', request.url);
     if (!isRootRoute) {
       loginUrl.searchParams.set('from', pathname);
@@ -81,33 +75,39 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  // 3. Resolve authoritative role
-  const userRole = (
-    validPayload?.role ||
-    userProfileFromCookie?.role ||
-    'viewer'
-  ).toLowerCase();
+  // 4. Resolve authoritative role from the validated JWT payload ONLY
+  const userRole = (validPayload.role || '').toLowerCase();
+
+  const isKnownRole = ['admin', 'accountant', 'stock_manager', 'salesman', 'viewer'].includes(userRole);
+  if (!isKnownRole) {
+    // Fail closed for unknown role
+    return NextResponse.redirect(new URL('/login', request.url));
+  }
 
   // Root route '/' authenticated -> Redirect to authorized default workspace
   if (isRootRoute) {
-    const defaultWorkspace = userRole === 'admin'
+    const defaultWorkspace = ['admin', 'accountant'].includes(userRole)
       ? '/management'
-      : ['manager', 'stock_manager', 'warehouse_manager', 'order_manager'].includes(userRole)
+      : userRole === 'stock_manager'
       ? '/operations'
       : '/sales';
     return NextResponse.redirect(new URL(defaultWorkspace, request.url));
   }
 
-  // 4. Server-side Permission & Workspace Access Enforcement
-  if (isManagementRoute && userRole !== 'admin') {
-    const redirectUrl = ['manager', 'stock_manager', 'warehouse_manager', 'order_manager'].includes(userRole)
+  // 5. Server-side Permission & Workspace Access Enforcement
+  if (isManagementRoute && !['admin', 'accountant'].includes(userRole)) {
+    const redirectUrl = userRole === 'stock_manager'
       ? new URL('/operations', request.url)
       : new URL('/sales', request.url);
     return NextResponse.redirect(redirectUrl);
   }
 
-  if (isOperationsRoute && !['admin', 'manager', 'stock_manager', 'warehouse_manager', 'order_manager'].includes(userRole)) {
+  if (isOperationsRoute && !['admin', 'accountant', 'stock_manager'].includes(userRole)) {
     return NextResponse.redirect(new URL('/sales', request.url));
+  }
+
+  if (isSalesRoute && !['admin', 'accountant', 'stock_manager', 'salesman', 'viewer'].includes(userRole)) {
+    return NextResponse.redirect(new URL('/login', request.url));
   }
 
   // Authorized request -> Proceed

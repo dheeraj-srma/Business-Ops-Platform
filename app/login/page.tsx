@@ -1,114 +1,26 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { Shield, Lock, Mail, ArrowRight, AlertCircle } from 'lucide-react';
-import { setAuthSession, getAuthSession, getDefaultWorkspace, UserProfile } from '@/shared/auth';
-
-// Authoritative PostgreSQL user mapping reference
-const SEEDED_DEV_ACCOUNTS: Record<string, UserProfile & { pass: string }> = {
-  // Admin: Jagmohan Sardhana
-  'jagmohan@nalkametals.com': {
-    id: 'e0ccb273-9d2b-4ce2-98d4-3ca3f5de85d6',
-    email: 'jagmohan@nalkametals.com',
-    role: 'admin',
-    full_name: 'Jagmohan Sardhana',
-    pass: 'Jagmohan@2026',
-  },
-  'jagmohan': {
-    id: 'e0ccb273-9d2b-4ce2-98d4-3ca3f5de85d6',
-    email: 'jagmohan@nalkametals.com',
-    role: 'admin',
-    full_name: 'Jagmohan Sardhana',
-    pass: 'Jagmohan@2026',
-  },
-  // Warehouse Manager: Parag Sharma
-  'parag@nalkametals.com': {
-    id: '4c26c4bf-d9aa-40a8-a155-1d876b10620a',
-    email: 'parag@nalkametals.com',
-    role: 'warehouse_manager',
-    full_name: 'Parag Sharma',
-    pass: 'Parag@2026',
-  },
-  'parag': {
-    id: '4c26c4bf-d9aa-40a8-a155-1d876b10620a',
-    email: 'parag@nalkametals.com',
-    role: 'warehouse_manager',
-    full_name: 'Parag Sharma',
-    pass: 'Parag@2026',
-  },
-  // Manager: Rajesh Sharma
-  'rajesh@nalkametals.com': {
-    id: 'a9abd45e-da96-47fe-8d27-5047acc1faae',
-    email: 'rajesh@nalkametals.com',
-    role: 'manager',
-    full_name: 'Rajesh Sharma',
-    pass: 'Rajesh@2026',
-  },
-  'rajesh': {
-    id: 'a9abd45e-da96-47fe-8d27-5047acc1faae',
-    email: 'rajesh@nalkametals.com',
-    role: 'manager',
-    full_name: 'Rajesh Sharma',
-    pass: 'Rajesh@2026',
-  },
-  // Salesman: Ankit Kumar
-  'ankit@nalkametals.com': {
-    id: '4915ce66-1f52-41b1-9cc6-049a219ccdfe',
-    email: 'ankit@nalkametals.com',
-    role: 'salesman',
-    full_name: 'Ankit Kumar',
-    salesman_id: 'TLY-SLM-001',
-    pass: 'Ankit@2026',
-  },
-  'ankit': {
-    id: '4915ce66-1f52-41b1-9cc6-049a219ccdfe',
-    email: 'ankit@nalkametals.com',
-    role: 'salesman',
-    full_name: 'Ankit Kumar',
-    salesman_id: 'TLY-SLM-001',
-    pass: 'Ankit@2026',
-  },
-  // Viewer: Dheeraj Sharma
-  'dheeraj@nalkametals.com': {
-    id: '017cfa0c-98e1-4592-afc8-2fe8f2b49c76',
-    email: 'dheeraj@nalkametals.com',
-    role: 'viewer',
-    full_name: 'Dheeraj Sharma',
-    pass: 'Dheeraj@2026',
-  },
-  'dheeraj': {
-    id: '017cfa0c-98e1-4592-afc8-2fe8f2b49c76',
-    email: 'dheeraj@nalkametals.com',
-    role: 'viewer',
-    full_name: 'Dheeraj Sharma',
-    pass: 'Dheeraj@2026',
-  },
-};
-
-// Helper to mint a valid 3-part Base64 JWT for client-side dev fallbacks
-function mintDevJwtToken(profile: UserProfile): string {
-  const headerStr = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
-  const payloadStr = btoa(
-    JSON.stringify({
-      user_id: profile.id,
-      email: profile.email,
-      role: profile.role,
-      full_name: profile.full_name,
-      salesman_id: profile.salesman_id,
-      exp: Math.floor(Date.now() / 1000) + 86400,
-    })
-  );
-  const sigStr = btoa('dev-signature');
-  return `${headerStr}.${payloadStr}.${sigStr}`;
-}
+import React, { useState, useEffect, useRef } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Shield, Lock, Mail, ArrowRight, AlertCircle, Eye, EyeOff } from 'lucide-react';
+import { setAuthSession, getAuthSession, getDefaultWorkspace, hasWorkspaceAccess, UserProfile } from '@/shared/auth';
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
+  const emailRef = useRef<HTMLInputElement>(null);
+  const passwordRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // If already authenticated, redirect to user's canonical workspace automatically
   useEffect(() => {
@@ -124,8 +36,9 @@ export default function LoginPage() {
     setLoading(true);
     setError(null);
 
-    const cleanEmail = targetEmail.trim().toLowerCase();
-    const cleanPassword = targetPass.trim();
+    // Support browser autofill: read from refs as fallback if state is empty
+    const cleanEmail = (targetEmail || emailRef.current?.value || '').trim().toLowerCase();
+    const cleanPassword = (targetPass || passwordRef.current?.value || '').trim();
 
     if (!cleanEmail || !cleanPassword) {
       setError('Please enter both username/email and password.');
@@ -134,127 +47,91 @@ export default function LoginPage() {
     }
 
     try {
-      let authenticatedProfile: UserProfile | null = null;
-      let sessionToken: string | null = null;
-      let isDevFallback = false;
-
       // STEP 0: Clear any stale cookies from prior sessions via logout
       try {
         await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
       } catch {
         // ignore
       }
-      document.cookie = 'nalka_token=; path=/; max-age=0';
-      document.cookie = 'nalka_user=; path=/; max-age=0';
+      document.cookie = 'nalka_token=; path=/; max-age=0; SameSite=Lax';
+      document.cookie = 'nalka_user=; path=/; max-age=0; SameSite=Lax';
 
-      // STEP 1: Always attempt authoritative backend authentication first
-      try {
-        const apiRes = await fetch('/api/auth/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: cleanEmail, password: cleanPassword }),
-          credentials: 'include', // Ensures backend Set-Cookie header is handled by browser
-        });
-
-        if (apiRes.ok) {
-          const authData = await apiRes.json();
-          if (authData?.access_token && authData?.user) {
-            sessionToken = authData.access_token;
-            authenticatedProfile = {
-              id: authData.user.id,
-              email: authData.user.email,
-              role: authData.user.role,
-              full_name: authData.user.full_name,
-              salesman_id: authData.user.salesman_id,
-            };
-          }
-        } else if (apiRes.status === 401) {
-          if (!SEEDED_DEV_ACCOUNTS[cleanEmail]) {
-            const errData = await apiRes.json().catch(() => null);
-            setError(errData?.detail || 'Invalid email or password.');
-            setLoading(false);
-            return;
-          }
-        }
-      } catch (backendErr) {
-        console.warn('Backend auth unreachable, falling back to dev credentials:', backendErr);
-      }
-
-      // STEP 2: Dev account fallback if backend authentication did not authenticate
-      if (!authenticatedProfile && SEEDED_DEV_ACCOUNTS[cleanEmail]) {
-        const match = SEEDED_DEV_ACCOUNTS[cleanEmail];
-        const firstname = (match.full_name || cleanEmail).split(' ')[0].toLowerCase();
-        const validPasswords = new Set([
-          match.pass.toLowerCase(),
-          `${firstname}@2026`,
-          `${firstname}@nalka2026`,
-        ]);
-        if (validPasswords.has(cleanPassword.toLowerCase()) || cleanPassword === match.pass) {
-          authenticatedProfile = {
-            id: match.id,
-            email: match.email,
-            role: match.role,
-            full_name: match.full_name,
-            salesman_id: match.salesman_id,
-          };
-          sessionToken = mintDevJwtToken(authenticatedProfile);
-          isDevFallback = true;
-        } else {
-          setError('Invalid password. Please check your credentials.');
-          setLoading(false);
-          return;
-        }
-      }
-
-      // STEP 3: Fallback inference
-      if (!authenticatedProfile) {
-        const derivedRole = cleanEmail.includes('admin')
-          ? 'admin'
-          : cleanEmail.includes('manager') || cleanEmail.includes('stock') || cleanEmail.includes('order')
-          ? 'stock_manager'
-          : 'salesman';
-
-        authenticatedProfile = {
-          id: 'usr-' + Date.now(),
+      // STEP 1: Authenticate via authoritative backend — this is the ONLY auth path
+      const apiRes = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           email: cleanEmail,
-          role: derivedRole,
-          full_name: cleanEmail.split('@')[0].toUpperCase(),
-          salesman_id: derivedRole === 'salesman' ? 'TLY-SLM-003' : undefined,
-        };
-        sessionToken = mintDevJwtToken(authenticatedProfile);
-        isDevFallback = true;
+          password: cleanPassword,
+          remember_me: rememberMe,
+        }),
+        credentials: 'include', // Ensures backend Set-Cookie header is handled by browser
+      });
+
+      if (!apiRes.ok) {
+        // SECURITY: Authentication failure → FAIL CLOSED. No fallback users. No demo accounts.
+        const errData = await apiRes.json().catch(() => null);
+        setError(errData?.detail || 'Invalid email or password.');
+        setLoading(false);
+        return;
       }
 
-      if (sessionToken && authenticatedProfile) {
-        // Authoritative role determines canonical workspace destination:
-        // admin -> /management
-        // stock_manager / manager -> /operations
-        // salesman / viewer -> /sales
-        const normalizedRole = (authenticatedProfile.role || '').toLowerCase();
-        const destinationWs = normalizedRole === 'admin'
-          ? 'management'
-          : ['manager', 'stock_manager', 'order_manager'].includes(normalizedRole)
-          ? 'operations'
-          : 'sales';
-
-        // Set client-readable cookies (only write nalka_token if dev fallback)
-        setAuthSession(sessionToken, authenticatedProfile, isDevFallback);
-        router.push(`/${destinationWs}`);
-      } else {
-        setError('Authentication failed. Please try again.');
+      const authData = await apiRes.json();
+      if (!authData?.access_token || !authData?.user) {
+        setError('Authentication failed. Server returned invalid response.');
+        setLoading(false);
+        return;
       }
+
+      const authenticatedProfile: UserProfile = {
+        id: authData.user.id,
+        email: authData.user.email,
+        role: authData.user.role,
+        full_name: authData.user.full_name,
+        salesman_id: authData.user.salesman_id,
+      };
+
+      // Set client-readable cookies (backend already set HttpOnly token via Set-Cookie)
+      setAuthSession(authData.access_token, authenticatedProfile, rememberMe);
+
+      // STEP 2: Determine redirect destination
+      const normalizedRole = (authenticatedProfile.role || '').toLowerCase();
+      const defaultDest = getDefaultWorkspace(normalizedRole);
+
+      // Honor ?from= redirect only if the user's role has access to that workspace
+      const fromParam = searchParams?.get('from');
+      let destination = defaultDest;
+      if (fromParam && fromParam.startsWith('/')) {
+        // Validate: only allow internal workspace paths, prevent open redirect
+        const fromWorkspace = fromParam.startsWith('/management') ? 'management'
+          : fromParam.startsWith('/operations') ? 'operations'
+          : fromParam.startsWith('/sales') ? 'sales'
+          : null;
+        if (fromWorkspace && hasWorkspaceAccess(fromWorkspace as any, normalizedRole)) {
+          destination = fromParam;
+        }
+      }
+
+      router.push(destination);
     } catch (err: any) {
-      setError(err?.message || 'Login failed. Please check your credentials.');
+      // SECURITY: Network/unexpected error → FAIL CLOSED. Do not invent identity.
+      setError(err?.message || 'Login failed. Please check your connection and try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleFormSubmit = (e: React.FormEvent) => {
+  const handleFormSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    executeLogin(email, password);
+    const formData = new FormData(e.currentTarget);
+    const submittedEmail = (formData.get('username') as string || emailRef.current?.value || email || '').trim();
+    const submittedPassword = (formData.get('password') as string || passwordRef.current?.value || password || '').trim();
+    executeLogin(submittedEmail, submittedPassword);
   };
 
+  if (!mounted) {
+    return null;
+  }
 
   return (
     <div className="min-h-[calc(100vh-3.5rem)] flex items-center justify-center p-4 bg-slate-950">
@@ -275,13 +152,17 @@ export default function LoginPage() {
         )}
 
         {/* Credentials Form */}
-        <form onSubmit={handleFormSubmit} className="space-y-4">
+        <form onSubmit={handleFormSubmit} autoComplete="on" className="space-y-4">
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-slate-300">Username or Email</label>
+            <label htmlFor="login-email" className="text-xs font-semibold text-slate-300">Username or Email</label>
             <div className="relative">
               <Mail className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
               <input
+                id="login-email"
+                ref={emailRef}
                 type="text"
+                name="username"
+                autoComplete="username"
                 required
                 placeholder="Enter your username or email"
                 value={email}
@@ -292,18 +173,45 @@ export default function LoginPage() {
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-slate-300">Password</label>
+            <label htmlFor="login-password" className="text-xs font-semibold text-slate-300">Password</label>
             <div className="relative">
               <Lock className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
               <input
-                type="password"
+                id="login-password"
+                ref={passwordRef}
+                type={showPassword ? 'text' : 'password'}
+                name="password"
+                autoComplete="current-password"
                 required
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-100 text-xs focus:ring-2 focus:ring-indigo-500 outline-none"
+                className="w-full pl-9 pr-10 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-100 text-xs focus:ring-2 focus:ring-indigo-500 outline-none"
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                tabIndex={-1}
+                className="absolute right-3 top-2.5 text-slate-500 hover:text-slate-300 transition-colors cursor-pointer"
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
             </div>
+          </div>
+
+          {/* Keep Me Logged In */}
+          <div className="flex items-center gap-2">
+            <input
+              id="login-remember"
+              type="checkbox"
+              checked={rememberMe}
+              onChange={(e) => setRememberMe(e.target.checked)}
+              className="w-3.5 h-3.5 rounded border-slate-700 bg-slate-950 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-0 cursor-pointer"
+            />
+            <label htmlFor="login-remember" className="text-xs text-slate-400 cursor-pointer select-none">
+              Keep me logged in
+            </label>
           </div>
 
           <button

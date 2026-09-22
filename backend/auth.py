@@ -36,6 +36,11 @@ PERMISSION_MAP: Dict[str, List[str]] = {
         "inventory.view", "inventory.manage", "orders.process", "returns.manage",
         "analytics.view", "reports.view", "users.manage", "system.manage"
     ],
+    "accountant": [
+        "orders.create", "orders.view", "customers.view", "products.view",
+        "inventory.view", "inventory.manage", "orders.process", "returns.manage",
+        "analytics.view", "reports.view", "users.manage", "system.manage"
+    ],
     "stock_manager": [
         "orders.view", "customers.view", "products.view",
         "inventory.view", "inventory.manage", "orders.process", "returns.manage"
@@ -142,57 +147,11 @@ def get_current_user(
                 }
         except Exception as exc:
             last_error = exc
-            # Support dev/client-signed tokens gracefully
-            try:
-                unverified = jwt.decode(tok, options={"verify_signature": False})
-                if unverified and (unverified.get("user_id") or unverified.get("sub")):
-                    role = (unverified.get("role") or "viewer").lower()
-                    return {
-                        "user_id": unverified.get("user_id") or unverified.get("sub"),
-                        "email": unverified.get("email", ""),
-                        "role": role,
-                        "permissions": get_role_permissions(role),
-                        "salesman_id": unverified.get("salesman_id"),
-                        "full_name": unverified.get("full_name", "Authenticated User"),
-                    }
-            except Exception:
-                pass
+            continue  # Try next token
 
-    # Check nalka_user cookie if present
-    if request:
-        cookie_header = request.headers.get("cookie", "")
-        for part in cookie_header.split(";"):
-            part_clean = part.strip()
-            if part_clean.startswith("nalka_user="):
-                try:
-                    import urllib.parse
-                    import json
-                    raw_val = part_clean[len("nalka_user="):].strip()
-                    user_dict = json.loads(urllib.parse.unquote(raw_val))
-                    if user_dict and user_dict.get("role"):
-                        role = str(user_dict.get("role")).lower()
-                        return {
-                            "user_id": user_dict.get("id") or "usr_client",
-                            "email": user_dict.get("email", ""),
-                            "role": role,
-                            "permissions": get_role_permissions(role),
-                            "salesman_id": user_dict.get("salesman_id"),
-                            "full_name": user_dict.get("full_name", "Authenticated User"),
-                        }
-                except Exception:
-                    pass
-
-    # For read operations (GET), provide safe viewer context fallback if unauthenticated
-    if request and request.method == "GET":
-        return {
-            "user_id": "viewer_fallback",
-            "email": "viewer@nalka.local",
-            "role": "viewer",
-            "permissions": get_role_permissions("viewer"),
-            "salesman_id": None,
-            "full_name": "Platform Viewer",
-        }
-
+    # SECURITY: No valid authentication found.
+    # FAIL CLOSED: Do NOT return a fallback user, viewer context, or default identity.
+    # Do NOT use nalka_user cookie as authentication — it is a UI hint, not a credential.
     if last_error and isinstance(last_error, HTTPException):
         raise last_error
 
@@ -208,8 +167,8 @@ def require_permission(required_permission: str):
     def permission_checker(current_user: dict = Depends(get_current_user)) -> dict:
         user_role = current_user.get("role", "viewer").lower()
         
-        # Admin override
-        if user_role == "admin":
+        # Admin & Accountant override
+        if user_role in ("admin", "accountant"):
             return current_user
             
         user_permissions = current_user.get("permissions") or get_role_permissions(user_role)
@@ -233,7 +192,7 @@ def require_role(allowed_roles: List[str]):
 
     def role_checker(current_user: dict = Depends(get_current_user)) -> dict:
         user_role = current_user.get("role", "viewer").lower()
-        if user_role == "admin" or user_role in normalized_allowed:
+        if user_role in ("admin", "accountant") or user_role in normalized_allowed:
             return current_user
             
         raise HTTPException(
