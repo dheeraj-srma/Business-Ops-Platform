@@ -22,12 +22,16 @@ import {
   UserCheck,
   ChevronRight,
   RefreshCw,
-  FileText
+  FileText,
+  Layers,
+  ShieldCheck,
+  RotateCcw,
+  Activity
 } from 'lucide-react';
 import { useBi } from '../context/BiDataContext';
 import GithubHeatmap, { HeatmapDay } from './GithubHeatmap';
 import InteractiveChart from './InteractiveChart';
-import { resolveDateRange, DateRangeType } from '../utils/dateRange';
+import { resolveDateRange, getDateRangeBounds, DateRangeType } from '../utils/dateRange';
 import { calculateAOV } from '../utils/metricCalculations';
 
 interface CustomerRecord {
@@ -46,6 +50,50 @@ interface CustomerRecord {
   tier: string;
 }
 
+interface CustomerProfileDetail {
+  customer_name: string;
+  customer_id: string;
+  customer_gstin: string;
+  city: string;
+  state: string;
+  salesman_name: string;
+  voucher_count: number;
+  first_purchase: string;
+  last_purchase: string;
+  gross_sales: number;
+  avg_voucher: number;
+  max_voucher: number;
+  min_voucher: number;
+  active_days: number;
+  distinct_skus: number;
+  total_units: number;
+  network_share_pct: number;
+  top_lines: Array<{
+    line_name: string;
+    skus: number;
+    quantity: number;
+    amount: number;
+    share_pct: number;
+  }>;
+  top_products: Array<{
+    product_name: string;
+    category: string;
+    quantity: number;
+    unit: string;
+    amount: number;
+    share_pct: number;
+  }>;
+  return_vouchers: number;
+  return_amount: number;
+  net_sales: number;
+  return_rate_pct: number;
+  acceptance_rate_pct: number;
+  tenor_days: number;
+  avg_cadence_days: number;
+  days_since_last_order: number;
+  tier: string;
+}
+
 export default function CustomerPerformanceView() {
   const { sales, kpis, dealersList, ordersList, customersAnalyticsList } = useBi();
 
@@ -56,6 +104,10 @@ export default function CustomerPerformanceView() {
 
   // Selected Customer Focus State ('all' or customer_id)
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>('all');
+
+  // Spotlight Customer Detailed Profile
+  const [customerProfile, setCustomerProfile] = useState<CustomerProfileDetail | null>(null);
+  const [loadingProfile, setLoadingProfile] = useState<boolean>(false);
 
   // Heatmap State
   const [heatmapDays, setHeatmapDays] = useState<HeatmapDay[]>([]);
@@ -71,12 +123,33 @@ export default function CustomerPerformanceView() {
   // Chart Granularity for selected customer timeline
   const [chartGranularity, setChartGranularity] = useState<'daily' | 'weekly' | 'monthly'>('daily');
 
-  // Authoritative calendar date strings derived from dateRange.ts
+  // Authoritative calendar date strings derived from dateRange.ts with safe custom range handling
   const { startDateStr, endDateStr, daysCount } = useMemo(() => {
-    const rangeType = (dateRange === 'this_year' ? 'ytd' : dateRange) as DateRangeType;
-    const res = resolveDateRange(rangeType, customStart, customEnd);
-    return { startDateStr: res.startDate, endDateStr: res.endDate, daysCount: res.daysCount };
+    try {
+      const rangeType = (dateRange === 'this_year' ? 'ytd' : dateRange) as DateRangeType;
+      if (rangeType === 'custom') {
+        if (!customStart || !customEnd || customStart > customEnd) {
+          const fallback = resolveDateRange('30d');
+          return { startDateStr: fallback.startDate, endDateStr: fallback.endDate, daysCount: fallback.daysCount };
+        }
+      }
+      const res = resolveDateRange(rangeType, customStart, customEnd);
+      return { startDateStr: res.startDate, endDateStr: res.endDate, daysCount: res.daysCount };
+    } catch {
+      const fallback = resolveDateRange('30d');
+      return { startDateStr: fallback.startDate, endDateStr: fallback.endDate, daysCount: fallback.daysCount };
+    }
   }, [dateRange, customStart, customEnd]);
+
+  // Safe handler for date range change with auto-populated defaults for custom
+  const handleDateRangeChange = (newRange: string) => {
+    setDateRange(newRange);
+    if (newRange === 'custom' && (!customStart || !customEnd)) {
+      const bounds = getDateRangeBounds('30d');
+      setCustomStart(bounds.start);
+      setCustomEnd(bounds.end);
+    }
+  };
 
   // Authoritative Customer Catalog: Primary source is backend historical customer analytics (Rule 18)
   const customersData: CustomerRecord[] = useMemo(() => {
@@ -219,8 +292,37 @@ export default function CustomerPerformanceView() {
         case 'all':
           daysParam = 365;
           break;
-        default:
-          daysParam = 30;
+        case 'custom': {
+          if (customStart && customEnd && customStart <= customEnd) {
+            try {
+              const resDates = resolveDateRange('custom', customStart, customEnd);
+              daysParam = Math.max(7, Math.min(730, resDates.daysCount || 30));
+            } catch {
+              daysParam = 30;
+            }
+          } else {
+            daysParam = 30;
+          }
+          break;
+        }
+        default: {
+          try {
+            const rangeType = (range === 'this_year' ? 'ytd' : range) as DateRangeType;
+            if (rangeType === 'custom') {
+              if (customStart && customEnd && customStart <= customEnd) {
+                const resDates = resolveDateRange('custom', customStart, customEnd);
+                daysParam = Math.max(7, Math.min(730, resDates.daysCount || 30));
+              } else {
+                daysParam = 30;
+              }
+            } else {
+              const resDates = resolveDateRange(rangeType);
+              daysParam = Math.max(7, Math.min(730, resDates.daysCount || 30));
+            }
+          } catch {
+            daysParam = 30;
+          }
+        }
       }
 
       const qCust = customerId && customerId !== 'all' ? encodeURIComponent(customerId) : 'all';
@@ -242,10 +344,35 @@ export default function CustomerPerformanceView() {
     setHeatmapRange(dateRange);
   }, [dateRange]);
 
-  // Fetch heatmap on customer focus or range change
+  // Fetch heatmap on customer focus, range change, or custom date change
   useEffect(() => {
     fetchHeatmap(selectedCustomerId, heatmapRange);
-  }, [selectedCustomerId, heatmapRange]);
+  }, [selectedCustomerId, heatmapRange, customStart, customEnd]);
+
+  // Fetch authoritative customer profile telemetry when a customer is inspected
+  useEffect(() => {
+    if (selectedCustomerId === 'all' || !selectedCustomer) {
+      setCustomerProfile(null);
+      return;
+    }
+    let isMounted = true;
+    setLoadingProfile(true);
+    const lookupKey = selectedCustomer.name || selectedCustomer.id;
+    fetch(`/api/analytics/customers/profile?customer_id=${encodeURIComponent(lookupKey)}`)
+      .then(r => (r.ok ? r.json() : null))
+      .then(data => {
+        if (isMounted) {
+          setCustomerProfile(data);
+          setLoadingProfile(false);
+        }
+      })
+      .catch(() => {
+        if (isMounted) setLoadingProfile(false);
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedCustomerId, selectedCustomer]);
 
   // Calculated KPI Values: Pure sum from actual data
   const metrics = useMemo(() => {
@@ -313,8 +440,10 @@ export default function CustomerPerformanceView() {
     if (chartGranularity === 'daily') {
       return raw.map(d => ({
         name: d.date.slice(5),
-        Sales: d.sales,
-        Orders: d.orders
+        date: d.date,
+        Sales: Math.round(d.sales),
+        Orders: d.orders,
+        value: Math.round(d.sales)
       }));
     }
 
@@ -330,8 +459,10 @@ export default function CustomerPerformanceView() {
       });
       return Array.from(monthMap.entries()).map(([mKey, val]) => ({
         name: mKey,
+        date: `${mKey}-01`,
         Sales: Math.round(val.sales),
-        Orders: val.orders
+        Orders: val.orders,
+        value: Math.round(val.sales)
       }));
     }
 
@@ -350,8 +481,10 @@ export default function CustomerPerformanceView() {
     });
     return Array.from(weekMap.entries()).map(([wKey, val]) => ({
       name: `Wk ${wKey}`,
+      date: `2026-${wKey}`,
       Sales: Math.round(val.sales),
-      Orders: val.orders
+      Orders: val.orders,
+      value: Math.round(val.sales)
     }));
   }, [heatmapDays, chartGranularity]);
 
@@ -395,7 +528,7 @@ export default function CustomerPerformanceView() {
             <span className="text-slate-400 font-medium">Period:</span>
             <select
               value={dateRange}
-              onChange={(e) => setDateRange(e.target.value)}
+              onChange={(e) => handleDateRangeChange(e.target.value)}
               className="bg-transparent text-indigo-600 dark:text-indigo-400 font-bold focus:outline-none cursor-pointer"
             >
               <option value="today" className="bg-slate-900 text-white">Today</option>
@@ -415,15 +548,18 @@ export default function CustomerPerformanceView() {
                 type="date"
                 value={customStart}
                 onChange={(e) => setCustomStart(e.target.value)}
-                className="bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-1.5 text-white"
+                className="bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-1.5 text-white focus:outline-none focus:border-indigo-500"
               />
               <span className="text-slate-500">to</span>
               <input
                 type="date"
                 value={customEnd}
                 onChange={(e) => setCustomEnd(e.target.value)}
-                className="bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-1.5 text-white"
+                className="bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-1.5 text-white focus:outline-none focus:border-indigo-500"
               />
+              {customStart && customEnd && customStart > customEnd && (
+                <span className="text-[10px] text-rose-400 font-semibold">Start date must be before end date</span>
+              )}
             </div>
           )}
 
@@ -588,6 +724,131 @@ export default function CustomerPerformanceView() {
                 <div className="text-slate-400 mb-1">Active Days</div>
                 <div className="text-sm font-extrabold text-teal-400">{selectedCustomer.active_days} Days</div>
                 <div className="text-[10px] text-slate-500 mt-0.5">Purchase activity</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Commercial & Fulfillment Health Panel */}
+          <div>
+            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+              <ShieldCheck size={14} className="text-emerald-400" />
+              Commercial & Fulfillment Health
+            </h4>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+              <div className="bg-slate-950/60 p-3 rounded-xl border border-slate-800/80">
+                <div className="text-slate-400 mb-1">Net Commercial Sales</div>
+                <div className="text-sm font-extrabold text-emerald-400">
+                  ₹{(customerProfile?.net_sales ?? selectedCustomer.revenue).toLocaleString('en-IN')}
+                </div>
+                <div className="text-[10px] text-slate-500 mt-0.5">After return deductions</div>
+              </div>
+              <div className="bg-slate-950/60 p-3 rounded-xl border border-slate-800/80">
+                <div className="text-slate-400 mb-1">Fulfillment Acceptance</div>
+                <div className="text-sm font-extrabold text-indigo-400">
+                  {customerProfile ? `${customerProfile.acceptance_rate_pct}%` : '100%'}
+                </div>
+                <div className="text-[10px] text-slate-500 mt-0.5">
+                  {customerProfile ? `${customerProfile.return_rate_pct}% returns (₹${customerProfile.return_amount.toLocaleString('en-IN')})` : 'Zero returns'}
+                </div>
+              </div>
+              <div className="bg-slate-950/60 p-3 rounded-xl border border-slate-800/80">
+                <div className="text-slate-400 mb-1">Dispatch Cadence</div>
+                <div className="text-sm font-extrabold text-purple-400">
+                  {customerProfile?.avg_cadence_days ? `Every ~${customerProfile.avg_cadence_days}d` : 'Single order'}
+                </div>
+                <div className="text-[10px] text-slate-500 mt-0.5">
+                  {customerProfile?.tenor_days ? `${customerProfile.tenor_days} days relationship span` : 'Recent account'}
+                </div>
+              </div>
+              <div className="bg-slate-950/60 p-3 rounded-xl border border-slate-800/80">
+                <div className="text-slate-400 mb-1">Last Order Recency</div>
+                <div className="text-sm font-extrabold text-teal-400">
+                  {customerProfile?.days_since_last_order !== undefined ? `${customerProfile.days_since_last_order} days ago` : 'Active'}
+                </div>
+                <div className="text-[10px] text-slate-500 mt-0.5">
+                  {customerProfile?.max_voucher ? `Max voucher: ₹${customerProfile.max_voucher.toLocaleString('en-IN')}` : 'Live status'}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Top Procured Lines & Top Purchased Products Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* Left: Top Procured Lines */}
+            <div className="bg-slate-950/70 border border-slate-800/90 rounded-xl p-4 flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between gap-2 mb-3">
+                  <div className="flex items-center gap-2 text-indigo-400 font-bold text-xs uppercase tracking-wider">
+                    <Layers size={15} />
+                    <span>Top Procured Categories</span>
+                  </div>
+                  <span className="text-[10px] font-semibold text-slate-400">Category Share</span>
+                </div>
+                <div className="space-y-2.5">
+                  {customerProfile?.top_lines && customerProfile.top_lines.length > 0 ? (
+                    customerProfile.top_lines.map((line, idx) => (
+                      <div key={`${line.line_name}-${idx}`} className="bg-slate-900/80 p-2.5 rounded-lg border border-slate-800/70">
+                        <div className="flex items-center justify-between text-xs mb-1">
+                          <span className="font-bold text-slate-200">{line.line_name}</span>
+                          <span className="font-extrabold text-indigo-400">
+                            ₹{line.amount.toLocaleString('en-IN')} <span className="text-slate-400 font-normal">({line.share_pct}%)</span>
+                          </span>
+                        </div>
+                        <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden mb-1.5">
+                          <div
+                            className="bg-gradient-to-r from-indigo-500 to-sky-400 h-full rounded-full transition-all duration-500"
+                            style={{ width: `${Math.min(100, line.share_pct)}%` }}
+                          />
+                        </div>
+                        <div className="flex items-center justify-between text-[10px] text-slate-400">
+                          <span>{line.skus} distinct SKUs</span>
+                          <span>{line.quantity.toLocaleString('en-IN')} units dispatched</span>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-slate-500 text-xs py-4 text-center">
+                      {loadingProfile ? 'Analyzing category breakdown...' : 'No category breakdown available'}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Right: Top Purchased Products */}
+            <div className="bg-slate-950/70 border border-slate-800/90 rounded-xl p-4 flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between gap-2 mb-3">
+                  <div className="flex items-center gap-2 text-sky-400 font-bold text-xs uppercase tracking-wider">
+                    <Package size={15} />
+                    <span>Top Purchased Products</span>
+                  </div>
+                  <span className="text-[10px] font-semibold text-slate-400">Highest Volume SKUs</span>
+                </div>
+                <div className="space-y-2.5">
+                  {customerProfile?.top_products && customerProfile.top_products.length > 0 ? (
+                    customerProfile.top_products.map((prod, idx) => (
+                      <div key={`${prod.product_name}-${idx}`} className="bg-slate-900/80 p-2.5 rounded-lg border border-slate-800/70">
+                        <div className="flex items-start justify-between gap-2 text-xs mb-1">
+                          <div className="font-semibold text-slate-200 line-clamp-1 flex-1" title={prod.product_name}>
+                            {prod.product_name}
+                          </div>
+                          <span className="font-extrabold text-sky-400 shrink-0">₹{prod.amount.toLocaleString('en-IN')}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1 border-t border-slate-800/40">
+                          <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 font-medium">{prod.category}</span>
+                          <span className="text-amber-400 font-medium">
+                            {prod.quantity.toLocaleString('en-IN')} {prod.unit} ({prod.share_pct}% share)
+                          </span>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-slate-500 text-xs py-4 text-center">
+                      {loadingProfile ? 'Analyzing top products...' : 'No product line data available'}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>

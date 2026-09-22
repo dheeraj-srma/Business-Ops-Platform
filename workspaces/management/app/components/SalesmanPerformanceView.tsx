@@ -22,7 +22,7 @@ import {
 } from 'lucide-react';
 import GithubHeatmap, { HeatmapDay } from './GithubHeatmap';
 import InteractiveChart from './InteractiveChart';
-import { resolveDateRange, DateRangeType } from '../utils/dateRange';
+import { resolveDateRange, getDateRangeBounds, DateRangeType } from '../utils/dateRange';
 
 interface TeamSummary {
   total_team_sales: number;
@@ -100,12 +100,33 @@ export default function SalesmanPerformanceView() {
   const [loadingHeatmap, setLoadingHeatmap] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // Authoritative calendar date strings derived from dateRange.ts
+  // Authoritative calendar date strings derived from dateRange.ts with safe custom range handling
   const { startDateStr, endDateStr, daysCount } = useMemo(() => {
-    const rangeType = (dateRange === 'this_year' ? 'ytd' : dateRange) as DateRangeType;
-    const res = resolveDateRange(rangeType, customStart, customEnd);
-    return { startDateStr: res.startDate, endDateStr: res.endDate, daysCount: res.daysCount };
+    try {
+      const rangeType = (dateRange === 'this_year' ? 'ytd' : dateRange) as DateRangeType;
+      if (rangeType === 'custom') {
+        if (!customStart || !customEnd || customStart > customEnd) {
+          const fallback = resolveDateRange('30d');
+          return { startDateStr: fallback.startDate, endDateStr: fallback.endDate, daysCount: fallback.daysCount };
+        }
+      }
+      const res = resolveDateRange(rangeType, customStart, customEnd);
+      return { startDateStr: res.startDate, endDateStr: res.endDate, daysCount: res.daysCount };
+    } catch {
+      const fallback = resolveDateRange('30d');
+      return { startDateStr: fallback.startDate, endDateStr: fallback.endDate, daysCount: fallback.daysCount };
+    }
   }, [dateRange, customStart, customEnd]);
+
+  // Safe handler for date range change with auto-populated defaults for custom
+  const handleDateRangeChange = (newRange: string) => {
+    setDateRange(newRange);
+    if (newRange === 'custom' && (!customStart || !customEnd)) {
+      const bounds = getDateRangeBounds('30d');
+      setCustomStart(bounds.start);
+      setCustomEnd(bounds.end);
+    }
+  };
 
   // Get Auth Token from localStorage if needed
   const getAuthHeaders = (): HeadersInit => {
@@ -249,13 +270,7 @@ export default function SalesmanPerformanceView() {
       fetchSalesmanDetail(selectedSalesmanId);
       fetchHeatmap(selectedSalesmanId, heatmapRange);
     }
-  }, [selectedSalesmanId, startDateStr, endDateStr]);
-
-  useEffect(() => {
-    if (selectedSalesmanId) {
-      fetchHeatmap(selectedSalesmanId, heatmapRange);
-    }
-  }, [heatmapRange]);
+  }, [selectedSalesmanId, heatmapRange, customStart, customEnd]);
 
   // Sort handler
   const handleSort = (column: string) => {
@@ -275,8 +290,10 @@ export default function SalesmanPerformanceView() {
     if (chartGranularity === 'daily') {
       return raw.map(d => ({
         name: d.date.slice(5),
-        Sales: d.sales,
-        Orders: d.orders
+        date: d.date,
+        Sales: Math.round(d.sales),
+        Orders: d.orders,
+        value: Math.round(d.sales)
       }));
     }
 
@@ -292,8 +309,10 @@ export default function SalesmanPerformanceView() {
       });
       return Array.from(monthMap.entries()).map(([mKey, val]) => ({
         name: mKey,
-        Sales: val.sales,
-        Orders: val.orders
+        date: `${mKey}-01`,
+        Sales: Math.round(val.sales),
+        Orders: val.orders,
+        value: Math.round(val.sales)
       }));
     }
 
@@ -312,8 +331,10 @@ export default function SalesmanPerformanceView() {
     });
     return Array.from(weekMap.entries()).map(([wKey, val]) => ({
       name: `Wk ${wKey}`,
-      Sales: val.sales,
-      Orders: val.orders
+      date: `2026-${wKey}`,
+      Sales: Math.round(val.sales),
+      Orders: val.orders,
+      value: Math.round(val.sales)
     }));
   }, [salesmanDetail, chartGranularity]);
 
@@ -357,7 +378,7 @@ export default function SalesmanPerformanceView() {
             <span className="text-slate-400 font-medium">Period:</span>
             <select
               value={dateRange}
-              onChange={(e) => setDateRange(e.target.value)}
+              onChange={(e) => handleDateRangeChange(e.target.value)}
               className="bg-transparent text-indigo-600 dark:text-indigo-400 font-bold focus:outline-none cursor-pointer"
             >
               <option value="today" className="bg-slate-900 text-white">Today</option>
@@ -377,15 +398,18 @@ export default function SalesmanPerformanceView() {
                 type="date"
                 value={customStart}
                 onChange={(e) => setCustomStart(e.target.value)}
-                className="bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-1.5 text-white"
+                className="bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-1.5 text-white focus:outline-none focus:border-indigo-500"
               />
               <span className="text-slate-500">to</span>
               <input
                 type="date"
                 value={customEnd}
                 onChange={(e) => setCustomEnd(e.target.value)}
-                className="bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-1.5 text-white"
+                className="bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-1.5 text-white focus:outline-none focus:border-indigo-500"
               />
+              {customStart && customEnd && customStart > customEnd && (
+                <span className="text-[10px] text-rose-400 font-semibold">Start date must be before end date</span>
+              )}
             </div>
           )}
 
