@@ -1,114 +1,112 @@
 'use client';
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { RotateCcw, AlertTriangle, Sparkles, CheckCircle2 } from 'lucide-react';
 import { useBi } from '../context/BiDataContext';
 import InteractiveChart from '../components/InteractiveChart';
 
+interface ReturnAnalyticsData {
+  total_returns: number;
+  total_value: number;
+  earliest_date: string | null;
+  latest_date: string | null;
+  unique_customers: number;
+  timeline: Array<{ date: string; returns: number; value: number }>;
+  top_returned_products: Array<{ product: string; category: string; quantity: number; value: number; occurrences: number }>;
+  by_customer: Array<{ customer: string; returns: number; value: number }>;
+  by_category: Array<{ category: string; quantity: number; value: number; lines: number }>;
+}
+
 export default function QualityReturnsPage() {
   const { ret, sales, kpis, returnsList } = useBi();
+  const [retData, setRetData] = useState<ReturnAnalyticsData | null>(null);
 
-  // Authoritative returns timeline from actual return timestamps
+  useEffect(() => {
+    fetch('/api/analytics/returns')
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data && typeof data === 'object') {
+          setRetData(data);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  // 1. Authoritative returns timeline from historical return vouchers
   const returnsTimelineData = useMemo(() => {
-    if (!returnsList || returnsList.length === 0) return [];
-    const dateMap: Record<string, { name: string; defective: number; reusable: number }> = {};
-    returnsList.forEach(r => {
-      const ts = String(r.Timestamp || r.created_at || '').slice(0, 10);
-      if (!ts) return;
-      if (!dateMap[ts]) {
-        dateMap[ts] = { name: ts.slice(5), defective: 0, reusable: 0 };
-      }
-      const cond = String(r.Condition || r.condition || '').toLowerCase();
-      const qty = Number(r.Quantity || r.quantity || 1);
-      if (cond.includes('defect') || cond.includes('scrap') || cond.includes('damage')) {
-        dateMap[ts].defective += qty;
-      } else {
-        dateMap[ts].reusable += qty;
-      }
-    });
-    return Object.keys(dateMap).sort().map(k => dateMap[k]);
-  }, [returnsList]);
-
-  const returnsTimelineSeries = [
-    { key: 'defective', label: 'Defective (Scrapped)', color: '#ef4444' },
-    { key: 'reusable', label: 'Restocked (Good)', color: '#10b981' },
-  ];
-
-  const returnReasonsData = useMemo(() => {
-    if (returnsList && returnsList.length > 0) {
-      const reasonsMap: Record<string, number> = {};
-      returnsList.forEach(r => {
-        const rsn = String(r.Reason || r.reason || 'Transit Impact Damage').trim();
-        reasonsMap[rsn] = (reasonsMap[rsn] || 0) + 1;
-      });
-      return Object.entries(reasonsMap).map(([name, value]) => ({ name, value }));
+    if (retData && retData.timeline && retData.timeline.length > 0) {
+      return retData.timeline.map(t => ({
+        name: t.date.slice(5),
+        date: t.date,
+        value: t.value,
+        returns: t.returns,
+      }));
     }
-    const reasons = ret.return_reasons || ret.reasons || {};
-    return Object.entries(reasons).map(([reason, count]) => ({
-      name: reason,
-      value: count,
-    }));
-  }, [returnsList, ret]);
+    if (returnsList && returnsList.length > 0) {
+      const dateMap: Record<string, { name: string; value: number; returns: number }> = {};
+      returnsList.forEach(r => {
+        const ts = String(r.Timestamp || r.created_at || '').slice(0, 10);
+        if (!ts) return;
+        if (!dateMap[ts]) {
+          dateMap[ts] = { name: ts.slice(5), value: 0, returns: 0 };
+        }
+        dateMap[ts].returns += 1;
+        dateMap[ts].value += Number(r.Price || r.price || 0) * Number(r.Quantity || r.quantity || 1);
+      });
+      return Object.keys(dateMap).sort().map(k => dateMap[k]);
+    }
+    return [];
+  }, [retData, returnsList]);
 
+  // 2. Returns by Category
+  const returnCategoryData = useMemo(() => {
+    if (retData && retData.by_category && retData.by_category.length > 0) {
+      return retData.by_category.map(c => ({
+        name: c.category,
+        value: c.value,
+      }));
+    }
+    return [];
+  }, [retData]);
+
+  // 3. Top Returned Products (Horizontal Bar)
   const topReturnedProducts = useMemo(() => {
-    if (!returnsList || returnsList.length === 0) return [];
-    const prodMap: Record<string, number> = {};
-    returnsList.forEach(r => {
-      const name = String(r["Item Name"] || r.item_name || r.SKU || 'Item').trim();
-      const qty = Number(r.Quantity || r.quantity || 1);
-      prodMap[name] = (prodMap[name] || 0) + qty;
-    });
-    return Object.entries(prodMap)
-      .map(([name, value]) => ({ name, value }))
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 6);
-  }, [returnsList]);
+    if (retData && retData.top_returned_products && retData.top_returned_products.length > 0) {
+      return retData.top_returned_products.map(p => ({
+        name: p.product.length > 22 ? p.product.slice(0, 22) + '…' : p.product,
+        value: p.value,
+      }));
+    }
+    if (returnsList && returnsList.length > 0) {
+      const prodMap: Record<string, number> = {};
+      returnsList.forEach(r => {
+        const name = String(r["Item Name"] || r.item_name || r.SKU || 'Item').trim();
+        const qty = Number(r.Quantity || r.quantity || 1);
+        prodMap[name] = (prodMap[name] || 0) + qty;
+      });
+      return Object.entries(prodMap)
+        .map(([name, value]) => ({ name, value }))
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 6);
+    }
+    return [];
+  }, [retData, returnsList]);
 
-  const supplierDefectRate = useMemo(() => {
-    if (!returnsList || returnsList.length === 0) return [];
-    const brandDefects: Record<string, number> = {};
-    returnsList.forEach(r => {
-      const cat = String(r.Category || r.category || 'General').trim();
-      brandDefects[cat] = (brandDefects[cat] || 0) + 1;
-    });
-    return Object.entries(brandDefects)
-      .map(([name, count]) => ({
-        name,
-        value: Number(((count / (returnsList.length || 1)) * 100).toFixed(1)),
-      }))
-      .sort((a, b) => b.value - a.value);
-  }, [returnsList]);
+  // 4. Returns by Customer
+  const returnsByCustomerData = useMemo(() => {
+    if (retData && retData.by_customer && retData.by_customer.length > 0) {
+      return retData.by_customer.slice(0, 10).map(c => ({
+        name: c.customer.length > 20 ? c.customer.slice(0, 20) + '…' : c.customer,
+        value: c.value,
+      }));
+    }
+    return [];
+  }, [retData]);
 
-  const geographicReturnData = useMemo(() => {
-    if (!returnsList || returnsList.length === 0) return [];
-    const locMap: Record<string, number> = {};
-    returnsList.forEach(r => {
-      const loc = String(r.Location || r.location || 'Main Depot').trim();
-      const qty = Number(r.Quantity || r.quantity || 1);
-      locMap[loc] = (locMap[loc] || 0) + qty;
-    });
-    return Object.entries(locMap)
-      .map(([name, value]) => ({ name, value }))
-      .sort((a, b) => b.value - a.value);
-  }, [returnsList]);
-
-  const returnsLossData = useMemo(() => {
-    if (!returnsList || returnsList.length === 0) return [];
-    let salvaged = 0;
-    let scrapped = 0;
-    returnsList.forEach(r => {
-      const val = Number(r.Price || r.price || 0) * Number(r.Quantity || r.quantity || 1);
-      const cond = String(r.Condition || r.condition || '').toLowerCase();
-      if (cond.includes('defect') || cond.includes('scrap')) {
-        scrapped += val;
-      } else {
-        salvaged += val;
-      }
-    });
-    return [
-      { name: 'Salvaged & Restocked Value', value: Math.round(salvaged) },
-      { name: 'Scrap & Write-off Loss', value: Math.round(scrapped) },
-    ];
-  }, [returnsList]);
+  const returnRateLabel = kpis.return_rate_pct != null
+    ? `${kpis.return_rate_pct}%`
+    : 'N/A';
+  const totalReturnCount = retData?.total_returns ?? (returnsList?.length || 0);
+  const totalReturnValue = retData?.total_value ?? 0;
 
   return (
     <div className="space-y-6 pb-12">
@@ -123,75 +121,88 @@ export default function QualityReturnsPage() {
             Returns & Quality Diagnostics
           </h1>
           <p className="text-xs text-slate-400 mt-0.5">
-            Customer RMA reasons, transit damage mitigation, defective supplier scrap metrics, and asset recovery valuation.
+            Authoritative customer return vouchers, financial claim impact, and returned product analytics.
           </p>
         </div>
 
         <div className="flex items-center gap-3">
           <div className="px-3.5 py-2 bg-slate-800/60 rounded-xl border border-slate-700/50">
             <div className="text-[10px] text-slate-400 uppercase font-semibold">Return Rate</div>
-            <div className="text-base font-extrabold text-rose-400">{kpis.return_rate_pct || 1.4}%</div>
+            <div className="text-base font-extrabold text-rose-400">{returnRateLabel}</div>
           </div>
           <div className="px-3.5 py-2 bg-slate-800/60 rounded-xl border border-slate-700/50">
-            <div className="text-[10px] text-slate-400 uppercase font-semibold">Total Audited RMAs</div>
-            <div className="text-base font-extrabold text-indigo-600 dark:text-indigo-400">{ret.total_returns || 14} Logs</div>
+            <div className="text-[10px] text-slate-400 uppercase font-semibold">Total Returns</div>
+            <div className="text-base font-extrabold text-indigo-600 dark:text-indigo-400">{totalReturnCount} Vouchers</div>
+          </div>
+          <div className="px-3.5 py-2 bg-slate-800/60 rounded-xl border border-slate-700/50">
+            <div className="text-[10px] text-slate-400 uppercase font-semibold">Total Claim Value</div>
+            <div className="text-base font-extrabold text-rose-400">₹{totalReturnValue.toLocaleString('en-IN')}</div>
           </div>
         </div>
       </div>
 
-      {/* ── Hero Chart: Returns & QC Timeline ───────────────────────────── */}
+      {/* ── Hero Chart: Returns Timeline ───────────────────────────── */}
       <div className="w-full">
         <InteractiveChart
-          title="Returns & QC Timeline"
-          subtitle="Timeline tracking Defective (Scrapped) vs Reusable (Restocked) returns"
+          title="Customer Returns Value Timeline"
+          subtitle="Chronological return claims aggregated from historical return vouchers"
           data={returnsTimelineData}
           defaultChartType="area"
-          unit="units"
-          multiSeries={returnsTimelineSeries}
+          unit="₹"
           isHero={true}
+          statusBadge="LIVE"
         />
       </div>
 
       {/* ── Supporting Analytics Grid ───────────────────────────────────── */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
         <InteractiveChart
-          title="RMA Return Reasons Breakdown"
-          subtitle="Customer logged root causes (Damage, Spec Error, Packaging Defect)"
-          data={returnReasonsData}
+          title="Returns by Product Category"
+          subtitle="Financial return claim value distributed across product lines"
+          data={returnCategoryData}
           defaultChartType="donut"
-          unit="returns"
+          unit="₹"
+          statusBadge="LIVE"
         />
 
         <InteractiveChart
           title="Top Returned Products"
-          subtitle="Catalog SKUs with highest claim frequency"
+          subtitle="Products with highest cumulative return claim values"
           data={topReturnedProducts}
-          defaultChartType="bar"
-          unit="units"
+          defaultChartType="horizontal_bar"
+          unit="₹"
+          statusBadge="LIVE"
+        />
+
+        <InteractiveChart
+          title="Returns by Customer"
+          subtitle="Customer accounts with highest logged return values"
+          data={returnsByCustomerData}
+          defaultChartType="horizontal_bar"
+          unit="₹"
+          statusBadge="LIVE"
         />
 
         <InteractiveChart
           title="Supplier Defect Rate (%)"
           subtitle="Percentage of defective items sourced per manufacturing partner"
-          data={supplierDefectRate}
+          data={[]}
           defaultChartType="line"
           unit="%"
+          unavailable={true}
+          unavailableReason="Supplier defect rate telemetry is unavailable. Inward gate QC inspection logs are not connected."
+          statusBadge="UNAVAILABLE"
         />
 
         <InteractiveChart
           title="Geographic Return Hotspots"
           subtitle="Regional distribution of logged customer returns across dealer network"
-          data={geographicReturnData}
+          data={[]}
           defaultChartType="pie"
           unit="claims"
-        />
-
-        <InteractiveChart
-          title="Financial Asset Recovery vs Loss"
-          subtitle="Net cost allocation of scrap loss vs salvaged asset value"
-          data={returnsLossData}
-          defaultChartType="area"
-          unit="₹"
+          unavailable={true}
+          unavailableReason="Regional return hotspot tracking requires return depot location tagging."
+          statusBadge="UNAVAILABLE"
         />
 
         {/* AI Quality Control Diagnostics Panel */}
@@ -202,25 +213,31 @@ export default function QualityReturnsPage() {
               <span>AI Quality Control Diagnostics</span>
             </div>
             <p className="text-xs text-slate-400 mb-4">
-              Automated suggestions to prevent transit damages and reduce supplier reject rates.
+              Automated diagnostics derived directly from authoritative return ledger data.
             </p>
 
             <div className="space-y-3 text-xs">
               <div className="p-3 bg-slate-800/60 rounded-lg border border-slate-700/50">
-                <div className="font-bold text-rose-400 mb-0.5">Recalibrate Transit Packaging:</div>
-                <div className="text-slate-400">42% of customer returns are due to Transit Impact. Recommended corner foam buffers on seat cover consignments.</div>
+                <div className="font-bold text-rose-400 mb-0.5">Top Return Product Concentration:</div>
+                <div className="text-slate-300">
+                  {retData?.top_returned_products?.[0]
+                    ? `${retData.top_returned_products[0].product} accounts for ₹${Math.round(retData.top_returned_products[0].value).toLocaleString('en-IN')} in return claims. Recommend packaging review for this SKU.`
+                    : 'Analyze top returned products to minimize transit packaging claims.'}
+                </div>
               </div>
 
               <div className="p-3 bg-slate-800/60 rounded-lg border border-slate-700/50">
-                <div className="font-bold text-amber-400 mb-0.5">Supplier Pre-Dispatch Audit:</div>
-                <div className="text-slate-400">Supplier quality inspection reports reflect 98.6% acceptance rating across current consignments.</div>
+                <div className="font-bold text-amber-400 mb-0.5">Territory Return Impact:</div>
+                <div className="text-slate-300">
+                  Total audited return claim value is ₹{totalReturnValue.toLocaleString('en-IN')} across {totalReturnCount} vouchers, representing an overall return rate of {returnRateLabel}.
+                </div>
               </div>
             </div>
           </div>
 
           <div className="mt-4 pt-3 border-t border-slate-800 text-xs text-slate-400 flex items-center gap-1.5">
-            <CheckCircle2 size={14} className="text-indigo-600 dark:text-indigo-400" />
-            <span>RMA Return Rate (1.4%) is within optimal SLA limit (&lt;2.0%)</span>
+            <CheckCircle2 size={14} className="text-emerald-400" />
+            <span>Authoritative Historical Return Ledgers Synchronized</span>
           </div>
         </div>
       </div>

@@ -11,6 +11,7 @@ export default function InventoryVelocityPage() {
   const movementTimelineData = useMemo(() => {
     return (sales.daily_sales || []).map(d => ({
       name: d.date.slice(5),
+      date: d.date,
       inward: Number(d.stock_in || 0),
       outward: Number(d.stock_out || 0),
     }));
@@ -49,11 +50,11 @@ export default function InventoryVelocityPage() {
     if (!inventoryList || inventoryList.length === 0) return [];
     const activeSkus = new Set((sales.top_products || []).filter(p => Number(p.qty || 0) > 0).map(m => m.sku));
     const candidates = inventoryList
-      .filter(p => !activeSkus.has(p.SKU || p.sku) && Number(p['Current Stock'] || p.currentStock || 0) > 0)
+      .filter(p => !activeSkus.has(p.SKU || p.sku) && Number(p['Current Stock'] || p.currentStock || p.physical_stock || 0) > 0)
       .map(p => {
-        const name = p['Item Name'] || p.name || p.SKU || 'Item';
-        const stock = Number(p['Current Stock'] || p.currentStock || 0);
-        const cost = Number(p['Cost Price'] || p.unitCost || p.Price || 0);
+        const name = p['Item Name'] || p.name || p.SKU || p.sku || 'Item';
+        const stock = Number(p['Current Stock'] || p.currentStock || p.physical_stock || 0);
+        const cost = Number(p['Cost Price'] || p.unitCost || p.cost_price || p.sale_price || p.Price || 0);
         return {
           name: name.length > 22 ? name.slice(0, 22) + '…' : name,
           value: Math.round(stock * cost),
@@ -65,19 +66,27 @@ export default function InventoryVelocityPage() {
   }, [inventoryList, sales.top_products]);
 
   const agingData = useMemo(() => {
-    const total = inventoryList.length;
-    if (total === 0) return [];
-    const healthy = inv.healthy_count || 0;
-    const low = inv.low_stock || 0;
-    const oos = inv.out_of_stock || 0;
-    const stagnant = Math.max(0, total - healthy - low - oos);
+    if (!inventoryList || inventoryList.length === 0) return [];
+    let healthy = 0;
+    let low = 0;
+    let oos = 0;
+    inventoryList.forEach(p => {
+      const stock = Number(p.physical_stock || p.currentStock || p['Current Stock'] || 0);
+      const minStock = Number(p.minimumStock || p.criticalStock || p['Min Stock Level'] || 10);
+      if (stock <= 0) {
+        oos += 1;
+      } else if (stock <= minStock) {
+        low += 1;
+      } else {
+        healthy += 1;
+      }
+    });
     return [
-      { name: '0 - 30 Days (Active Turnover)', value: healthy },
-      { name: '31 - 60 Days (Buffer Buffer)', value: low },
-      { name: '61 - 90 Days (Low Velocity)', value: stagnant },
-      { name: '90+ Days (Stockout/Depleted)', value: oos },
+      { name: 'Healthy (Adequate Buffer)', value: healthy },
+      { name: 'Low Stock (Reorder Zone)', value: low },
+      { name: 'Out of Stock (Depleted)', value: oos },
     ];
-  }, [inventoryList.length, inv.healthy_count, inv.low_stock, inv.out_of_stock]);
+  }, [inventoryList]);
 
   // Authoritative category valuation = quantity × unit cost (Phase 9)
   const categoryValueData = useMemo(() => {
@@ -89,9 +98,9 @@ export default function InventoryVelocityPage() {
     }
     const catMap: Record<string, number> = {};
     inventoryList.forEach(p => {
-      const cat = p.Category || p.category || p.Brand || 'General';
-      const stock = Math.max(0, Number(p['Current Stock'] || p.currentStock || 0));
-      const cost = Math.max(0, Number(p['Cost Price'] || p.unitCost || p.Price || 0));
+      const cat = p.Category || p.category || p.Brand || p.brand || 'General';
+      const stock = Math.max(0, Number(p['Current Stock'] || p.currentStock || p.physical_stock || 0));
+      const cost = Math.max(0, Number(p['Cost Price'] || p.unitCost || p.cost_price || p.sale_price || p.Price || 0));
       catMap[cat] = (catMap[cat] || 0) + (stock * cost);
     });
     return Object.entries(catMap)
@@ -103,8 +112,8 @@ export default function InventoryVelocityPage() {
   const abcAnalysisData = useMemo(() => {
     if (!inventoryList || inventoryList.length === 0) return [];
     const classified = calculateABC(inventoryList, p => {
-      const qty = Number(p['Current Stock'] || p.currentStock || 0);
-      const cost = Number(p['Cost Price'] || p.unitCost || p.Price || 0);
+      const qty = Number(p['Current Stock'] || p.currentStock || p.physical_stock || 0);
+      const cost = Number(p['Cost Price'] || p.unitCost || p.cost_price || p.sale_price || p.Price || 0);
       return qty * cost;
     });
     const aVal = classified.filter(x => x.classification === 'A').reduce((s, x) => s + x.value, 0);
@@ -130,18 +139,22 @@ export default function InventoryVelocityPage() {
             Inventory Velocity & Movement
           </h1>
           <p className="text-xs text-slate-400 mt-0.5">
-            Turnover ratios, inward vs outward dispatch velocity, aging breakdown, and dead stock carrying analysis across 4,315 SKUs.
+            Turnover ratios, inward vs outward dispatch velocity, inventory health distribution, and dead stock carrying analysis across catalog SKUs.
           </p>
         </div>
 
         <div className="flex items-center gap-3">
           <div className="px-3.5 py-2 bg-slate-800/60 rounded-xl border border-slate-700/50">
             <div className="text-[10px] text-slate-400 uppercase font-semibold">Turnover Ratio</div>
-            <div className="text-base font-extrabold text-indigo-600 dark:text-indigo-400">{kpis.inventory_turnover_ratio || 4.2}x</div>
+            <div className="text-base font-extrabold text-indigo-600 dark:text-indigo-400">
+              {kpis.inventory_turnover_ratio ? `${kpis.inventory_turnover_ratio}x` : '—'}
+            </div>
           </div>
           <div className="px-3.5 py-2 bg-slate-800/60 rounded-xl border border-slate-700/50">
             <div className="text-[10px] text-slate-400 uppercase font-semibold">Total Stock Units</div>
-            <div className="text-base font-extrabold text-sky-400">{Number(kpis.total_units || 369702).toLocaleString('en-IN')}</div>
+            <div className="text-base font-extrabold text-sky-400">
+              {kpis.total_units ? Number(kpis.total_units).toLocaleString('en-IN') : '—'}
+            </div>
           </div>
         </div>
       </div>
@@ -156,6 +169,7 @@ export default function InventoryVelocityPage() {
           unit="units"
           multiSeries={movementSeries}
           isHero={true}
+          statusBadge="LIVE"
         />
       </div>
 
@@ -163,9 +177,9 @@ export default function InventoryVelocityPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
         <InteractiveChart
           title="Fast Moving SKUs"
-          subtitle="Highest turnover catalog items by units dispatched in current quarter"
+          subtitle="Highest turnover catalog items by units dispatched in current period"
           data={fastMoversData}
-          defaultChartType="bar"
+          defaultChartType="horizontal_bar"
           unit="units"
         />
 
@@ -173,31 +187,31 @@ export default function InventoryVelocityPage() {
           title="Slow Moving SKUs"
           subtitle="Low sales velocity items requiring promotional liquidation"
           data={slowMoversData}
-          defaultChartType="line"
+          defaultChartType="horizontal_bar"
           unit="units"
         />
 
         <InteractiveChart
           title="Dead Stock Capital Lockup"
-          subtitle="Valuation locked in items with zero sales movements in the last 30 days"
+          subtitle="Valuation locked in items with zero sales movements in the historical period"
           data={deadStockData}
           defaultChartType="donut"
           unit="₹"
         />
 
         <InteractiveChart
-          title="Inventory Aging Profile"
-          subtitle="Stock distribution across days on warehouse racks"
+          title="Inventory Health Status Distribution"
+          subtitle="Authoritative classification: Healthy buffer, Low stock, and Out-of-stock items"
           data={agingData}
           defaultChartType="pie"
-          unit="%"
+          unit="SKUs"
         />
 
         <InteractiveChart
           title="Category-wise Valuation"
-          subtitle="Total physical stock capital distributed across core metal lines"
+          subtitle="Total physical stock capital distributed across core product categories"
           data={categoryValueData}
-          defaultChartType="bar"
+          defaultChartType="horizontal_bar"
           unit="₹"
         />
 
@@ -206,7 +220,7 @@ export default function InventoryVelocityPage() {
           subtitle="Pareto classification: Class A (70% value), Class B (20%), Class C (10%)"
           data={abcAnalysisData}
           defaultChartType="donut"
-          unit="%"
+          unit="₹"
         />
       </div>
     </div>

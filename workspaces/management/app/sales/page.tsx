@@ -1,5 +1,5 @@
 'use client';
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { TrendingUp, Users, DollarSign, Award, BarChart3, UserCheck } from 'lucide-react';
 import { useBi } from '../context/BiDataContext';
 import InteractiveChart from '../components/InteractiveChart';
@@ -31,79 +31,52 @@ export default function SalesPage() {
     }));
   }, [sales.top_products]);
 
-  const dealerRankData = useMemo(() => {
-    return (sales.dealer_rankings || []).map(d => ({
-      name: d.dealer,
-      value: d.revenue,
+  const topCustomersData = useMemo(() => {
+    return (sales.dealer_rankings || []).map(r => ({
+      name: r.dealer.length > 20 ? r.dealer.slice(0, 20) + '…' : r.dealer,
+      value: r.revenue,
     }));
   }, [sales.dealer_rankings]);
 
   const salesmanRankData = useMemo(() => {
-    return (sales.salesman_performance || []).map(s => ({
+    return (sales.salesman_performance || []).map((s: any) => ({
       name: s.salesman,
       value: s.revenue,
     }));
   }, [sales.salesman_performance]);
 
-  // Derive region revenue from actual orders & dealer state mapping
-  const regionRevenueData = useMemo(() => {
-    const dealerStateMap: Record<string, string> = {};
-    dealersList.forEach(d => {
-      const name = (d["Shop Name"] || d.name || d.shop_name || '').trim().toLowerCase();
-      const state = (d.State || d.state || 'Haryana').trim();
-      if (name) dealerStateMap[name] = state;
-    });
-
-    const stateRevMap: Record<string, number> = {};
-    ordersList.forEach(o => {
-      const isApproved = ['approved', 'dispatched', 'delivered'].includes(String(o.status || '').toLowerCase());
-      if (!isApproved) return;
-      const cust = String(o.shop_name || o.customer_name || '').trim().toLowerCase();
-      const st = dealerStateMap[cust] || 'Haryana';
-      stateRevMap[st] = (stateRevMap[st] || 0) + Number(o.total_amount || 0);
-    });
-
-    const list = Object.entries(stateRevMap).map(([name, value]) => ({
-      name,
-      value: Math.round(value),
-    })).sort((a, b) => b.value - a.value);
-
-    if (list.length > 0) return list;
-
-    // If no direct order geography map, aggregate by top dealer regions or default to available state breakdown
-    if (sales.dealer_states && Object.keys(sales.dealer_states).length > 0) {
-      return Object.entries(sales.dealer_states).map(([name, count]) => ({
-        name,
-        value: count,
+  // Authoritative Regional Revenue from backend canonical customer mapping (Phase 9)
+  const regionData = useMemo(() => {
+    if (sales.by_state && sales.by_state.length > 0) {
+      return sales.by_state.map((s: any) => ({
+        name: s.state,
+        value: s.revenue,
       }));
     }
+    return (sales.by_region || []).map((s: any) => ({
+      name: s.region,
+      value: s.revenue,
+    }));
+  }, [sales.by_state, sales.by_region]);
 
-    return [];
-  }, [ordersList, dealersList, sales.dealer_states]);
+  // Order value distribution buckets from historical sales vouchers
+  const [orderDist, setOrderDist] = useState<Array<{ bucket: string; orders: number; value: number }>>([]);
 
-  // Derive order size distribution from actual orders
+  useEffect(() => {
+    fetch('/api/analytics/order-distribution')
+      .then(r => r.ok ? r.json() : [])
+      .then(data => {
+        if (Array.isArray(data)) setOrderDist(data);
+      })
+      .catch(() => {});
+  }, []);
+
   const orderValueDistribution = useMemo(() => {
-    let large = 0;
-    let medium = 0;
-    let small = 0;
-
-    ordersList.forEach(o => {
-      const amt = Number(o.total_amount || 0);
-      if (amt >= 200000) large++;
-      else if (amt >= 50000) medium++;
-      else if (amt > 0) small++;
-    });
-
-    if (large === 0 && medium === 0 && small === 0 && kpis.total_orders) {
-      return [];
-    }
-
-    return [
-      { name: 'Large (>₹2L)', value: large },
-      { name: 'Medium (₹50k-₹2L)', value: medium },
-      { name: 'Small (<₹50k)', value: small },
-    ];
-  }, [ordersList, kpis.total_orders]);
+    return orderDist.map(item => ({
+      name: item.bucket,
+      value: item.orders,
+    }));
+  }, [orderDist]);
 
   return (
     <div className="space-y-6 pb-12">
@@ -198,35 +171,39 @@ export default function SalesPage() {
 
             <InteractiveChart
               title="Top Customers"
-              subtitle="Highest buying customers"
-              data={dealerRankData}
-              defaultChartType="area"
+              subtitle="Highest buying customer accounts by realized sales"
+              data={topCustomersData}
+              defaultChartType="horizontal_bar"
               unit="₹"
               showLegend={false}
+              statusBadge="LIVE"
             />
 
             <InteractiveChart
               title="Salesmen Ranking"
-              subtitle="Total sales per salesman"
+              subtitle="Total sales contribution per attributed salesman"
               data={salesmanRankData}
-              defaultChartType="bar"
+              defaultChartType="horizontal_bar"
               unit="₹"
+              statusBadge="LIVE"
             />
 
             <InteractiveChart
               title="Sales by Region"
-              subtitle="Sales split across regional territories"
-              data={regionRevenueData}
-              defaultChartType="pie"
+              subtitle="Authoritative sales realization per territory"
+              data={regionData}
+              defaultChartType="horizontal_bar"
               unit="₹"
+              statusBadge="LIVE"
             />
 
             <InteractiveChart
-              title="Order Size"
-              subtitle="Orders grouped by value size"
+              title="Order Size Distribution"
+              subtitle="Historical sales vouchers grouped by invoice value"
               data={orderValueDistribution}
               defaultChartType="donut"
-              unit="orders"
+              unit="vouchers"
+              statusBadge="LIVE"
             />
           </div>
         </>

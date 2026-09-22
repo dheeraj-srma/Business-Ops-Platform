@@ -1,68 +1,45 @@
 'use client';
 import React, { useMemo } from 'react';
-import { Compass, MapPin, Globe } from 'lucide-react';
+import { Compass, MapPin } from 'lucide-react';
 import { useBi } from '../context/BiDataContext';
 import InteractiveChart from '../components/InteractiveChart';
 import IndiaMapChart from '../components/IndiaMapChart';
 
 export default function GeographyPage() {
-  const { sales, kpis } = useBi();
+  const { sales, kpis, dealersList } = useBi();
 
+  // 1. Authoritative State Revenue Ranking from Historical Sales Ledger
   const stateRevenueData = useMemo(() => {
-    return [
-      { name: 'Haryana', value: 1250000 },
-      { name: 'Delhi NCR', value: 480000 },
-      { name: 'Uttar Pradesh', value: 240000 },
-      { name: 'Punjab', value: 148515.75 },
-    ];
-  }, []);
+    return (sales.by_state || []).map((s: any) => ({
+      name: s.state,
+      value: s.revenue,
+    }));
+  }, [sales.by_state]);
 
+  // 2. Authoritative City Revenue Ranking from Historical Sales Ledger
   const cityRevenueData = useMemo(() => {
-    return [
-      { name: 'Gurugram', value: 680000 },
-      { name: 'Faridabad', value: 420000 },
-      { name: 'Noida', value: 295000 },
-      { name: 'Panipat', value: 210000 },
-      { name: 'Delhi Central', value: 260000 },
-      { name: 'Rohtak', value: 165000 },
-      { name: 'Hisar', value: 140000 },
-    ];
-  }, []);
+    return (sales.by_city || []).map((c: any) => ({
+      name: `${c.city} (${c.state || ''})`,
+      value: c.revenue,
+    }));
+  }, [sales.by_city]);
 
+  // 3. Real Dealer Outlet Density from Canonical Dealers Ledger
   const dealerDensityData = useMemo(() => {
-    return [
-      { name: 'Haryana Outlets', value: 586 },
-      { name: 'Delhi NCR Outlets', value: 142 },
-      { name: 'Uttar Pradesh Outlets', value: 52 },
-      { name: 'Punjab Outlets', value: 24 },
-    ];
-  }, []);
+    const counts: Record<string, number> = {};
+    dealersList.forEach(d => {
+      const st = (d.State || d.state || 'Unmapped').trim();
+      counts[st] = (counts[st] || 0) + 1;
+    });
+    return Object.entries(counts)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value);
+  }, [dealersList]);
 
-  const supplierDistData = useMemo(() => {
-    return [
-      { name: 'Maharashtra (Pune)', value: 84 },
-      { name: 'Haryana (Faridabad / Manesar)', value: 62 },
-      { name: 'Gujarat (Ahmedabad)', value: 42 },
-      { name: 'Delhi NCR Hub', value: 23 },
-    ];
-  }, []);
-
-  const regionalReturnRate = useMemo(() => {
-    return [
-      { name: 'Haryana', value: 1.1 },
-      { name: 'Delhi NCR', value: 1.5 },
-      { name: 'Uttar Pradesh', value: 1.8 },
-      { name: 'Punjab', value: 0.9 },
-    ];
-  }, []);
-
-  const regionalInventoryData = useMemo(() => {
-    return [
-      { name: 'Central Depot (Haryana)', value: 11200000 },
-      { name: 'Delhi Regional Hub', value: 3400000 },
-      { name: 'Noida Transit Hub', value: 1908299.03 },
-    ];
-  }, []);
+  const topState = sales.by_state?.[0];
+  const primaryTerritoryLabel = topState
+    ? `${topState.state} (${topState.share_percent}%)`
+    : 'Haryana';
 
   return (
     <div className="space-y-6 pb-12">
@@ -77,18 +54,18 @@ export default function GeographyPage() {
             Geographic Distribution & Mapping
           </h1>
           <p className="text-xs text-slate-400 mt-0.5">
-            Interactive India GIS heatmap, state territory revenue share, retail dealer concentration, and regional depot valuation.
+            Interactive India GIS heatmap, state territory revenue share, and verified retail dealer concentration.
           </p>
         </div>
 
         <div className="flex items-center gap-3">
           <div className="px-3.5 py-2 bg-slate-800/60 rounded-xl border border-slate-700/50">
             <div className="text-[10px] text-slate-400 uppercase font-semibold">Primary Territory</div>
-            <div className="text-base font-extrabold text-indigo-600 dark:text-indigo-400">Haryana (72.8%)</div>
+            <div className="text-base font-extrabold text-indigo-600 dark:text-indigo-400">{primaryTerritoryLabel}</div>
           </div>
           <div className="px-3.5 py-2 bg-slate-800/60 rounded-xl border border-slate-700/50">
             <div className="text-[10px] text-slate-400 uppercase font-semibold">Total Outlets</div>
-            <div className="text-base font-extrabold text-purple-400">{kpis.active_dealers || 804} Verified</div>
+            <div className="text-base font-extrabold text-purple-400">{dealersList.length || kpis.active_dealers || 0} Verified</div>
           </div>
         </div>
       </div>
@@ -106,50 +83,62 @@ export default function GeographyPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
         <InteractiveChart
           title="Revenue by State Territory"
-          subtitle="Gross sales contribution per regional state territory"
+          subtitle="Authoritative sales realization per state territory"
           data={stateRevenueData}
-          defaultChartType="area"
+          defaultChartType="horizontal_bar"
           unit="₹"
+          statusBadge="LIVE"
         />
 
         <InteractiveChart
           title="Revenue by City Hub"
-          subtitle="Top contributing metro and tier-2 city commercial centers"
+          subtitle="Top contributing metro and city commercial centers"
           data={cityRevenueData}
-          defaultChartType="bar"
+          defaultChartType="horizontal_bar"
           unit="₹"
+          statusBadge="LIVE"
         />
 
         <InteractiveChart
           title="Dealer Outlet Density"
-          subtitle="Partner outlet distribution across territories"
+          subtitle="Verified partner outlet distribution across territories"
           data={dealerDensityData}
-          defaultChartType="pie"
+          defaultChartType="donut"
           unit="dealers"
+          statusBadge="LIVE"
         />
 
         <InteractiveChart
           title="Manufacturing Supplier Sourcing Hubs"
           subtitle="Location density of active manufacturing vendor factories"
-          data={supplierDistData}
+          data={[]}
           defaultChartType="donut"
           unit="vendors"
+          unavailable={true}
+          unavailableReason="Supplier geolocation telemetry is unavailable. Vendor addresses are not tracked in the current database schema."
+          statusBadge="UNAVAILABLE"
         />
 
         <InteractiveChart
           title="Regional Return Rate (%)"
-          subtitle="Customer RMA defect percentages categorized by destination hub"
-          data={regionalReturnRate}
-          defaultChartType="line"
+          subtitle="Customer return percentages categorized by destination territory"
+          data={[]}
+          defaultChartType="bar"
           unit="%"
+          unavailable={true}
+          unavailableReason="Regional return telemetry is unavailable. All customer returns are processed at the central receiving dock."
+          statusBadge="UNAVAILABLE"
         />
 
         <InteractiveChart
           title="Regional Inventory Valuation"
           subtitle="Physical asset capital allocation stored per regional warehouse depot"
-          data={regionalInventoryData}
+          data={[]}
           defaultChartType="bar"
           unit="₹"
+          unavailable={true}
+          unavailableReason="Regional inventory breakdown is unavailable. The business operates a single centralized warehouse facility."
+          statusBadge="UNAVAILABLE"
         />
       </div>
     </div>

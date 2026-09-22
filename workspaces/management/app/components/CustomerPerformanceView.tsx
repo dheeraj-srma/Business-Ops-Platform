@@ -42,71 +42,31 @@ interface CustomerRecord {
 }
 
 export default function CustomerPerformanceView() {
-  const { sales, kpis, dealersList, ordersList } = useBi();
+  const { sales, kpis, dealersList, ordersList, customersAnalyticsList } = useBi();
 
   // Search & Filter State
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [dateRange, setDateRange] = useState<DateRangeType>('30d');
+  const [page, setPage] = useState<number>(1);
+  const pageSize = 10;
 
-  // Authoritative Customer Catalog: Derived from actual dealers and real orders (Phase 13)
+  // Authoritative Customer Catalog: Primary source is backend historical customer analytics (Rule 18)
   const customersData: CustomerRecord[] = useMemo(() => {
-    const cleanDealerNameAndCity = (rawName: string, rawCity?: string, rawState?: string) => {
-      let name = (rawName || '').trim();
-      let city = (rawCity || '').trim();
-      let state = (rawState || '').trim() || 'Haryana';
-
-      const match = name.match(/^(.*?)\s*\(([^)]+)\)$/);
-      if (match) {
-        name = match[1].trim();
-        if (!city || city === 'Gurugram' || city === 'Faridabad') {
-          city = match[2].trim();
-        }
-      }
-
-      if (!city) city = 'Gurugram';
-      return { name, city, state };
-    };
-
-    // Filter orders in active range first
-    const rangedOrders = filterItemsByDateRange(ordersList, dateRange, o => String(o.created_at || ''));
-
-    // Group orders by normalized customer name
-    const orderMap: Record<string, { rev: number; count: number; dates: Set<string>; units: number }> = {};
-    rangedOrders.forEach(o => {
-      const isApproved = ['approved', 'dispatched', 'delivered'].includes(String(o.status || '').toLowerCase());
-      if (!isApproved) return;
-      const key = String(o.shop_name || o.customer_name || '').trim().toLowerCase();
-      if (!key) return;
-      if (!orderMap[key]) {
-        orderMap[key] = { rev: 0, count: 0, dates: new Set(), units: 0 };
-      }
-      orderMap[key].rev += Number(o.total_amount || 0);
-      orderMap[key].count += 1;
-      const dStr = String(o.created_at || '').slice(0, 10);
-      if (dStr) orderMap[key].dates.add(dStr);
-      // Units from items if available
-      const items = Array.isArray(o.items) ? o.items : [];
-      const itemUnits = items.reduce((sum: number, it: any) => sum + Number(it.quantity || 1), 0);
-      orderMap[key].units += (itemUnits || 1);
-    });
-
-    if (dealersList && dealersList.length > 0) {
-      return dealersList.map((d: any, idx: number) => {
-        const rawName = d["Shop Name"] || d.name || d.shop_name || `Customer ${idx + 1}`;
-        const { name, city, state } = cleanDealerNameAndCity(rawName, d.City || d.city, d.State || d.state);
-        const salesman = d["Salesman Name"] || d.salesman || 'Unassigned';
-        const phone = d.Phone || d.phone || '-';
-        const code = d["Customer Code"] || d.customer_code || `CUST-${1001 + idx}`;
-
-        const normKey = name.toLowerCase();
-        const ordData = orderMap[normKey] || { rev: 0, count: 0, dates: new Set(), units: 0 };
-
-        const rev = Math.round(ordData.rev);
-        const ords = ordData.count;
-        const avgOrd = calculateAOV(rev, ords);
-        const units = ordData.units;
-        const activeDays = ordData.dates.size;
+    if (customersAnalyticsList && customersAnalyticsList.length > 0) {
+      return customersAnalyticsList.map((c: any, idx: number) => {
+        const name = c.customer_name || 'Counter Customer';
+        const city = c.city || 'Gurugram';
+        const state = c.state || 'Haryana';
+        const salesman = c.salesman || 'Unassigned';
+        const phone = c.gstin ? `GST: ${c.gstin}` : '-';
+        const code = c.customer_id || `CUST-${1001 + idx}`;
+        const rev = Math.round(Number(c.revenue || 0));
+        const ords = Number(c.voucher_count || 0);
+        const avgOrd = Number(c.aov || (ords > 0 ? Math.round(rev / ords) : 0));
+        const units = 0;
+        const activeDays = Number(c.active_days || 1);
+        const prodDiversity = Number(c.product_diversity || 1);
         const tier = rev > 250000 ? 'Platinum' : rev > 120000 ? 'Gold' : rev > 50000 ? 'Silver' : 'Bronze';
 
         return {
@@ -120,36 +80,54 @@ export default function CustomerPerformanceView() {
           orders: ords,
           avg_order: avgOrd,
           units_sold: units,
-          products_count: ords > 0 ? Math.min(24, Math.max(1, ords * 2)) : 0,
+          products_count: prodDiversity,
           active_days: activeDays,
           tier,
         };
       });
     }
 
-    // Fallback to top dealer rankings from backend
-    const rawRankings = sales.dealer_rankings || [];
-    return rawRankings.map((r, idx) => {
-      const { name, city, state } = cleanDealerNameAndCity(r.dealer);
-      const rev = Math.round(r.revenue || 0);
-      const ords = rev > 0 ? Math.max(1, Math.round(rev / 7000)) : 0;
-      return {
-        id: `CUST-${1001 + idx}`,
-        name,
-        city,
-        state,
-        salesman: sales.top_salesman || 'Unassigned',
-        phone: '-',
-        revenue: rev,
-        orders: ords,
-        avg_order: calculateAOV(rev, ords),
-        units_sold: Math.round(ords * 45),
-        products_count: Math.min(20, Math.max(1, ords)),
-        active_days: Math.min(28, Math.max(1, Math.round(ords * 0.4))),
-        tier: rev > 250000 ? 'Platinum' : rev > 120000 ? 'Gold' : 'Silver',
-      };
-    });
-  }, [dealersList, ordersList, dateRange, sales.dealer_rankings, sales.top_salesman]);
+    // Fallback if historical endpoint has not returned yet: operational dealers
+    const cleanDealerNameAndCity = (rawName: string, rawCity?: string, rawState?: string) => {
+      let name = (rawName || '').trim();
+      let city = (rawCity || '').trim();
+      let state = (rawState || '').trim() || 'Haryana';
+      const match = name.match(/^(.*?)\s*\(([^)]+)\)$/);
+      if (match) {
+        name = match[1].trim();
+        if (!city || city === 'Gurugram' || city === 'Faridabad') city = match[2].trim();
+      }
+      if (!city) city = 'Gurugram';
+      return { name, city, state };
+    };
+
+    if (dealersList && dealersList.length > 0) {
+      return dealersList.map((d: any, idx: number) => {
+        const rawName = d["Shop Name"] || d.name || d.shop_name || `Customer ${idx + 1}`;
+        const { name, city, state } = cleanDealerNameAndCity(rawName, d.City || d.city, d.State || d.state);
+        const salesman = d["Salesman Name"] || d.salesman || 'Unassigned';
+        const phone = d.Phone || d.phone || '-';
+        const code = d["Customer Code"] || d.customer_code || `CUST-${1001 + idx}`;
+        return {
+          id: code,
+          name,
+          city,
+          state,
+          salesman,
+          phone,
+          revenue: 0,
+          orders: 0,
+          avg_order: 0,
+          units_sold: 0,
+          products_count: 0,
+          active_days: 0,
+          tier: 'Standard',
+        };
+      });
+    }
+
+    return [];
+  }, [customersAnalyticsList, dealersList]);
 
   // Filtered Customers dropdown options based on search query
   const filteredCustomerOptions = useMemo(() => {
@@ -184,16 +162,47 @@ export default function CustomerPerformanceView() {
     const totalUnits = customersData.reduce((acc, c) => acc + c.units_sold, 0);
     const avgOrder = calculateAOV(totalSales, totalOrders);
     const activeDays = customersData.length > 0 ? Math.max(...customersData.map(c => c.active_days), 0) : 0;
+    const maxDiversity = customersData.length > 0 ? Math.max(...customersData.map(c => c.products_count), 0) : 0;
 
     return {
       totalSales,
       orders: totalOrders,
       avgOrder,
       unitsSold: totalUnits,
-      products: 142,
+      products: maxDiversity > 0 ? maxDiversity : (sales.top_products?.length || 0),
       activeDays,
     };
-  }, [selectedCustomer, customersData]);
+  }, [selectedCustomer, customersData, sales.top_products]);
+
+  // Top Customer Revenue Ranking (Horizontal Bar - Rule 18 & 26)
+  const topCustomersRankingData = useMemo(() => {
+    return [...customersData]
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 10)
+      .map(c => ({
+        name: c.name.length > 20 ? c.name.slice(0, 20) + '…' : c.name,
+        value: c.revenue,
+      }));
+  }, [customersData]);
+
+  // Customer Purchase Frequency Distribution (Bar - Rule 18 & 26)
+  const frequencyDistributionData = useMemo(() => {
+    const buckets: Record<string, number> = {
+      '1 Voucher': 0,
+      '2-5 Vouchers': 0,
+      '6-10 Vouchers': 0,
+      '11-20 Vouchers': 0,
+      '20+ Vouchers': 0,
+    };
+    customersData.forEach(c => {
+      if (c.orders <= 1) buckets['1 Voucher'] += 1;
+      else if (c.orders <= 5) buckets['2-5 Vouchers'] += 1;
+      else if (c.orders <= 10) buckets['6-10 Vouchers'] += 1;
+      else if (c.orders <= 20) buckets['11-20 Vouchers'] += 1;
+      else buckets['20+ Vouchers'] += 1;
+    });
+    return Object.entries(buckets).map(([name, value]) => ({ name, value }));
+  }, [customersData]);
 
   // Order Activity Heatmap: Derived from actual orders (Phase 13)
   const heatmapDays: HeatmapDay[] = useMemo(() => {
@@ -561,7 +570,9 @@ export default function CustomerPerformanceView() {
                   </div>
                   <div className="text-right shrink-0">
                     <div className="font-bold text-slate-100">{item.qty} units</div>
-                    <div className="text-[10px] text-indigo-600 dark:text-indigo-400 font-semibold">₹{item.revenue.toLocaleString('en-IN')}</div>
+                    {item.revenue > 0 && (
+                      <div className="text-[10px] text-indigo-600 dark:text-indigo-400 font-semibold">₹{item.revenue.toLocaleString('en-IN')}</div>
+                    )}
                   </div>
                 </div>
               ))}
@@ -570,17 +581,53 @@ export default function CustomerPerformanceView() {
         </div>
       </div>
 
-      {/* ── Order History Ledger ────────────────────────────────────────── */}
+      {/* ── Customer Analytical Charts (Rule 18 & 26) ───────────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <InteractiveChart
+          title="Top Customer Revenue Ranking"
+          subtitle="Top 10 highest-value dealer accounts ranked by cumulative gross revenue"
+          data={topCustomersRankingData}
+          defaultChartType="horizontal_bar"
+          unit="₹"
+        />
+
+        <InteractiveChart
+          title="Customer Purchase Frequency Distribution"
+          subtitle="Count of dealer accounts categorized by number of distinct purchase vouchers"
+          data={frequencyDistributionData}
+          defaultChartType="bar"
+          unit="Accounts"
+        />
+      </div>
+
+      {/* ── Customer Accounts Directory Ledger (Rule 18) ────────────────── */}
       <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-5 shadow-lg backdrop-blur-sm">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
           <div>
             <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
-              <Clock size={16} className="text-sky-400" />
-              <span>Order History — {selectedCustomer ? selectedCustomer.name : 'Recent Customer Dispatches'}</span>
+              <Users size={16} className="text-indigo-400" />
+              <span>Customer Accounts Directory ({filteredCustomerOptions.length} Accounts)</span>
             </h3>
             <p className="text-xs text-slate-400 mt-0.5">
-              Recent dispatches and order completion status ledger ({dateRange.toUpperCase()})
+              Authoritative historical sales ledger data at customer grain (1 row per account)
             </p>
+          </div>
+          <div className="flex items-center gap-2 text-xs text-slate-400">
+            <span>Page {page} of {Math.max(1, Math.ceil(filteredCustomerOptions.length / pageSize))}</span>
+            <button
+              disabled={page <= 1}
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              className="px-2.5 py-1 bg-slate-800 rounded-lg border border-slate-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-700 text-slate-200"
+            >
+              Prev
+            </button>
+            <button
+              disabled={page >= Math.ceil(filteredCustomerOptions.length / pageSize)}
+              onClick={() => setPage(p => p + 1)}
+              className="px-2.5 py-1 bg-slate-800 rounded-lg border border-slate-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-700 text-slate-200"
+            >
+              Next
+            </button>
           </div>
         </div>
 
@@ -588,27 +635,50 @@ export default function CustomerPerformanceView() {
           <table className="w-full text-left text-xs text-slate-300">
             <thead className="bg-slate-800/60 text-slate-400 font-bold uppercase text-[10px] border-b border-slate-800">
               <tr>
-                <th className="py-3 px-4">Order ID</th>
-                <th className="py-3 px-4">Date</th>
-                <th className="py-3 px-4">Customer Account</th>
-                <th className="py-3 px-4 text-center">Items</th>
-                <th className="py-3 px-4 text-right">Amount</th>
-                <th className="py-3 px-4 text-center">Status</th>
+                <th className="py-3 px-4">Customer Name</th>
+                <th className="py-3 px-4">Location</th>
+                <th className="py-3 px-4">Sales Rep</th>
+                <th className="py-3 px-4 text-center">Tier</th>
+                <th className="py-3 px-4 text-center">Vouchers</th>
+                <th className="py-3 px-4 text-right">AOV</th>
+                <th className="py-3 px-4 text-center">Diversity</th>
+                <th className="py-3 px-4 text-right">Total Revenue</th>
+                <th className="py-3 px-4 text-center">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/50 font-medium">
-              {orderHistory.map((row) => (
-                <tr key={row.id} className="hover:bg-slate-800/30 transition-colors">
-                  <td className="py-3 px-4 font-bold text-slate-100">{row.id}</td>
-                  <td className="py-3 px-4 text-slate-400">{row.date}</td>
-                  <td className="py-3 px-4 font-semibold text-slate-200">{row.customer}</td>
-                  <td className="py-3 px-4 text-center text-slate-300">{row.items} SKUs</td>
-                  <td className="py-3 px-4 text-right font-bold text-indigo-600 dark:text-indigo-400">₹{row.amount.toLocaleString('en-IN')}</td>
+              {filteredCustomerOptions.slice((page - 1) * pageSize, page * pageSize).map((c) => (
+                <tr key={c.id} className="hover:bg-slate-800/30 transition-colors">
+                  <td className="py-3 px-4">
+                    <div className="font-bold text-slate-100">{c.name}</div>
+                    <div className="text-[10px] text-slate-400 font-mono">{c.id}</div>
+                  </td>
+                  <td className="py-3 px-4 text-slate-300">
+                    <div>{c.city}</div>
+                    <div className="text-[10px] text-slate-500">{c.state}</div>
+                  </td>
+                  <td className="py-3 px-4 font-medium text-slate-300">{c.salesman}</td>
                   <td className="py-3 px-4 text-center">
-                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800/40">
-                      <CheckCircle2 size={11} />
-                      {row.status}
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                      c.tier === 'Platinum' ? 'bg-indigo-900/60 text-indigo-300 border border-indigo-700/60' :
+                      c.tier === 'Gold' ? 'bg-amber-900/60 text-amber-300 border border-amber-700/60' :
+                      c.tier === 'Silver' ? 'bg-slate-800 text-slate-300 border border-slate-700' :
+                      'bg-slate-800/60 text-slate-400'
+                    }`}>
+                      {c.tier}
                     </span>
+                  </td>
+                  <td className="py-3 px-4 text-center font-semibold text-slate-200">{c.orders}</td>
+                  <td className="py-3 px-4 text-right font-medium text-purple-400">₹{c.avg_order.toLocaleString('en-IN')}</td>
+                  <td className="py-3 px-4 text-center text-slate-300">{c.products_count} SKUs</td>
+                  <td className="py-3 px-4 text-right font-bold text-indigo-400">₹{c.revenue.toLocaleString('en-IN')}</td>
+                  <td className="py-3 px-4 text-center">
+                    <button
+                      onClick={() => setSelectedCustomerId(c.id)}
+                      className="px-2.5 py-1 rounded bg-indigo-950/60 hover:bg-indigo-900 text-indigo-400 border border-indigo-800/50 text-[10px] font-semibold transition-all"
+                    >
+                      Inspect
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -616,6 +686,55 @@ export default function CustomerPerformanceView() {
           </table>
         </div>
       </div>
+
+      {/* ── Order History Ledger (Operational Orders) ──────────────────── */}
+      {orderHistory.length > 0 && (
+        <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-5 shadow-lg backdrop-blur-sm">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+                <Clock size={16} className="text-sky-400" />
+                <span>Operational Dispatches — {selectedCustomer ? selectedCustomer.name : 'Recent Platform Orders'}</span>
+              </h3>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Real-time operational orders and fulfillment state ({dateRange.toUpperCase()})
+              </p>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs text-slate-300">
+              <thead className="bg-slate-800/60 text-slate-400 font-bold uppercase text-[10px] border-b border-slate-800">
+                <tr>
+                  <th className="py-3 px-4">Order ID</th>
+                  <th className="py-3 px-4">Date</th>
+                  <th className="py-3 px-4">Customer Account</th>
+                  <th className="py-3 px-4 text-center">Items</th>
+                  <th className="py-3 px-4 text-right">Amount</th>
+                  <th className="py-3 px-4 text-center">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/50 font-medium">
+                {orderHistory.map((row) => (
+                  <tr key={row.id} className="hover:bg-slate-800/30 transition-colors">
+                    <td className="py-3 px-4 font-bold text-slate-100">{row.id}</td>
+                    <td className="py-3 px-4 text-slate-400">{row.date}</td>
+                    <td className="py-3 px-4 font-semibold text-slate-200">{row.customer}</td>
+                    <td className="py-3 px-4 text-center text-slate-300">{row.items} SKUs</td>
+                    <td className="py-3 px-4 text-right font-bold text-indigo-600 dark:text-indigo-400">₹{row.amount.toLocaleString('en-IN')}</td>
+                    <td className="py-3 px-4 text-center">
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800/40">
+                        <CheckCircle2 size={11} />
+                        {row.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

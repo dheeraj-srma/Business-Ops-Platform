@@ -181,19 +181,53 @@ export default function SalesmanPerformanceView() {
   const fetchHeatmap = async (salesmanId: string, range: string) => {
     setLoadingHeatmap(true);
     try {
-      const rangeType = (range === 'this_year' ? 'ytd' : range) as DateRangeType;
-      const resDates = resolveDateRange(rangeType, customStart, customEnd);
-      const url = `/api/sales/salesmen/${salesmanId}/heatmap?days=${resDates.daysCount || 30}`;
+      let daysCount = 30;
+      switch (range) {
+        case '7d':
+        case 'this_week':
+          daysCount = 7;
+          break;
+        case '30d':
+        case 'this_month':
+        case 'last_month':
+          daysCount = 30;
+          break;
+        case '3m':
+        case '90d':
+        case 'this_quarter':
+          daysCount = 90;
+          break;
+        case '6m':
+        case '180d':
+          daysCount = 180;
+          break;
+        case '12m':
+        case '1y':
+        case '365d':
+        case 'this_year':
+        case 'ytd':
+        case 'all':
+          daysCount = 365;
+          break;
+        default: {
+          try {
+            const rangeType = (range === 'this_year' ? 'ytd' : range) as DateRangeType;
+            const resDates = resolveDateRange(rangeType, customStart, customEnd);
+            daysCount = Math.max(7, Math.min(730, resDates.daysCount || 30));
+          } catch {
+            daysCount = 30;
+          }
+        }
+      }
+
+      const url = `/api/sales/salesmen/${salesmanId}/heatmap?days=${daysCount}`;
       const res = await fetch(url, { headers: getAuthHeaders() });
       if (res.ok) {
         const data = await res.json();
         setHeatmapDays(data.days || []);
-      } else {
-        setHeatmapDays([]);
       }
     } catch (err) {
       console.error(err);
-      setHeatmapDays([]);
     } finally {
       setLoadingHeatmap(false);
     }
