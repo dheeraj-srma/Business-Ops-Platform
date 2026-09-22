@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo, useRef } from 'react';
 import { Calendar, Activity, Zap, TrendingUp, Clock, Award } from 'lucide-react';
+import { parseCalendarDate, addCalendarDays } from '../utils/dateRange';
 
 export interface HeatmapDay {
   date: string;
@@ -117,20 +118,16 @@ export default function GithubHeatmap({
     const minDateStr = sortedDates[0];
     const maxDateStr = sortedDates[sortedDates.length - 1];
 
-    const startDate = new Date(minDateStr);
-    const endDate = new Date(maxDateStr);
-
-    // If date range span is short (e.g. 7d), pad effective start date to at least 28 days back for visual grid completeness
-    const effectiveStartDate = new Date(startDate);
-    const daySpan = Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 3600 * 24)) + 1;
+    let effectiveStartStr = minDateStr;
+    const daySpan = days.length;
     if (daySpan < 28) {
-      effectiveStartDate.setDate(endDate.getDate() - 27);
+      // Pad to at least 28 days back from maxDateStr for visual grid completeness
+      effectiveStartStr = addCalendarDays(maxDateStr, -27);
     }
 
-    const startDayOfWeek = effectiveStartDate.getDay();
+    const startDayOfWeek = parseCalendarDate(effectiveStartStr).getDay();
     const daysToMon = startDayOfWeek === 0 ? 6 : startDayOfWeek - 1;
-    const calendarStart = new Date(effectiveStartDate);
-    calendarStart.setDate(calendarStart.getDate() - daysToMon);
+    const calendarStartStr = addCalendarDays(effectiveStartStr, -daysToMon);
 
     const weekCols: { dateStr: string; day: HeatmapDay | null }[][] = [];
     const monthLbls: { monthName: string; weekIndex: number }[] = [];
@@ -138,19 +135,20 @@ export default function GithubHeatmap({
     let weekIdx = 0;
     let lastMonth = -1;
 
-    const curr = new Date(calendarStart);
-    while (curr <= endDate || currentWeek.length > 0) {
-      const dateStr = curr.toISOString().split('T')[0];
-      const month = curr.getMonth();
+    let currStr = calendarStartStr;
+    const mNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    while (currStr <= maxDateStr || currentWeek.length > 0) {
+      const currDateObj = parseCalendarDate(currStr);
+      const month = currDateObj.getMonth();
 
       if (month !== lastMonth && currentWeek.length === 0) {
-        const monthName = curr.toLocaleString('en-US', { month: 'short' });
+        const monthName = mNames[month];
         monthLbls.push({ monthName, weekIndex: weekIdx });
         lastMonth = month;
       }
 
-      const dayData = dayMap.has(dateStr) ? dayMap.get(dateStr)! : { date: dateStr, orders: 0, sales: 0, customers: 0 };
-      currentWeek.push({ dateStr, day: dayData });
+      const dayData = dayMap.has(currStr) ? dayMap.get(currStr)! : { date: currStr, orders: 0, sales: 0, customers: 0 };
+      currentWeek.push({ dateStr: currStr, day: dayData });
 
       if (currentWeek.length === 7) {
         weekCols.push(currentWeek);
@@ -158,15 +156,14 @@ export default function GithubHeatmap({
         weekIdx++;
       }
 
-      curr.setDate(curr.getDate() + 1);
-      if (curr > endDate && currentWeek.length === 0) break;
+      currStr = addCalendarDays(currStr, 1);
+      if (currStr > maxDateStr && currentWeek.length === 0) break;
     }
 
     if (currentWeek.length > 0) {
       while (currentWeek.length < 7) {
-        const dateStr = curr.toISOString().split('T')[0];
-        currentWeek.push({ dateStr, day: null });
-        curr.setDate(curr.getDate() + 1);
+        currentWeek.push({ dateStr: currStr, day: null });
+        currStr = addCalendarDays(currStr, 1);
       }
       weekCols.push(currentWeek);
     }
@@ -236,54 +233,66 @@ export default function GithubHeatmap({
 
   const cardTitle = customerName ? `${title} — ${customerName}` : title;
 
+  const isRangeActive = (id: string) => {
+    if (selectedRange === id) return true;
+    if (id === '7d' && selectedRange === 'this_week') return true;
+    if (id === '30d' && (selectedRange === 'this_month' || selectedRange === 'last_month')) return true;
+    if (id === '3m' && (selectedRange === '90d' || selectedRange === 'this_quarter')) return true;
+    if (id === '6m' && selectedRange === '180d') return true;
+    if (id === '12m' && (selectedRange === '1y' || selectedRange === '365d' || selectedRange === 'this_year' || selectedRange === 'ytd' || selectedRange === 'all')) return true;
+    return false;
+  };
+
   return (
     <div ref={containerRef} className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-xl relative backdrop-blur-md z-10">
+      {/* Persistent Section Header Title & Range Controls (Never disappears) */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 pb-3 border-b border-slate-800/80">
+        <div>
+          <h3 className="text-base sm:text-lg font-extrabold text-white tracking-tight flex items-center gap-2">
+            <Calendar size={18} className="text-indigo-600 dark:text-indigo-400" />
+            <span>{cardTitle}</span>
+          </h3>
+          <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p>
+        </div>
+
+        {onRangeChange && (
+          <div className="flex items-center gap-1 bg-slate-950/80 p-1 rounded-xl border border-slate-800 text-[11px] self-start sm:self-auto">
+            {[
+              { id: '7d', label: '7D' },
+              { id: '30d', label: '30D' },
+              { id: '3m', label: '3M' },
+              { id: '6m', label: '6M' },
+              { id: '12m', label: '1Y' },
+            ].map((r) => (
+              <button
+                key={r.id}
+                type="button"
+                onClick={() => onRangeChange(r.id)}
+                className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${
+                  isRangeActive(r.id)
+                    ? 'bg-indigo-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                }`}
+              >
+                {r.label}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
       {isLoading ? (
-        <div className="h-48 flex items-center justify-center text-slate-400 text-sm animate-pulse">
+        <div className="h-56 flex items-center justify-center text-slate-400 text-sm animate-pulse">
           Loading activity heatmap...
         </div>
       ) : weeks.length === 0 ? (
-        <div className="h-48 flex items-center justify-center text-slate-400 text-sm">
+        <div className="h-56 flex items-center justify-center text-slate-400 text-sm">
           No order activity recorded for selected range.
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          {/* Left Column: Title + Heatmap Grid (Spans 7 columns on lg+ screens) */}
+          {/* Left Column: Heatmap Grid (Spans 7 columns on lg+ screens) */}
           <div className="lg:col-span-7 flex flex-col justify-between overflow-x-auto pb-1 scrollbar-thin scrollbar-thumb-slate-800">
-            {/* Section Header Title & Range Controls */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
-              <div>
-                <h3 className="text-base sm:text-lg font-extrabold text-white tracking-tight flex items-center gap-2">
-                  <Calendar size={18} className="text-indigo-600 dark:text-indigo-400" />
-                  <span>{cardTitle}</span>
-                </h3>
-                <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p>
-              </div>
-
-              {onRangeChange && (
-                <div className="flex items-center gap-1 bg-slate-950/80 p-1 rounded-xl border border-slate-800 text-[11px] self-start sm:self-auto">
-                  {[
-                    { id: '7d', label: '7D' },
-                    { id: '30d', label: '30D' },
-                    { id: '3m', label: '3M' },
-                    { id: '6m', label: '6M' },
-                    { id: '12m', label: '1Y' },
-                  ].map((r) => (
-                    <button
-                      key={r.id}
-                      onClick={() => onRangeChange(r.id)}
-                      className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${
-                        selectedRange === r.id || (selectedRange === 'this_month' && r.id === '30d')
-                          ? 'bg-indigo-600 text-white shadow-sm'
-                          : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-                      }`}
-                    >
-                      {r.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
 
             <div className="min-w-[480px]">
               {/* Month Labels Row */}

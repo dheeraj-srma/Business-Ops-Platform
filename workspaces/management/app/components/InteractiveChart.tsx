@@ -40,7 +40,7 @@ interface SeriesOption {
   yAxisId?: 'left' | 'right';
 }
 
-export type ChartTypeOption = 'area' | 'bar' | 'pie' | 'donut' | 'line' | 'table' | 'kpi';
+export type ChartTypeOption = 'area' | 'bar' | 'horizontal_bar' | 'pie' | 'donut' | 'line' | 'table' | 'kpi';
 
 interface InteractiveChartProps {
   title: string;
@@ -55,6 +55,9 @@ interface InteractiveChartProps {
   enablePagination?: boolean;
   hideXAxisLabels?: boolean;
   showLegend?: boolean;
+  unavailable?: boolean;
+  unavailableReason?: string;
+  statusBadge?: 'LIVE' | 'SNAPSHOT' | 'MODELLED' | 'UNAVAILABLE' | 'HEURISTIC';
 }
 
 const COLORS = [
@@ -182,6 +185,9 @@ export default function InteractiveChart({
   enablePagination,
   hideXAxisLabels,
   showLegend = true,
+  unavailable = false,
+  unavailableReason,
+  statusBadge,
 }: InteractiveChartProps) {
   const [chartType, setChartType] = useState<ChartTypeOption>(defaultChartType);
   const [timeRange, setTimeRange] = useState<DateRangeType>(defaultTimeRange || '30d');
@@ -592,11 +598,22 @@ export default function InteractiveChart({
       {/* ── Header Toolbar ─────────────────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800/80 pb-3">
         <div className="min-w-0">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <BarChart3 className="text-indigo-600 dark:text-indigo-400 shrink-0" size={17} />
             <h3 className="font-bold text-sm text-slate-100 truncate" title={title}>
               {title}
             </h3>
+            {statusBadge && (
+              <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold tracking-wider uppercase font-mono ${
+                statusBadge === 'LIVE' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
+                statusBadge === 'MODELLED' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
+                statusBadge === 'UNAVAILABLE' ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' :
+                statusBadge === 'HEURISTIC' ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' :
+                'bg-slate-800 text-slate-400 border border-slate-700'
+              }`}>
+                {statusBadge}
+              </span>
+            )}
           </div>
           {subtitle && (
             <p className="text-xs text-slate-400 truncate mt-0.5" title={subtitle}>
@@ -614,6 +631,7 @@ export default function InteractiveChart({
           >
             <option value="area">Area Chart</option>
             <option value="bar">Bar Chart</option>
+            <option value="horizontal_bar">Horizontal Bar</option>
             <option value="line">Line Chart</option>
             <option value="pie">Pie Chart</option>
             <option value="donut">Donut Chart</option>
@@ -721,9 +739,93 @@ export default function InteractiveChart({
 
       {/* ── View Canvas Area ─────────────────────────────────────────────────── */}
       <div style={{ flex: 1, width: '100%', position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-        {filteredData.length === 0 ? (
+        {unavailable ? (
+          <div className="flex flex-col items-center justify-center h-full text-center p-6 bg-slate-950/40 rounded-xl border border-slate-800/60 my-auto min-h-[220px]">
+            <div className="w-10 h-10 rounded-full bg-slate-800/80 border border-slate-700 flex items-center justify-center mb-2.5 text-slate-400">
+              <Activity size={18} />
+            </div>
+            <span className="text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">Telemetry Unavailable</span>
+            <p className="text-[11px] text-slate-400 max-w-sm leading-relaxed">
+              {unavailableReason || "Authoritative database telemetry not currently available for this dimension."}
+            </p>
+          </div>
+        ) : filteredData.length === 0 ? (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)', fontSize: '0.82rem' }}>
             No data records available for this selected time range
+          </div>
+        ) : chartType === 'horizontal_bar' ? (
+          /* ── Horizontal Bar Chart for Rankings ── */
+          <div className="flex flex-col h-full w-full min-h-0">
+            <div className={`w-full flex-1 ${isEffectiveHero ? 'min-h-[340px] h-[340px] sm:h-[380px]' : 'min-h-[250px] h-[250px] sm:h-[280px]'} relative`}>
+              {isMounted ? (
+                <ResponsiveContainer width="100%" height="100%" minHeight={isEffectiveHero ? 340 : 250}>
+                  <BarChart
+                    layout="vertical"
+                    data={normalizedVisibleData}
+                    margin={{ top: 10, right: 30, left: 10, bottom: 10 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.4} horizontal={false} />
+                    <XAxis
+                      type="number"
+                      stroke="#94a3b8"
+                      fontSize={10}
+                      tickFormatter={formatYAxis}
+                      tickLine={false}
+                      axisLine={{ stroke: '#334155' }}
+                    />
+                    <YAxis
+                      type="category"
+                      dataKey="name"
+                      stroke="#94a3b8"
+                      fontSize={10}
+                      tickLine={false}
+                      width={120}
+                      tick={{ fill: '#cbd5e1', fontSize: 10 }}
+                      axisLine={{ stroke: '#334155' }}
+                    />
+                    <Tooltip content={renderCustomTooltip} />
+                    {multiSeries ? (
+                      multiSeries.map((s, idx) => (
+                        <Bar key={idx} dataKey={s.key} name={s.label} fill={s.color} radius={[0, 4, 4, 0]} />
+                      ))
+                    ) : (
+                      <Bar dataKey="value" radius={[0, 4, 4, 0]}>
+                        {normalizedVisibleData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color || COLORS[(startIndex + index) % COLORS.length]} />
+                        ))}
+                      </Bar>
+                    )}
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="w-full h-full min-h-[250px] bg-slate-800/30 animate-pulse rounded-xl" />
+              )}
+            </div>
+            {/* Bottom Legend */}
+            {showLegend && (
+              <div className="shrink-0 flex flex-wrap gap-x-3 gap-y-1 justify-center items-center pt-2 pb-0.5 border-t border-slate-800/60 mt-auto select-none">
+                {multiSeries ? (
+                  multiSeries.map((s, idx) => (
+                    <div key={idx} className="flex items-center gap-1.5 text-xs text-slate-400">
+                      <span className="w-2 h-2 rounded-full shrink-0" style={{ background: s.color }} />
+                      <span className="font-semibold text-slate-200">{s.label}</span>
+                    </div>
+                  ))
+                ) : (
+                  visiblePieData.map((item, idx) => {
+                    const val = Number(item.value) || 0;
+                    const pct = totalValue > 0 ? ((val / totalValue) * 100).toFixed(0) : '0';
+                    return (
+                      <div key={idx} className="flex items-center gap-1.5 text-xs text-slate-400">
+                        <span className="w-2 h-2 rounded-full shrink-0" style={{ background: item.color || COLORS[(startIndex + idx) % COLORS.length] }} />
+                        <span className="font-semibold text-slate-200 truncate max-w-[130px]" title={item.name}>{item.name}</span>
+                        {totalValue > 0 && <span className="text-sky-400 font-bold text-[10px]">({pct}%)</span>}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            )}
           </div>
         ) : chartType === 'table' ? (
           /* ── 1. Table View Mode (Paginated) ──────────────────────────── */

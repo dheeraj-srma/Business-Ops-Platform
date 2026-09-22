@@ -15,6 +15,8 @@ export type DateRangeType =
   | 'last_month'
   | '30d'
   | '90d'
+  | '3m'
+  | '6m'
   | 'this_quarter'
   | 'ytd'
   | '12m'
@@ -148,10 +150,17 @@ export function getDateRangeBounds(
       return { start: start30d, end: ref, isValid: true };
     }
 
-    case '90d': {
+    case '90d':
+    case '3m': {
       // Exactly 90 calendar dates inclusive: [ref - 89 days, ref]
       const start90d = addCalendarDays(ref, -89);
       return { start: start90d, end: ref, isValid: true };
+    }
+
+    case '6m': {
+      // Exactly 180 calendar dates inclusive: [ref - 179 days, ref]
+      const start6m = addCalendarDays(ref, -179);
+      return { start: start6m, end: ref, isValid: true };
     }
 
     case 'this_quarter': {

@@ -38,6 +38,10 @@ export interface SalesIntelligence {
   salesman_performance?: Array<{ salesman: string; revenue: number }>;
   dealer_states?: Record<string, number>;
   top_products?: Array<{ sku: string; name: string; qty: number }>;
+  geographic_sales?: Record<string, number>;
+  by_region?: Array<{ region: string; revenue: number; percentage?: number; share_percent?: number }>;
+  by_state?: Array<{ state: string; revenue: number; percentage?: number; share_percent?: number }>;
+  by_city?: Array<{ city: string; revenue: number }>;
 }
 
 export interface InventoryIntelligence {
@@ -48,6 +52,7 @@ export interface InventoryIntelligence {
   out_of_stock?: number;
   overstock?: number;
   category_breakdown?: Array<{ category: string; count: number; total_qty?: number }>;
+  category_valuation?: Array<{ category: string; value: number }>;
   top_movers?: Array<{ name: string; sku: string; units_sold: number }>;
 }
 
@@ -106,8 +111,25 @@ export const EMPTY_BI_DATA: BIData = {
   ai_insights: [],
 };
 
+export interface DataQualityReport {
+  total_historical_vouchers: number;
+  total_line_items: number;
+  total_voucher_amount: number;
+  total_line_amount: number;
+  reconciliation_difference: number;
+  is_fully_reconciled: boolean;
+  customer_mapping: { mapped: number; unresolved: number; percentage: number };
+  salesman_mapping: { mapped: number; unresolved: number; percentage: number };
+  location_mapping: { resolved: number; unresolved: number; percentage: number };
+  product_mapping: { mapped: number; unresolved: number; percentage: number };
+  category_mapping: { mapped: number; unresolved: number; percentage: number };
+  unresolved_customers?: Array<{ name: string; gstin: string | null; address: string | null; vouchers: number; amount: number }>;
+  unresolved_products?: Array<{ name: string; lines: number; amount: number }>;
+}
+
 interface BiDataContextType {
   biData: BIData;
+  dataQuality: DataQualityReport | null;
   loading: boolean;
   dataStatus: DataQualityStatus;
   dataAsOf: string | null;
@@ -120,6 +142,7 @@ interface BiDataContextType {
   returnsList: any[];
   ordersList: any[];
   inwardsList: any[];
+  customersAnalyticsList: any[];
   kpis: CoreKPIs;
   sales: SalesIntelligence;
   inv: InventoryIntelligence;
@@ -138,6 +161,7 @@ export const BiDataProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [dataStatus, setDataStatus] = useState<DataQualityStatus>('LIVE');
   const [dataAsOf, setDataAsOf] = useState<string | null>(null);
   const [snapshotUpdatedAt, setSnapshotUpdatedAt] = useState<string | null>(null);
+  const [dataQuality, setDataQuality] = useState<DataQualityReport | null>(null);
   const [inventoryList, setInventoryList] = useState<any[]>([]);
   const [categoriesList, setCategoriesList] = useState<any[]>([]);
   const [dealersList, setDealersList] = useState<any[]>([]);
@@ -145,13 +169,15 @@ export const BiDataProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [returnsList, setReturnsList] = useState<any[]>([]);
   const [ordersList, setOrdersList] = useState<any[]>([]);
   const [inwardsList, setInwardsList] = useState<any[]>([]);
+  const [customersAnalyticsList, setCustomersAnalyticsList] = useState<any[]>([]);
 
   const fetchAllData = useCallback(async () => {
     try {
       setLoading(true);
 
-      const [biFetch, invRes, catRes, dlrRes, supRes, retRes, ordRes, inwRes] = await Promise.allSettled([
+      const [biFetch, dqFetch, invRes, catRes, dlrRes, supRes, retRes, ordRes, inwRes, custRes] = await Promise.allSettled([
         fetch('/api/analytics/bi'),
+        fetch('/api/analytics/data-quality'),
         fetch('/api/inventory').then(r => (r.ok ? r.json() : [])),
         fetch('/api/categories').then(r => (r.ok ? r.json() : [])),
         fetch('/api/dealers?limit=1000').then(r => (r.ok ? r.json() : [])),
@@ -159,6 +185,7 @@ export const BiDataProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         fetch('/api/returns').then(r => (r.ok ? r.json() : [])),
         fetch('/api/orders').then(r => (r.ok ? r.json() : [])),
         fetch('/api/inwards').then(r => (r.ok ? r.json() : [])),
+        fetch('/api/analytics/customers?limit=500').then(r => (r.ok ? r.json() : [])),
       ]);
 
       if (biFetch.status === 'fulfilled' && biFetch.value.ok) {
@@ -184,28 +211,50 @@ export const BiDataProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         setDataAsOf(null);
       }
 
-      if (invRes.status === 'fulfilled' && Array.isArray(invRes.value)) {
-        setInventoryList(invRes.value);
+      if (dqFetch.status === 'fulfilled' && dqFetch.value.ok) {
+        const dqData: DataQualityReport = await dqFetch.value.json();
+        setDataQuality(dqData);
       }
-      if (catRes.status === 'fulfilled' && Array.isArray(catRes.value)) {
-        setCategoriesList(catRes.value);
+
+      if (invRes.status === 'fulfilled' && invRes.value) {
+        const val = invRes.value;
+        const list = Array.isArray(val) ? val : (val.items || val.products || []);
+        setInventoryList(list);
+      }
+      if (catRes.status === 'fulfilled' && catRes.value) {
+        const val = catRes.value;
+        const list = Array.isArray(val) ? val : (val.categories || val.items || []);
+        setCategoriesList(list);
       }
       if (dlrRes.status === 'fulfilled' && dlrRes.value) {
         const dData = dlrRes.value;
-        const list = Array.isArray(dData) ? dData : dData.dealers || dData.customers || [];
+        const list = Array.isArray(dData) ? dData : (dData.dealers || dData.customers || dData.items || []);
         setDealersList(list);
       }
-      if (supRes.status === 'fulfilled' && Array.isArray(supRes.value)) {
-        setSuppliersList(supRes.value);
+      if (supRes.status === 'fulfilled' && supRes.value) {
+        const val = supRes.value;
+        const list = Array.isArray(val) ? val : (val.suppliers || val.items || []);
+        setSuppliersList(list);
       }
-      if (retRes.status === 'fulfilled' && Array.isArray(retRes.value)) {
-        setReturnsList(retRes.value);
+      if (retRes.status === 'fulfilled' && retRes.value) {
+        const val = retRes.value;
+        const list = Array.isArray(val) ? val : (val.returns || val.items || []);
+        setReturnsList(list);
       }
-      if (ordRes.status === 'fulfilled' && Array.isArray(ordRes.value)) {
-        setOrdersList(ordRes.value);
+      if (ordRes.status === 'fulfilled' && ordRes.value) {
+        const val = ordRes.value;
+        const list = Array.isArray(val) ? val : (val.orders || val.items || []);
+        setOrdersList(list);
       }
-      if (inwRes.status === 'fulfilled' && Array.isArray(inwRes.value)) {
-        setInwardsList(inwRes.value);
+      if (inwRes.status === 'fulfilled' && inwRes.value) {
+        const val = inwRes.value;
+        const list = Array.isArray(val) ? val : (val.inwards || val.items || []);
+        setInwardsList(list);
+      }
+      if (custRes.status === 'fulfilled' && custRes.value) {
+        const val = custRes.value;
+        const list = Array.isArray(val) ? val : (val.customers || val.items || []);
+        setCustomersAnalyticsList(list);
       }
     } catch {
       setBiData(EMPTY_BI_DATA);
@@ -257,6 +306,7 @@ export const BiDataProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     <BiDataContext.Provider
       value={{
         biData,
+        dataQuality,
         loading,
         dataStatus,
         dataAsOf,
@@ -269,6 +319,7 @@ export const BiDataProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         returnsList,
         ordersList,
         inwardsList,
+        customersAnalyticsList,
         kpis,
         sales,
         inv,
