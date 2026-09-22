@@ -85,10 +85,23 @@ class AnalyticsService:
                 movements_today += 1
 
             if tx_date_str.startswith(current_month_prefix):
-                if tx_type in ("INWARD", "STOCK_IN", "INITIAL_STOCK", "CUSTOMER_RETURN", "RETURN_IN", "ADJUSTMENT_INCREASE") or ("ADJUSTMENT" in tx_type and qty > 0):
-                    stock_added_this_month += abs(qty)
-                elif tx_type in ("SALE", "SALES", "STOCK_OUT", "DISPATCH", "ADJUSTMENT_DECREASE") or ("ADJUSTMENT" in tx_type and qty < 0):
-                    stock_issued_this_month += abs(qty)
+                # Strict exclusion of non-physical reservation events
+                if tx_type in ("RESERVATION", "RESERVATION_RELEASE"):
+                    continue
+
+                t_notes_check = str(tx.get("notes") or "").lower()
+                is_opening_check = "opening quantity" in t_notes_check or "initial stock" in t_notes_check
+
+                if not is_opening_check:
+                    if tx_type in ("INWARD", "STOCK_IN", "CUSTOMER_RETURN", "RETURN_IN", "ADJUSTMENT_INCREASE"):
+                        stock_added_this_month += abs(qty)
+                    elif tx_type in ("SALE", "SALES", "STOCK_OUT", "DISPATCH", "RETURN_OUT", "ADJUSTMENT_DECREASE"):
+                        stock_issued_this_month += abs(qty)
+                    elif "ADJUSTMENT" in tx_type:
+                        if "delta: -" in t_notes_check or "- " in t_notes_check:
+                            stock_issued_this_month += abs(qty)
+                        else:
+                            stock_added_this_month += abs(qty)
 
             if len(recent_movements) < 10:
                 prod = tx.get("products") or {}
@@ -120,14 +133,28 @@ class AnalyticsService:
                     "created_at": tx.get("created_at") or tx.get("transaction_date") or datetime.utcnow().isoformat(),
                 })
 
-        # Generate trend for the last N days
-        trend_days = max(1, min(90, days or 7))
+        # Generate trend for requested date range or last N days
+        date_list = []
+        if start_date and end_date:
+            try:
+                cur_dt = datetime.strptime(start_date[:10], "%Y-%m-%d")
+                end_dt = datetime.strptime(end_date[:10], "%Y-%m-%d")
+                while cur_dt <= end_dt and len(date_list) < 365:
+                    date_list.append(cur_dt)
+                    cur_dt += timedelta(days=1)
+            except Exception:
+                date_list = []
+
+        if not date_list:
+            trend_days = max(1, min(90, days or 7))
+            for i in range(trend_days - 1, -1, -1):
+                date_list.append(datetime.utcnow() - timedelta(days=i))
+
         trend = []
-        for i in range(trend_days - 1, -1, -1):
-            d = datetime.utcnow() - timedelta(days=i)
+        for d in date_list:
             day_iso = d.strftime("%Y-%m-%d")
             label = d.strftime("%b %d")
-            
+
             s_in = 0.0
             s_out = 0.0
             adj = 0.0
@@ -135,31 +162,32 @@ class AnalyticsService:
                 t_date = str(tx.get("transaction_date") or tx.get("created_at") or "")[:10]
                 if t_date == day_iso:
                     t_type = str(tx.get("transaction_type") or tx.get("transactionType") or "").upper()
-                    t_qty = float(tx.get("quantity") or 0.0)
+                    t_qty = abs(float(tx.get("quantity") or 0.0))
                     t_notes = str(tx.get("notes") or "").lower()
-                    is_opening = "opening quantity" in t_notes
 
+                    # Strictly exclude non-physical reservation movements
+                    if t_type in ("RESERVATION", "RESERVATION_RELEASE"):
+                        continue
+
+                    is_opening = "opening quantity" in t_notes or "initial stock" in t_notes
                     if is_opening:
-                        adj += abs(t_qty)
+                        adj += t_qty
                         continue
 
                     if t_type in ("INWARD", "STOCK_IN", "CUSTOMER_RETURN", "RETURN_IN", "ADJUSTMENT_INCREASE"):
-                        s_in += abs(t_qty)
-                    elif t_type in ("SALE", "SALES", "STOCK_OUT", "DISPATCH", "ADJUSTMENT_DECREASE"):
-                        s_out += abs(t_qty)
+                        s_in += t_qty
+                    elif t_type in ("SALE", "SALES", "STOCK_OUT", "DISPATCH", "RETURN_OUT", "ADJUSTMENT_DECREASE"):
+                        s_out += t_qty
                     elif "ADJUSTMENT" in t_type:
-                        if t_qty >= 0:
-                            s_in += abs(t_qty)
+                        if "delta: -" in t_notes or "- " in t_notes:
+                            s_out += t_qty
                         else:
-                            s_out += abs(t_qty)
-                        adj += abs(t_qty)
-                    else:
-                        if t_qty >= 0:
-                            s_in += abs(t_qty)
-                        else:
-                            s_out += abs(t_qty)
+                            s_in += t_qty
+                        adj += t_qty
+
             trend.append({
                 "date": label,
+                "dateIso": day_iso,
                 "stockIn": round(s_in, 2),
                 "stockOut": round(s_out, 2),
                 "adjustments": round(adj, 2)
@@ -235,6 +263,153 @@ class AnalyticsService:
             "core_kpis": core_kpis,
             "executive_summary": exec_summary,
             "inventory_intelligence": inventory_intelligence,
+        }
+
+    @staticmethod
+    def get_stock_movement_summary(
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        granularity: str = "daily"
+    ) -> Dict[str, Any]:
+        """
+        Authoritative calculation of stock in, stock out, net movement,
+        and timeline strictly derived from actual inventory_transactions.
+        """
+        all_txs = TransactionRepository.get_transactions(limit=10000)
+
+        # Date normalization
+        sd_str = start_date[:10] if start_date else None
+        ed_str = end_date[:10] if end_date else datetime.utcnow().strftime("%Y-%m-%d")
+        if not sd_str:
+            sd_dt = datetime.utcnow() - timedelta(days=30)
+            sd_str = sd_dt.strftime("%Y-%m-%d")
+
+        cur_dt = datetime.strptime(sd_str, "%Y-%m-%d")
+        end_dt = datetime.strptime(ed_str, "%Y-%m-%d")
+
+        total_stock_in = 0.0
+        total_stock_out = 0.0
+
+        daily_buckets: Dict[str, Dict[str, float]] = {}
+        temp_dt = cur_dt
+        while temp_dt <= end_dt and len(daily_buckets) < 365:
+            d_str = temp_dt.strftime("%Y-%m-%d")
+            daily_buckets[d_str] = {"stock_in": 0.0, "stock_out": 0.0, "adjustments": 0.0}
+            temp_dt += timedelta(days=1)
+
+        prior_net_movement = 0.0
+        has_prior_records = False
+
+        for tx in all_txs:
+            t_date = str(tx.get("transaction_date") or tx.get("created_at") or "")[:10]
+            t_type = str(tx.get("transaction_type") or tx.get("transactionType") or "").upper()
+            qty = abs(float(tx.get("quantity") or 0.0))
+            notes = str(tx.get("notes") or "").lower()
+
+            # Non-physical reservations are strictly excluded
+            if t_type in ("RESERVATION", "RESERVATION_RELEASE"):
+                continue
+
+            is_opening = "opening quantity" in notes or "initial stock" in notes
+
+            # Classify physical movement
+            is_inward = t_type in ("INWARD", "STOCK_IN", "CUSTOMER_RETURN", "RETURN_IN", "ADJUSTMENT_INCREASE")
+            is_outward = t_type in ("SALE", "SALES", "STOCK_OUT", "DISPATCH", "RETURN_OUT", "ADJUSTMENT_DECREASE")
+            if "ADJUSTMENT" in t_type and not (is_inward or is_outward):
+                if "delta: -" in notes or "- " in notes:
+                    is_outward = True
+                else:
+                    is_inward = True
+
+            # Track prior movements for opening balance reconstruction
+            if t_date < sd_str:
+                has_prior_records = True
+                if is_inward:
+                    prior_net_movement += qty
+                elif is_outward:
+                    prior_net_movement -= qty
+
+            # In-range movements
+            if sd_str <= t_date <= ed_str:
+                if is_opening:
+                    if t_date in daily_buckets:
+                        daily_buckets[t_date]["adjustments"] += qty
+                    continue
+
+                if is_inward:
+                    total_stock_in += qty
+                    if t_date in daily_buckets:
+                        daily_buckets[t_date]["stock_in"] += qty
+                elif is_outward:
+                    total_stock_out += qty
+                    if t_date in daily_buckets:
+                        daily_buckets[t_date]["stock_out"] += qty
+
+        # Format timeline based on granularity
+        timeline = []
+        if granularity == "weekly":
+            week_map: Dict[str, Dict[str, float]] = {}
+            for d_str, b in sorted(daily_buckets.items()):
+                dt = datetime.strptime(d_str, "%Y-%m-%d")
+                w_key = f"{dt.year}-W{dt.isocalendar()[1]:02d}"
+                if w_key not in week_map:
+                    week_map[w_key] = {"stock_in": 0.0, "stock_out": 0.0}
+                week_map[w_key]["stock_in"] += b["stock_in"]
+                week_map[w_key]["stock_out"] += b["stock_out"]
+            for w_key, b in sorted(week_map.items()):
+                timeline.append({
+                    "date": w_key,
+                    "stock_in": round(b["stock_in"], 2),
+                    "stock_out": round(b["stock_out"], 2),
+                    "net_movement": round(b["stock_in"] - b["stock_out"], 2)
+                })
+        elif granularity == "monthly":
+            month_map: Dict[str, Dict[str, float]] = {}
+            for d_str, b in sorted(daily_buckets.items()):
+                m_key = d_str[:7]
+                if m_key not in month_map:
+                    month_map[m_key] = {"stock_in": 0.0, "stock_out": 0.0}
+                month_map[m_key]["stock_in"] += b["stock_in"]
+                month_map[m_key]["stock_out"] += b["stock_out"]
+            for m_key, b in sorted(month_map.items()):
+                timeline.append({
+                    "date": m_key,
+                    "stock_in": round(b["stock_in"], 2),
+                    "stock_out": round(b["stock_out"], 2),
+                    "net_movement": round(b["stock_in"] - b["stock_out"], 2)
+                })
+        else:
+            for d_str, b in sorted(daily_buckets.items()):
+                dt = datetime.strptime(d_str, "%Y-%m-%d")
+                label = dt.strftime("%b %d")
+                timeline.append({
+                    "date": label,
+                    "date_iso": d_str,
+                    "stock_in": round(b["stock_in"], 2),
+                    "stock_out": round(b["stock_out"], 2),
+                    "net_movement": round(b["stock_in"] - b["stock_out"], 2)
+                })
+
+        opening_balance = round(prior_net_movement, 2) if has_prior_records else "UNAVAILABLE"
+        closing_balance = round(prior_net_movement + total_stock_in - total_stock_out, 2) if has_prior_records else "UNAVAILABLE"
+
+        matching_txs = [
+            tx for tx in all_txs
+            if sd_str <= str(tx.get("transaction_date") or tx.get("created_at") or "")[:10] <= ed_str
+            and str(tx.get("transaction_type") or "").upper() not in ("RESERVATION", "RESERVATION_RELEASE")
+        ]
+
+        return {
+            "start_date": sd_str,
+            "end_date": ed_str,
+            "granularity": granularity,
+            "stock_in": round(total_stock_in, 2),
+            "stock_out": round(total_stock_out, 2),
+            "net_movement": round(total_stock_in - total_stock_out, 2),
+            "opening_balance": opening_balance,
+            "closing_balance": closing_balance,
+            "transaction_count": len(matching_txs),
+            "timeline": timeline
         }
 
     @staticmethod

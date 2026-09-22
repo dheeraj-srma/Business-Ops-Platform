@@ -133,15 +133,19 @@ export const TransactionHistoryView: React.FC<TransactionHistoryViewProps> = ({
       let partyDisplayName = party;
       let partyRole = 'Party';
 
-      if (txType === 'STOCK_IN') {
+      const isStockIn = txType === 'STOCK_IN' || txType === 'INWARD';
+      const isStockOut = txType === 'STOCK_OUT' || txType === 'SALE' || txType === 'OUTWARD';
+      const isReturn = txType === 'CUSTOMER_RETURN' || txType === 'RETURN_IN';
+
+      if (isStockIn) {
         groupKey = `IN_${refNum}_${party}`;
         partyDisplayName = party || 'Direct Supplier';
         partyRole = 'Supplier / Vendor';
-      } else if (txType === 'STOCK_OUT') {
+      } else if (isStockOut) {
         groupKey = `OUT_${refNum}_${salesmanName || party}`;
         partyDisplayName = salesmanName ? `${salesmanName} (${party})` : party || 'Direct Recipient';
         partyRole = salesmanName ? 'Salesman & Shop' : 'Customer / Recipient';
-      } else if (txType === 'CUSTOMER_RETURN') {
+      } else if (isReturn) {
         groupKey = `RET_${refNum}_${party}`;
         partyDisplayName = party || 'Direct Customer';
         partyRole = 'Customer / Client';
@@ -507,9 +511,9 @@ export const TransactionHistoryView: React.FC<TransactionHistoryViewProps> = ({
             /* 1. Grouped Consignments Cards */
             <div className="p-4 sm:p-5 space-y-3">
               {groupedConsignments.map((group) => {
-                const isStockIn = group.type === 'STOCK_IN';
-                const isStockOut = group.type === 'STOCK_OUT';
-                const isReturn = group.type === 'CUSTOMER_RETURN';
+                const isStockIn = group.type === 'STOCK_IN' || group.type === 'INWARD';
+                const isStockOut = group.type === 'STOCK_OUT' || group.type === 'SALE' || group.type === 'OUTWARD';
+                const isReturn = group.type === 'CUSTOMER_RETURN' || group.type === 'RETURN_IN';
                 const isExpanded = expandedGroupIds.has(group.referenceNumber);
                 const totalUnits = group.items.reduce((sum, it) => sum + (it.quantity || 0), 0);
 
@@ -701,9 +705,11 @@ export const TransactionHistoryView: React.FC<TransactionHistoryViewProps> = ({
                   const txType = tx.transactionType || (tx as any).transaction_type;
                   const isPositive =
                     txType === 'STOCK_IN' ||
+                    txType === 'INWARD' ||
                     txType === 'INITIAL_STOCK' ||
                     txType === 'ADJUSTMENT_INCREASE' ||
-                    txType === 'CUSTOMER_RETURN';
+                    txType === 'CUSTOMER_RETURN' ||
+                    txType === 'RETURN_IN';
 
                   const singleConsignment: ExportableConsignment = {
                     referenceNumber: tx.referenceNumber || (tx as any).reference_number || tx.id,
@@ -757,9 +763,9 @@ export const TransactionHistoryView: React.FC<TransactionHistoryViewProps> = ({
                         <span
                           className={cn(
                             'px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider whitespace-nowrap inline-block',
-                            txType === 'STOCK_IN' && 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60',
-                            txType === 'STOCK_OUT' && 'bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60',
-                            txType === 'CUSTOMER_RETURN' && 'bg-purple-100 dark:bg-purple-950/60 text-purple-800 dark:text-purple-300 border border-purple-200 dark:border-purple-800/60',
+                            (txType === 'STOCK_IN' || txType === 'INWARD') && 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60',
+                            (txType === 'STOCK_OUT' || txType === 'SALE' || txType === 'OUTWARD') && 'bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60',
+                            (txType === 'CUSTOMER_RETURN' || txType === 'RETURN_IN') && 'bg-purple-100 dark:bg-purple-950/60 text-purple-800 dark:text-purple-300 border border-purple-200 dark:border-purple-800/60',
                             txType === 'INITIAL_STOCK' && 'bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-600',
                             txType === 'ADJUSTMENT_INCREASE' && 'bg-blue-100 dark:bg-blue-950/60 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-800/60',
                             txType === 'ADJUSTMENT_DECREASE' && 'bg-rose-100 dark:bg-rose-950/60 text-rose-800 dark:text-rose-300 border border-rose-200 dark:border-rose-800/60'

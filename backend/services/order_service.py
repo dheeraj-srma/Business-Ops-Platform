@@ -18,6 +18,13 @@ def is_valid_uuid(val: Any) -> bool:
     except (ValueError, AttributeError):
         return False
 
+DEFAULT_LOCATION_ID = "92db6a9f-6a52-5df1-5748-70301279a94a"
+
+def resolve_location_id(loc_id: Optional[str]) -> Optional[str]:
+    if is_valid_uuid(loc_id):
+        return loc_id
+    return DEFAULT_LOCATION_ID
+
 VALID_ORDER_TRANSITIONS = {
     "DRAFT": {"PENDING", "PENDING_APPROVAL", "CANCELLED"},
     "PENDING": {"APPROVED", "REJECTED", "CANCELLED"},
@@ -440,25 +447,6 @@ class OrderService:
             OrderRepository.insert_order_item(item_record)
             OrderRepository.recalculate_reservations(line["sku"])
 
-            # Record reservation transaction in inventory_transactions ledger
-            from repositories.transaction_repo import TransactionRepository
-            from repositories.inventory_repo import InventoryRepository
-            prod_info = inv_map.get(line["sku"])
-            if prod_info and prod_info.get("id"):
-                try:
-                    TransactionRepository.record_stock_transaction({
-                        "transaction_type": "reservation",
-                        "product_id": prod_info["id"],
-                        "location_id": resolve_location_id(payload.location_id or prod_info.get("location_id")),
-                        "quantity": line["quantity"],
-                        "reference_type": "order",
-                        "reference_id": human_order_code if is_valid_uuid(human_order_code) else None,
-                        "notes": f"Stock reserved for order {human_order_code}",
-                        "created_at": now_iso
-                    })
-                except Exception as tx_err:
-                    logger.warning(f"Failed recording reservation transaction: {tx_err}")
-
         from repositories.inventory_repo import InventoryRepository
         InventoryRepository.invalidate_cache()
 
@@ -525,12 +513,16 @@ class OrderService:
         client = get_supabase_client()
         now_str = datetime.now().isoformat()
 
-        orders = OrderRepository.get_orders()
-        target_lines = [o for o in orders if o.get("order_code") == order_id or o.get("id") == order_id or o.get("order_id") == order_id]
-        if not target_lines:
-            raise ValueError(f"Order '{order_id}' not found.")
-
-        current_status = str(target_lines[0].get("status", "Pending")).upper().strip()
+        order_dict = OrderRepository.get_order_by_id_with_items(order_id)
+        if order_dict and order_dict.get("items"):
+            target_lines = order_dict["items"]
+            current_status = str(order_dict.get("status", "Pending")).upper().strip()
+        else:
+            orders = OrderRepository.get_orders()
+            target_lines = [o for o in orders if o.get("order_code") == order_id or o.get("id") == order_id or o.get("order_id") == order_id]
+            if not target_lines:
+                raise ValueError(f"Order '{order_id}' not found.")
+            current_status = str(target_lines[0].get("status", "Pending")).upper().strip()
 
         if current_status in ("PROCESSED", "DISPATCHED", "DELIVERED", "COMPLETED", "FULFILLED"):
             logger.info(f"Order '{order_id}' is already in '{current_status}' state. Returning idempotent response.")
@@ -580,6 +572,14 @@ class OrderService:
             if not allow_negative and phys_stock < req_qty:
                 raise ValueError(f"INSUFFICIENT_PHYSICAL_STOCK: Physical stock ({phys_stock}) for SKU '{s}' is insufficient to fulfill order ({req_qty}).")
 
+        actor_user_id = None
+        actor_name = "Staff"
+        if current_user and isinstance(current_user, dict):
+            raw_uid = current_user.get("id") or current_user.get("user_id") or current_user.get("sub")
+            if raw_uid and is_valid_uuid(str(raw_uid)):
+                actor_user_id = str(raw_uid)
+            actor_name = current_user.get("name") or current_user.get("full_name") or current_user.get("email") or str(raw_uid or "Staff")
+
         tx_ids = []
         for s, req_qty in sku_qty_map.items():
             prod_info = inv_map.get(s)
@@ -593,30 +593,37 @@ class OrderService:
             new_avail = new_on_hand - reserved
 
             if client and prod_id:
-                client.table("inventory").update({
-                    "quantity_on_hand": new_on_hand,
-                    "updated_at": now_str
-                }).eq("product_id", prod_id).execute()
-
+                ref_uuid = order_id if is_valid_uuid(order_id) else None
+                ref_str = order_id if not is_valid_uuid(order_id) else None
                 tx = TransactionRepository.record_stock_transaction({
                     "transaction_type": "sale",
                     "product_id": prod_id,
-                    "location_id": loc_id,
-                    "quantity": -req_qty,
+                    "location_id": resolve_location_id(loc_id),
+                    "quantity": req_qty,
                     "unit_cost": unit_cost,
                     "reference_type": "order",
-                    "reference_id": order_id if is_valid_uuid(order_id) else None,
-                    "notes": f"Order fulfillment stock-out for order {order_id}",
+                    "reference_id": ref_uuid,
+                    "client_reference": ref_str,
+                    "performed_by": actor_user_id,
+                    "notes": f"Order fulfillment stock-out for order {order_id} | By: {actor_name}",
                     "created_at": now_str
                 })
                 if tx and isinstance(tx, dict) and tx.get("id"):
                     tx_ids.append(str(tx.get("id")))
 
+                # Explicitly enforce correct authoritative quantity_on_hand post-transaction
+                client.table("inventory").update({
+                    "quantity_on_hand": new_on_hand,
+                    "updated_at": now_str
+                }).eq("product_id", prod_id).execute()
+
         affected = OrderRepository.update_order_status(order_id, target_status)
-        affected_skus = {row.get("sku") for row in affected if row.get("sku")}
+        affected_skus = {row.get("sku") for row in affected if row.get("sku")} | set(sku_qty_map.keys())
         for s in affected_skus:
             OrderRepository.recalculate_reservations(s)
 
+        from services.snapshot_service import SnapshotService
+        SnapshotService.invalidate("inventory_transactions")
         InventoryRepository.invalidate_cache()
 
         return {

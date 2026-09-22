@@ -304,3 +304,16 @@ class SnapshotService:
                     "source": snap.get("source", "unknown")
                 }
             return summary
+
+    @classmethod
+    def invalidate(cls, entity: str) -> None:
+        """Invalidates in-memory and disk snapshot for an entity when mutations occur."""
+        cls._ensure_init()
+        with cls._lock:
+            cls._in_memory_snapshots.pop(entity, None)
+            target_file = SNAPSHOT_DIR / f"{entity}_snapshot.json"
+            if target_file.exists():
+                try:
+                    target_file.unlink()
+                except Exception as exc:
+                    logger.warning(f"Failed to remove invalidated snapshot file for '{entity}': {exc}")

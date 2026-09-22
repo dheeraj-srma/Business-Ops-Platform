@@ -360,25 +360,70 @@ export const api = {
       ? data
       : (Array.isArray(data?.transactions) ? data.transactions : []);
 
-    const transactions: StockTransaction[] = rawList.map((t: any) => ({
-      ...t,
-      id: String(t.id || t['Txn ID'] || ''),
-      productId: String(t.productId || t.product_id || t.SKU || ''),
-      productName: String(t.productName || t.product_name || t['Item Name'] || ''),
-      productSku: String(t.productSku || t.product_sku || t.SKU || ''),
-      categoryName: String(t.categoryName || t.category || t.Category || 'General'),
-      unit: String(t.unit || 'NOS'),
-      transactionType: (t.transactionType || t.transaction_type || t.Type || 'ADJUSTMENT').toUpperCase(),
-      quantity: Number(t.quantity ?? t.Quantity ?? 0),
-      previousStock: Number(t.previousStock ?? t.previous_stock ?? 0),
-      newStock: Number(t.newStock ?? t.new_stock ?? 0),
-      reason: String(t.reason || t.notes || t.Reference || ''),
-      supplierOrRecipient: t.supplierOrRecipient || t.supplier_or_recipient || t['supplierOrRecipient'] || '',
-      referenceNumber: t.referenceNumber || t.reference_number || t.Reference || '',
-      createdAt: t.createdAt || t.created_at || t.Timestamp || new Date().toISOString(),
-    }));
+    const transactions: StockTransaction[] = rawList.map((t: any) => {
+      const rawType = String(t.transactionType || t.transaction_type || t.Type || 'ADJUSTMENT').toUpperCase();
+      let normType = rawType;
+      if (['INWARD', 'STOCK_IN'].includes(rawType)) normType = 'STOCK_IN';
+      else if (['SALE', 'SALES', 'STOCK_OUT', 'OUTWARD', 'DISPATCH'].includes(rawType)) normType = 'STOCK_OUT';
+      else if (['RETURN_IN', 'CUSTOMER_RETURN'].includes(rawType)) normType = 'CUSTOMER_RETURN';
+      else if (['RETURN_OUT'].includes(rawType)) normType = 'STOCK_OUT';
+      else if (['INITIAL_STOCK'].includes(rawType)) normType = 'INITIAL_STOCK';
+      else if (['ADJUSTMENT_INCREASE'].includes(rawType)) normType = 'ADJUSTMENT_INCREASE';
+      else if (['ADJUSTMENT_DECREASE'].includes(rawType)) normType = 'ADJUSTMENT_DECREASE';
+
+      return {
+        ...t,
+        id: String(t.id || t['Txn ID'] || ''),
+        productId: String(t.productId || t.product_id || t.SKU || ''),
+        productName: String(t.productName || t.product_name || t['Item Name'] || ''),
+        productSku: String(t.productSku || t.product_sku || t.SKU || ''),
+        categoryName: String(t.categoryName || t.category || t.Category || 'General'),
+        unit: String(t.unit || 'NOS'),
+        transactionType: normType,
+        rawTransactionType: rawType,
+        quantity: Number(t.quantity ?? t.Quantity ?? 0),
+        previousStock: Number(t.previousStock ?? t.previous_stock ?? 0),
+        newStock: Number(t.newStock ?? t.new_stock ?? 0),
+        reason: String(t.reason || t.notes || t.Reference || ''),
+        supplierOrRecipient: t.supplierOrRecipient || t.supplier_or_recipient || t['supplierOrRecipient'] || '',
+        referenceNumber: t.referenceNumber || t.reference_number || t.Reference || '',
+        createdByName: t.createdByName || t.created_by_name || 'Staff',
+        createdAt: t.createdAt || t.created_at || t.Timestamp || new Date().toISOString(),
+      };
+    });
 
     return { transactions };
+  },
+
+  async getStockMovementSummary(params?: {
+    startDate?: string;
+    endDate?: string;
+    granularity?: 'daily' | 'weekly' | 'monthly';
+  }): Promise<{
+    start_date: string;
+    end_date: string;
+    granularity: string;
+    stock_in: number;
+    stock_out: number;
+    net_movement: number;
+    opening_balance: number | string;
+    closing_balance: number | string;
+    timeline: Array<{
+      date: string;
+      date_iso?: string;
+      stock_in: number;
+      stock_out: number;
+      net_movement: number;
+    }>;
+  }> {
+    const query = new URLSearchParams();
+    if (params?.startDate) query.set('startDate', params.startDate);
+    if (params?.endDate) query.set('endDate', params.endDate);
+    if (params?.granularity) query.set('granularity', params.granularity);
+    const qs = query.toString();
+    const res = await fetch(`/api/transactions/movement-summary${qs ? '?' + qs : ''}`);
+    if (!res.ok) throw new Error('Failed to load stock movement summary');
+    return res.json();
   },
 
   // Categories

@@ -103,62 +103,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         endDateStr = toLocalDateStr(end);
       }
 
-      // Query transactions within date range
-      const txRes = await api.getTransactions({
-        dateFrom: startDateStr,
-        dateTo: endDateStr,
+      // Fetch authoritative backend dashboard stats with trend for exact date range
+      const statsRes = await api.getDashboardStats({
+        startDate: startDateStr,
+        endDate: endDateStr,
+        days: numDays,
       });
-      const transactions = Array.isArray(txRes) ? txRes : (txRes?.transactions || []);
 
-      // Build daily buckets
-      const start = new Date(startDateStr);
-      const end = new Date(endDateStr);
-      const buckets: Array<{ date: string; stockIn: number; stockOut: number }> = [];
-      const cur = new Date(start);
-      let count = 0;
-      const maxDays = 90;
-
-      while (cur <= end && count < maxDays) {
-        const dayIso = toLocalDateStr(cur);
-        const label = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(cur);
-
-        let stockIn = 0;
-        let stockOut = 0;
-
-        for (const tx of (transactions || [])) {
-          const rawDate = tx.createdAt || (tx as any).created_at || (tx as any).transaction_date || (tx as any).transactionDate || '';
-          const txDate = rawDate ? toLocalDateStr(new Date(rawDate)) : '';
-          if (txDate === dayIso) {
-            const rawType = (tx.transactionType || (tx as any).transaction_type || '').toUpperCase();
-            const notes = ((tx as any).notes || (tx as any).reason || '').toLowerCase();
-            const qty = Math.abs(Number(tx.quantity) || 0);
-
-            // Exclude opening inventory import from daily movement trend
-            if (notes.includes('opening quantity') || notes.includes('initial stock')) {
-              continue;
-            }
-
-            if (['INWARD', 'STOCK_IN', 'CUSTOMER_RETURN', 'RETURN_IN', 'ADJUSTMENT_INCREASE'].includes(rawType)) {
-              stockIn += qty;
-            } else if (['SALE', 'SALES', 'STOCK_OUT', 'DISPATCH', 'ADJUSTMENT_DECREASE'].includes(rawType)) {
-              stockOut += qty;
-            } else if (rawType === 'ADJUSTMENT') {
-              if (Number(tx.quantity) >= 0) {
-                stockIn += qty;
-              } else {
-                stockOut += qty;
-              }
-            }
-          }
-        }
-
-        buckets.push({ date: label, stockIn, stockOut });
-        cur.setDate(cur.getDate() + 1);
-        count++;
-      }
-
-      if (buckets.length > 0) {
-        setTrendData(buckets);
+      if (statsRes && Array.isArray(statsRes.trend) && statsRes.trend.length > 0) {
+        setTrendData(statsRes.trend);
       }
     } catch (e) {
       console.error('Failed to fetch trend data:', e);
@@ -599,7 +552,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 </div>
                 <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-cyan-50/80 dark:bg-cyan-950/50 border border-cyan-200/60 dark:border-cyan-800/60 text-cyan-700 dark:text-cyan-300">
                   <span className="w-2.5 h-2.5 rounded-sm bg-[#06b6d4] dark:bg-[#22d3ee] inline-block shadow-2xs" />
-                  <span>Sales</span>
+                  <span>Outward (Dispatches)</span>
                 </div>
               </div>
             </div>
@@ -692,7 +645,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                           <div className="flex items-center justify-between gap-4 text-xs">
                             <div className="flex items-center gap-1.5">
                               <span className="w-2.5 h-2.5 rounded-sm bg-[#06b6d4] dark:bg-[#22d3ee] inline-block shadow-2xs" />
-                              <span className="text-slate-300 text-[11px] font-medium">Sales (Out)</span>
+                              <span className="text-slate-300 text-[11px] font-medium">Outward (Dispatches)</span>
                             </div>
                             <span className="font-mono font-bold text-white text-xs">
                               {stockOut.toLocaleString()}{' '}

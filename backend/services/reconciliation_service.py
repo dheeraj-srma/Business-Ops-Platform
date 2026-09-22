@@ -16,12 +16,25 @@ class ReconciliationService:
     def _calculate_ledger_stock(transactions: List[Dict[str, Any]]) -> float:
         total = 0.0
         for tx in transactions:
-            qty = float(tx.get("quantity", 0))
-            tx_type = tx.get("transactionType") or tx.get("transaction_type")
-            if tx_type in ("STOCK_OUT", "ADJUSTMENT_DECREASE"):
-                total -= abs(qty)
+            qty = abs(float(tx.get("quantity", 0)))
+            tx_type = str(tx.get("transactionType") or tx.get("transaction_type") or "").lower()
+            notes = str(tx.get("notes") or "").lower()
+
+            # Non-physical movements MUST NOT affect stock
+            if tx_type in ("reservation", "reservation_release"):
+                continue
+
+            if tx_type in ("sale", "stock_out", "return_out", "adjustment_decrease"):
+                total -= qty
+            elif tx_type in ("inward", "stock_in", "return_in", "customer_return", "adjustment_increase", "initial_stock"):
+                total += qty
+            elif tx_type == "adjustment":
+                if "delta: -" in notes or "- " in notes:
+                    total -= qty
+                else:
+                    total += qty
             else:
-                total += abs(qty)
+                total += qty
         return total
 
     @staticmethod
@@ -35,7 +48,7 @@ class ReconciliationService:
         discrepancies = []
         for p in products:
             pid = p.get("id")
-            current = float(p.get("current_stock") or p.get("currentStock") or 0.0)
+            current = float(p.get("physical_stock") or p.get("Current Stock") or p.get("quantity_on_hand") or p.get("current_stock") or 0.0)
             p_txs = tx_by_pid.get(pid, [])
             ledger_sum = ReconciliationService._calculate_ledger_stock(p_txs)
             variance = current - ledger_sum
@@ -56,27 +69,19 @@ class ReconciliationService:
         }
 
     def audit_inventory_invariant(self) -> Dict[str, Any]:
-
         """
-        Audits all products to compare materialized `current_stock`
+        Audits all products to compare materialized physical stock
         against the sum of historical ledger transactions.
         """
-        products = inventory_repository.get_all_products()
-        transactions = transaction_repository.list_transactions(limit=10000)
+        products = inventory_repository.fetch_all_products_with_inventory()
+        transactions = transaction_repository.get_transactions(limit=10000)
 
         # Calculate transaction sums per product ID
-        ledger_sums: Dict[str, float] = {}
+        tx_by_pid: Dict[str, List[Dict[str, Any]]] = {}
         for tx in transactions:
             pid = tx.get("productId") or tx.get("product_id")
             if pid:
-                qty = float(tx.get("quantity", 0))
-                # If quantity is not pre-signed by transaction_type, calculate signed delta
-                tx_type = tx.get("transactionType") or tx.get("transaction_type")
-                if tx_type in ("STOCK_OUT", "ADJUSTMENT_DECREASE"):
-                    delta = -abs(qty)
-                else:
-                    delta = abs(qty)
-                ledger_sums[pid] = ledger_sums.get(pid, 0.0) + delta
+                tx_by_pid.setdefault(pid, []).append(tx)
 
         audited_items: List[Dict[str, Any]] = []
         discrepant_count = 0
@@ -84,8 +89,9 @@ class ReconciliationService:
 
         for p in products:
             pid = p["id"]
-            current_balance = round(float(p.get("current_stock") or p.get("currentStock") or 0.0), 4)
-            ledger_balance = round(ledger_sums.get(pid, 0.0), 4)
+            current_balance = round(float(p.get("physical_stock") or p.get("Current Stock") or p.get("quantity_on_hand") or 0.0), 4)
+            p_txs = tx_by_pid.get(pid, [])
+            ledger_balance = round(ReconciliationService._calculate_ledger_stock(p_txs), 4)
             discrepancy = round(current_balance - ledger_balance, 4)
             is_valid = (discrepancy == 0.0)
 

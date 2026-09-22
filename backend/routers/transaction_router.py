@@ -12,49 +12,88 @@ from services.snapshot_service import SnapshotService
 logger = logging.getLogger("transaction_router")
 router = APIRouter(prefix="/api", tags=["Stock Movements & Transactions"])
 
+from services.analytics_service import analytics_service
+
 @router.get("/transactions")
 def list_transactions(
     limit: int = Query(default=1000),
     dateFrom: Optional[str] = Query(None),
     dateTo: Optional[str] = Query(None),
+    type: Optional[str] = Query(None),
+    search: Optional[str] = Query(None),
 ):
     try:
-        txns = TransactionRepository.get_transactions(limit=limit, start_date=dateFrom, end_date=dateTo)
+        txns = TransactionRepository.get_transactions(
+            limit=limit,
+            start_date=dateFrom,
+            end_date=dateTo,
+            transaction_type=type,
+            search=search
+        )
         records = []
         for t in txns:
             prod = t.get("products") or {}
+            if isinstance(prod, list) and prod:
+                prod = prod[0]
+            elif not isinstance(prod, dict):
+                prod = {}
+
             sku = prod.get("sku") or "UNKNOWN"
             name = prod.get("name") or sku
-            t_type = (t.get("transaction_type") or "adjustment").upper()
+            raw_type = str(t.get("transaction_type") or "adjustment").lower()
+            t_type = raw_type.upper()
             qty = round(float(t.get("quantity") or 0.0), 4)
             cost = round(float(t.get("unit_cost") or 0.0), 2)
             total = round(qty * cost, 2)
             ts = t.get("transaction_date") or t.get("created_at") or ""
 
+            notes_str = str(t.get("notes") or "")
+            actor_name = "Staff"
+            if "By:" in notes_str:
+                parts = notes_str.split("By:")
+                if len(parts) > 1:
+                    actor_name = parts[1].split("|")[0].strip()
+
+            supplier_recipient = "Main Depot"
+            if "Supplier:" in notes_str:
+                parts = notes_str.split("Supplier:")
+                if len(parts) > 1:
+                    supplier_recipient = parts[1].split("|")[0].strip()
+            elif "Recipient:" in notes_str:
+                parts = notes_str.split("Recipient:")
+                if len(parts) > 1:
+                    supplier_recipient = parts[1].split("|")[0].strip()
+
+            ref_display = t.get("client_reference") or str(t.get("reference_id") or "") or t.get("reference_type") or "-"
+
             records.append({
-                "id": t.get("id"),
-                "Txn ID": t.get("id"),
+                "id": str(t.get("id")),
+                "Txn ID": str(t.get("id")),
                 "Type": t_type,
                 "transactionType": t_type,
-                "transaction_type": t_type,
+                "transaction_type": raw_type,
+                "productId": str(t.get("product_id") or prod.get("id") or ""),
+                "product_id": str(t.get("product_id") or prod.get("id") or ""),
                 "SKU": sku,
                 "productSku": sku,
                 "Item Name": name,
                 "productName": name,
                 "Category": prod.get("brand") or "General",
                 "categoryName": prod.get("brand") or "General",
+                "unit": prod.get("unit_of_measure") or "NOS",
                 "Quantity": qty,
                 "quantity": qty,
                 "Unit Cost": cost,
                 "Total Cost": total,
-                "Reference": t.get("reference_type") or t.get("notes") or "Movement",
-                "referenceNumber": t.get("reference_type") or t.get("id"),
-                "reference_number": t.get("reference_type") or t.get("id"),
-                "supplierOrRecipient": "Main Depot",
-                "supplier_or_recipient": "Main Depot",
-                "notes": t.get("notes") or "",
-                "createdByName": "Director (Operations)",
-                "created_by_name": "Director (Operations)",
+                "Reference": ref_display,
+                "referenceNumber": ref_display,
+                "reference_number": ref_display,
+                "supplierOrRecipient": supplier_recipient,
+                "supplier_or_recipient": supplier_recipient,
+                "notes": notes_str,
+                "createdByName": actor_name,
+                "created_by_name": actor_name,
+                "performed_by": t.get("performed_by"),
                 "createdAt": ts,
                 "created_at": ts,
                 "Timestamp": ts[:19].replace("T", " ") if ts else "",
@@ -64,6 +103,23 @@ def list_transactions(
     except Exception as exc:
         logger.error(f"Error listing transactions: {exc}")
         return []
+
+@router.get("/transactions/movement-summary")
+@router.get("/inventory/movement-summary")
+def get_movement_summary(
+    startDate: Optional[str] = Query(None),
+    endDate: Optional[str] = Query(None),
+    granularity: Optional[str] = Query("daily", regex="^(daily|weekly|monthly)$")
+):
+    try:
+        return analytics_service.get_stock_movement_summary(
+            start_date=startDate,
+            end_date=endDate,
+            granularity=granularity or "daily"
+        )
+    except Exception as exc:
+        logger.error(f"Error calculating stock movement summary: {exc}")
+        raise HTTPException(status_code=500, detail="Failed to compute stock movement summary.")
 
 @router.get("/adjustments")
 def list_adjustments():

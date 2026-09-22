@@ -83,6 +83,11 @@ class InventoryService:
                 "notes": f"Initial SKU stock setup for {clean_sku}",
                 "created_at": datetime.utcnow().isoformat()
             })
+            if client:
+                client.table("inventory").update({
+                    "quantity_on_hand": qty,
+                    "updated_at": datetime.utcnow().isoformat()
+                }).eq("product_id", prod_id).execute()
 
         return {"status": "created", "id": prod_id, "sku": clean_sku}
 
@@ -143,28 +148,41 @@ class InventoryService:
         now_str = datetime.utcnow().isoformat()
         target_loc_id = resolve_location_id(location_id or current_inv.get("location_id"))
 
-        # Update physical stock & available stock atomically
+        # Record audit transaction entry in stock_transactions first
+        delta = new_quantity - old_on_hand
+        actor_user_id = None
+        actor_name = "Staff"
+        if actor and isinstance(actor, dict):
+            raw_uid = actor.get("id") or actor.get("user_id") or actor.get("sub")
+            if raw_uid and is_valid_uuid(str(raw_uid)):
+                actor_user_id = str(raw_uid)
+            actor_name = actor.get("name") or actor.get("full_name") or actor.get("email") or str(raw_uid or "Staff")
+
+        if delta != 0:
+            tx_data = {
+                "transaction_type": "adjustment",
+                "product_id": product_id,
+                "location_id": target_loc_id,
+                "quantity": abs(delta),
+                "reference_type": "adjustment",
+                "performed_by": actor_user_id,
+                "notes": f"Manual stock adjustment: {reason} | Delta: {delta:+g} | By: {actor_name}",
+                "created_at": now_str
+            }
+            try:
+                TransactionRepository.record_stock_transaction(tx_data)
+            except Exception as tx_err:
+                logger.warning(f"Transaction ledger log failed during stock adjustment: {tx_err}")
+
+        # Explicitly enforce authoritative new_quantity post-transaction
         client.table("inventory").update({
             "quantity_on_hand": new_quantity,
             "updated_at": now_str
         }).eq("product_id", product_id).execute()
 
-        # Record audit transaction entry in stock_transactions
-        tx_data = {
-            "transaction_type": "adjustment",
-            "product_id": product_id,
-            "location_id": target_loc_id,
-            "quantity": new_quantity - old_on_hand,
-            "reference_type": "adjustment",
-            "notes": f"Manual stock adjustment: {reason}",
-            "created_at": now_str
-        }
-        try:
-            TransactionRepository.record_stock_transaction(tx_data)
-        except Exception as tx_err:
-            logger.warning(f"Transaction ledger log failed during stock adjustment: {tx_err}")
-
         InventoryRepository.invalidate_cache()
+        from services.snapshot_service import SnapshotService
+        SnapshotService.invalidate("inventory_transactions")
 
         return {
             "status": "success",
@@ -181,16 +199,26 @@ class InventoryService:
         supplier: Optional[str] = None,
         reference_number: Optional[str] = None,
         reason: Optional[str] = "Stock Inward",
-        notes: Optional[str] = None
+        notes: Optional[str] = None,
+        actor: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         from datetime import datetime
         from supabase_client import get_supabase_client
         from repositories.transaction_repo import TransactionRepository
         from repositories.inventory_repo import InventoryRepository
+        from services.snapshot_service import SnapshotService
 
         client = get_supabase_client()
         processed_txs = []
         now_str = datetime.utcnow().isoformat()
+
+        actor_user_id = None
+        actor_name = "Staff"
+        if actor and isinstance(actor, dict):
+            raw_uid = actor.get("id") or actor.get("user_id") or actor.get("sub")
+            if raw_uid and is_valid_uuid(str(raw_uid)):
+                actor_user_id = str(raw_uid)
+            actor_name = actor.get("name") or actor.get("full_name") or actor.get("email") or str(raw_uid or "Staff")
 
         for it in items:
             raw_pid = it.get("product_id") or it.get("productId")
@@ -228,6 +256,8 @@ class InventoryService:
             new_on_hand = old_on_hand + qty
 
             if client:
+                ref_uuid = reference_number if is_valid_uuid(reference_number) else None
+                ref_str = reference_number if not is_valid_uuid(reference_number) else None
                 tx = TransactionRepository.record_stock_transaction({
                     "transaction_type": "inward",
                     "product_id": pid,
@@ -235,13 +265,22 @@ class InventoryService:
                     "quantity": qty,
                     "unit_cost": unit_cost,
                     "reference_type": "inward",
-                    "reference_id": reference_number if is_valid_uuid(reference_number) else None,
-                    "notes": f"{reason or 'Stock Inward'} | Supplier: {supplier or 'Direct Supplier'} | Ref: {reference_number or '-'} | {notes or ''}",
+                    "reference_id": ref_uuid,
+                    "client_reference": ref_str,
+                    "performed_by": actor_user_id,
+                    "notes": f"{reason or 'Stock Inward'} | Supplier: {supplier or 'Direct Supplier'} | Ref: {reference_number or '-'} | By: {actor_name} | {notes or ''}",
                     "created_at": now_str
                 })
                 processed_txs.append(tx)
 
+                # Set authoritative on_hand balance post-transaction
+                client.table("inventory").update({
+                    "quantity_on_hand": new_on_hand,
+                    "updated_at": now_str
+                }).eq("product_id", pid).execute()
+
         InventoryRepository.invalidate_cache()
+        SnapshotService.invalidate("inventory_transactions")
 
         return {
             "status": "SUCCESS",
@@ -262,10 +301,19 @@ class InventoryService:
         from supabase_client import get_supabase_client
         from repositories.transaction_repo import TransactionRepository
         from repositories.inventory_repo import InventoryRepository
+        from services.snapshot_service import SnapshotService
 
         client = get_supabase_client()
         processed_txs = []
         now_str = datetime.utcnow().isoformat()
+
+        actor_user_id = None
+        actor_name = "Staff"
+        if actor and isinstance(actor, dict):
+            raw_uid = actor.get("id") or actor.get("user_id") or actor.get("sub")
+            if raw_uid and is_valid_uuid(str(raw_uid)):
+                actor_user_id = str(raw_uid)
+            actor_name = actor.get("name") or actor.get("full_name") or actor.get("email") or str(raw_uid or "Staff")
 
         # Sort items deterministically by product ID or SKU to prevent lock inversion deadlocks
         sorted_items = sorted(items, key=lambda it: str(it.get("product_id") or it.get("productId") or it.get("sku") or ""))
@@ -309,6 +357,8 @@ class InventoryService:
             new_on_hand = old_on_hand - qty
 
             if client:
+                ref_uuid = reference_number if is_valid_uuid(reference_number) else None
+                ref_str = reference_number if not is_valid_uuid(reference_number) else None
                 # Record stock out transaction (positive quantity to comply with schema)
                 tx = TransactionRepository.record_stock_transaction({
                     "transaction_type": "sale",
@@ -316,8 +366,10 @@ class InventoryService:
                     "location_id": resolve_location_id(loc_id),
                     "quantity": qty,
                     "reference_type": "order",
-                    "reference_id": reference_number if is_valid_uuid(reference_number) else None,
-                    "notes": f"{reason or 'Stock Out'} | Recipient: {recipient or 'Direct'} | Ref: {reference_number or '-'} | {notes or ''}",
+                    "reference_id": ref_uuid,
+                    "client_reference": ref_str,
+                    "performed_by": actor_user_id,
+                    "notes": f"{reason or 'Stock Out'} | Recipient: {recipient or 'Direct'} | Ref: {reference_number or '-'} | By: {actor_name} | {notes or ''}",
                     "created_at": now_str
                 })
                 processed_txs.append(tx)
@@ -329,6 +381,7 @@ class InventoryService:
                 }).eq("product_id", pid).execute()
 
         InventoryRepository.invalidate_cache()
+        SnapshotService.invalidate("inventory_transactions")
 
         return {
             "status": "SUCCESS",
@@ -352,25 +405,51 @@ class InventoryService:
         client_ref = getattr(item, "client_reference", None) or None
         raw_sku = getattr(item, "sku", None)
         sku_clean = raw_sku.strip().upper() if raw_sku else None
+        is_good = "good" in (item.condition or "").lower() or "restock" in (item.condition or "").lower()
 
         # 1. Idempotency Check via client_reference or return_code
-        if client_ref and client:
-            try:
-                res = client.table("returns").select("*").or_(
-                    f"client_reference.eq.{client_ref},return_code.eq.{client_ref}"
-                ).limit(1).execute()
-                if res.data:
-                    existing = res.data[0]
+        if client_ref:
+            # Check in-memory returns first
+            for memo in TransactionRepository.get_returns():
+                if memo.get("client_reference") == client_ref or memo.get("return_number") == client_ref or memo.get("return_code") == client_ref or (client_ref in str(memo.get("notes") or "")):
                     return {
                         "status": "already_processed",
-                        "return_id": existing.get("return_code") or existing.get("id"),
+                        "return_id": memo.get("return_number") or memo.get("return_code") or client_ref,
                         "client_reference": client_ref,
-                        "restocked": existing.get("status") == "Restocked",
+                        "restocked": True,
                         "idempotent": True,
-                        "timestamp": existing.get("created_at") or datetime.utcnow().isoformat()
+                        "timestamp": memo.get("created_at") or datetime.utcnow().isoformat()
                     }
-            except Exception as e:
-                logger.warning(f"Error checking return idempotency in DB: {e}")
+
+            if client:
+                try:
+                    # Check authoritative inventory_transactions for matching client_ref in notes
+                    tx_check = client.table("inventory_transactions").select("id, client_reference, notes, created_at").ilike("notes", f"%Client ref: {client_ref}%").limit(1).execute()
+                    if tx_check.data:
+                        existing_tx = tx_check.data[0]
+                        return {
+                            "status": "already_processed",
+                            "return_id": client_ref,
+                            "client_reference": client_ref,
+                            "restocked": is_good,
+                            "idempotent": True,
+                            "timestamp": existing_tx.get("created_at") or datetime.utcnow().isoformat()
+                        }
+
+                    # Check returns table by return_number
+                    ret_check = client.table("returns").select("*").eq("return_number", client_ref).limit(1).execute()
+                    if ret_check.data:
+                        existing = ret_check.data[0]
+                        return {
+                            "status": "already_processed",
+                            "return_id": existing.get("return_number") or client_ref,
+                            "client_reference": client_ref,
+                            "restocked": existing.get("status") in ("Restocked", "completed"),
+                            "idempotent": True,
+                            "timestamp": existing.get("created_at") or datetime.utcnow().isoformat()
+                        }
+                except Exception as e:
+                    logger.warning(f"Error checking return idempotency in DB: {e}")
 
         # 2. Resolve Product ID
         prod_id = None
@@ -443,17 +522,23 @@ class InventoryService:
         new_on_hand = old_on_hand
         new_avail = old_on_hand - reserved
 
+        actor_user_id = None
+        actor_name = "Staff"
+        if actor and isinstance(actor, dict):
+            raw_uid = actor.get("id") or actor.get("user_id") or actor.get("sub")
+            if raw_uid and is_valid_uuid(str(raw_uid)):
+                actor_user_id = str(raw_uid)
+            actor_name = actor.get("name") or actor.get("full_name") or actor.get("email") or str(raw_uid or "Staff")
+
         if is_good:
             new_on_hand = old_on_hand + float(item.quantity)
             new_avail = new_on_hand - reserved
 
             if client:
-                client.table("inventory").update({
-                    "quantity_on_hand": new_on_hand,
-                    "updated_at": now_str
-                }).eq("product_id", prod_id).execute()
+                ref_uuid = ret_code if is_valid_uuid(ret_code) else None
+                ref_str = ret_code if not is_valid_uuid(ret_code) else None
 
-                # Record positive stock movement in ledger
+                # Record positive stock movement in ledger first
                 TransactionRepository.record_stock_transaction({
                     "transaction_type": "return_in",
                     "product_id": prod_id,
@@ -461,26 +546,29 @@ class InventoryService:
                     "quantity": float(item.quantity),
                     "unit_cost": float(item.price),
                     "reference_type": "return",
-                    "reference_id": ret_code if is_valid_uuid(ret_code) else None,
-                    "notes": f"Restocked from return {ret_code} | Reason: {item.reason}",
+                    "reference_id": ref_uuid,
+                    "client_reference": ref_str,
+                    "performed_by": actor_user_id,
+                    "notes": f"Restocked from return {ret_code} | Reason: {item.reason} | Client ref: {client_ref or ret_code} | By: {actor_name}",
                     "created_at": now_str
                 })
 
+                # Explicitly enforce authoritative balance post-transaction
+                client.table("inventory").update({
+                    "quantity_on_hand": new_on_hand,
+                    "updated_at": now_str
+                }).eq("product_id", prod_id).execute()
+
+        from services.snapshot_service import SnapshotService
+        SnapshotService.invalidate("inventory_transactions")
+        InventoryRepository.invalidate_cache()
+
         # 5. Insert Return Record
         ret_data = {
-            "return_code": ret_code,
-            "client_reference": client_ref or ret_code,
-            "order_id": order_id,
-            "customer_name": item.customer_name,
-            "location_name": item.location,
-            "sku": sku_clean or raw_sku,
-            "item_name": item.item_name,
-            "category": item.category,
-            "price": round(float(item.price), 2),
-            "quantity": int(item.quantity),
-            "condition": "Good Return" if is_good else "Defective Return",
-            "reason": item.reason,
-            "status": status_str,
+            "return_number": ret_code,
+            "return_type": "customer",
+            "status": "completed" if is_good else "pending",
+            "notes": f"SKU: {sku_clean or raw_sku} | Qty: {item.quantity} | Client ref: {client_ref or ret_code} | Reason: {item.reason} | Condition: {item.condition}",
             "created_at": now_str
         }
 

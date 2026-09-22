@@ -1,10 +1,19 @@
-# backend/repositories/order_repo.py
 import logging
+import uuid
 from typing import List, Dict, Any, Optional, Tuple
 from supabase_client import get_supabase_client
 from services.snapshot_service import SnapshotService
 
 logger = logging.getLogger("order_repo")
+
+def is_valid_uuid(val: Any) -> bool:
+    if not val or not isinstance(val, str):
+        return False
+    try:
+        uuid.UUID(val)
+        return True
+    except (ValueError, AttributeError):
+        return False
 
 RESERVATION_ELIGIBLE_STATUSES = {"pending", "processing", "reserved", "approved"}
 
@@ -263,11 +272,16 @@ class OrderRepository:
         affected = []
         if client:
             try:
-                sel_res = client.table("pending_orders").select("order_id").or_(f"order_id.eq.{order_id},id.eq.{order_id}").execute()
-                affected = sel_res.data or []
-                client.table("pending_orders").update({"status": new_status, "updated_at": "now()"}).or_(f"order_id.eq.{order_id},id.eq.{order_id}").execute()
-            except Exception:
-                pass
+                if is_valid_uuid(order_id):
+                    sel_res = client.table("pending_orders").select("order_id").or_(f"order_id.eq.{order_id},id.eq.{order_id}").execute()
+                    affected = sel_res.data or []
+                    client.table("pending_orders").update({"status": new_status, "updated_at": "now()"}).or_(f"order_id.eq.{order_id},id.eq.{order_id}").execute()
+                else:
+                    sel_res = client.table("pending_orders").select("order_id").eq("order_id", order_id).execute()
+                    affected = sel_res.data or []
+                    client.table("pending_orders").update({"status": new_status, "updated_at": "now()"}).eq("order_id", order_id).execute()
+            except Exception as err:
+                logger.warning(f"Error updating order status for {order_id}: {err}")
 
         for o in _IN_MEMORY_ORDERS:
             if o.get("order_code") == order_id or o.get("order_id") == order_id or o.get("id") == order_id:
