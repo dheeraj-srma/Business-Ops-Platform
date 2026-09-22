@@ -9,6 +9,15 @@ from schemas.orders import OrderCreateSchema, BulkOrderCreateSchema
 
 logger = logging.getLogger("order_service")
 
+def is_valid_uuid(val: Any) -> bool:
+    if not val or not isinstance(val, str):
+        return False
+    try:
+        uuid.UUID(val)
+        return True
+    except (ValueError, AttributeError):
+        return False
+
 VALID_ORDER_TRANSITIONS = {
     "DRAFT": {"PENDING", "PENDING_APPROVAL", "CANCELLED"},
     "PENDING": {"APPROVED", "REJECTED", "CANCELLED"},
@@ -399,31 +408,59 @@ class OrderService:
         now_iso = datetime.now().isoformat()
 
         # 6. Execute Atomic Order Header + Line Items + Reservation Persistence
+        from services.inventory_service import resolve_location_id
+        loc_id = resolve_location_id(payload.location_id)
+        header_record = {
+            "order_id": human_order_code,
+            "salesman_id": payload.salesman_id or "SLS-001",
+            "salesman_name": payload.salesman_name or current_user.get("full_name") or "Salesman",
+            "shop_name": payload.shop_name or "Direct Dealer",
+            "location_id": loc_id,
+            "city": payload.city or "Faridabad",
+            "state": payload.state or "Haryana",
+            "item_count": len(validated_lines),
+            "total_amount": round(total_amount, 2),
+            "status": "Pending",
+            "notes": payload.notes or f"Client ref: {client_ref}",
+            "created_at": now_iso
+        }
+        OrderRepository.insert_order(header_record)
+
         for line in validated_lines:
-            item_uuid = str(uuid.uuid4())
-            record = {
-                "id": item_uuid,
-                "order_code": human_order_code,
+            item_record = {
                 "order_id": human_order_code,
-                "client_reference": client_ref,
                 "sku": line["sku"],
                 "item_name": line["item_name"],
                 "category": line["category"],
-                "total_quantity": line["quantity"],
+                "quantity": line["quantity"],
                 "price": line["price"],
-                "total_amount": line["line_total"],
-                "salesman_id": payload.salesman_id or "SLS-001",
-                "salesman_name": payload.salesman_name or current_user.get("full_name") or "Salesman",
-                "customer_name": payload.shop_name or "Direct Dealer",
-                "shop_name": payload.shop_name or "Direct Dealer",
-                "city": payload.city or "Faridabad",
-                "state": payload.state or "Haryana",
-                "location_id": payload.location_id or "",
-                "status": "Pending",
+                "total_price": line["line_total"],
                 "created_at": now_iso
             }
-            OrderRepository.insert_order(record)
+            OrderRepository.insert_order_item(item_record)
             OrderRepository.recalculate_reservations(line["sku"])
+
+            # Record reservation transaction in inventory_transactions ledger
+            from repositories.transaction_repo import TransactionRepository
+            from repositories.inventory_repo import InventoryRepository
+            prod_info = inv_map.get(line["sku"])
+            if prod_info and prod_info.get("id"):
+                try:
+                    TransactionRepository.record_stock_transaction({
+                        "transaction_type": "reservation",
+                        "product_id": prod_info["id"],
+                        "location_id": resolve_location_id(payload.location_id or prod_info.get("location_id")),
+                        "quantity": line["quantity"],
+                        "reference_type": "order",
+                        "reference_id": human_order_code if is_valid_uuid(human_order_code) else None,
+                        "notes": f"Stock reserved for order {human_order_code}",
+                        "created_at": now_iso
+                    })
+                except Exception as tx_err:
+                    logger.warning(f"Failed recording reservation transaction: {tx_err}")
+
+        from repositories.inventory_repo import InventoryRepository
+        InventoryRepository.invalidate_cache()
 
         return {
             "status": "created",
@@ -558,18 +595,17 @@ class OrderService:
             if client and prod_id:
                 client.table("inventory").update({
                     "quantity_on_hand": new_on_hand,
-                    "quantity_available": new_avail,
                     "updated_at": now_str
                 }).eq("product_id", prod_id).execute()
 
                 tx = TransactionRepository.record_stock_transaction({
-                    "transaction_type": "STOCK_OUT",
+                    "transaction_type": "sale",
                     "product_id": prod_id,
                     "location_id": loc_id,
                     "quantity": -req_qty,
                     "unit_cost": unit_cost,
-                    "reference_type": "order_fulfillment",
-                    "reference_id": order_id,
+                    "reference_type": "order",
+                    "reference_id": order_id if is_valid_uuid(order_id) else None,
                     "notes": f"Order fulfillment stock-out for order {order_id}",
                     "created_at": now_str
                 })
@@ -580,6 +616,8 @@ class OrderService:
         affected_skus = {row.get("sku") for row in affected if row.get("sku")}
         for s in affected_skus:
             OrderRepository.recalculate_reservations(s)
+
+        InventoryRepository.invalidate_cache()
 
         return {
             "status": "processed",
@@ -816,8 +854,32 @@ class OrderService:
                 pass
 
         skus = {it.get("sku") for it in order_dict.get("items", []) if it.get("sku")}
-        for s in skus:
-            OrderRepository.recalculate_reservations(s)
+        from repositories.transaction_repo import TransactionRepository
+        from repositories.inventory_repo import InventoryRepository
+        inv_catalog = InventoryRepository.fetch_all_products_with_inventory()
+        inv_map = {str(item.get("sku")).strip().upper(): item for item in inv_catalog if item.get("sku")}
+
+        for it in order_dict.get("items", []):
+            s = it.get("sku")
+            if s:
+                OrderRepository.recalculate_reservations(s)
+                prod_info = inv_map.get(str(s).strip().upper())
+                if prod_info and prod_info.get("id"):
+                    try:
+                        TransactionRepository.record_stock_transaction({
+                            "transaction_type": "reservation_release",
+                            "product_id": prod_info["id"],
+                            "location_id": prod_info.get("location_id"),
+                            "quantity": -float(it.get("quantity") or 0.0),
+                            "reference_type": "order",
+                            "reference_id": order_id if is_valid_uuid(order_id) else None,
+                            "notes": f"Reservation released on order cancel: {order_id}",
+                            "created_at": now_str
+                        })
+                    except Exception as tx_err:
+                        logger.warning(f"Failed recording reservation release transaction: {tx_err}")
+
+        InventoryRepository.invalidate_cache()
 
         return {
             "status": "cancelled",

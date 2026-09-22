@@ -303,9 +303,11 @@ def record_stock_inward(
             notes=payload.notes
         )
         return res
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
     except Exception as exc:
         logger.error(f"Error recording stock inward: {exc}")
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(status_code=500, detail=str(exc))
 
 @router.post("/inventory/stock-out", summary="Record stock-out dispatch", description="Records stock-out consignment dispatch, deducts physical stock, and releases reservation.")
 def record_stock_outward(
@@ -335,9 +337,13 @@ def record_stock_outward(
             actor=current_user
         )
         return res
+    except ValueError as ve:
+        err_msg = str(ve)
+        status_code = status.HTTP_409_CONFLICT if "INSUFFICIENT_STOCK" in err_msg else status.HTTP_400_BAD_REQUEST
+        raise HTTPException(status_code=status_code, detail=err_msg)
     except Exception as exc:
         logger.error(f"Error recording stock outward: {exc}")
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(status_code=500, detail=str(exc))
 
 @router.get("/inventory/reconcile")
 def audit_inventory_reconciliation(

@@ -218,13 +218,13 @@ class OrderRepository:
     def get_order_by_client_reference(client_reference: str) -> Optional[Dict[str, Any]]:
         if not client_reference:
             return None
-        memo = next((o for o in _IN_MEMORY_ORDERS if o.get("client_reference") == client_reference), None)
+        memo = next((o for o in _IN_MEMORY_ORDERS if o.get("client_reference") == client_reference or f"Client ref: {client_reference}" in str(o.get("notes", ""))), None)
         if memo:
             return memo
         client = get_supabase_client()
         if client:
             try:
-                res = client.table("pending_orders").select("*").eq("client_reference", client_reference).limit(1).execute()
+                res = client.table("pending_orders").select("*").ilike("notes", f"%Client ref: {client_reference}%").limit(1).execute()
                 if res.data:
                     return res.data[0]
             except Exception:
@@ -244,6 +244,18 @@ class OrderRepository:
 
         _IN_MEMORY_ORDERS.insert(0, order_data)
         return order_data
+
+    @staticmethod
+    def insert_order_item(item_data: Dict[str, Any]) -> Dict[str, Any]:
+        client = get_supabase_client()
+        if client:
+            try:
+                res = client.table("pending_order_items").insert(item_data).execute()
+                if res.data:
+                    return res.data[0]
+            except Exception as err:
+                logger.warning(f"Supabase order item insert failed: {err}")
+        return item_data
 
     @staticmethod
     def update_order_status(order_id: str, new_status: str) -> List[Dict[str, Any]]:
@@ -268,29 +280,45 @@ class OrderRepository:
         """Filters reservations strictly by active status and updates inventory table."""
         if not sku:
             return
+        clean_sku = sku.strip().upper()
         try:
             client = get_supabase_client()
-            res = client.table("pending_orders").select("total_quantity, item_count, status").eq("sku", sku).execute()
-            orders_data = res.data or []
+            active_reserved = 0.0
 
-            active_reserved = sum(
-                float(o.get("total_quantity") or o.get("quantity") or 0)
-                for o in orders_data
-                if str(o.get("status", "")).lower() in RESERVATION_ELIGIBLE_STATUSES
-            )
+            if client:
+                try:
+                    item_res = client.table("pending_order_items").select("order_id, quantity").eq("sku", clean_sku).execute()
+                    items_data = item_res.data or []
+                    order_ids = list({it["order_id"] for it in items_data if it.get("order_id")})
 
-            p_res = client.table("products").select("id").eq("sku", sku).limit(1).execute()
-            if p_res.data:
+                    if order_ids:
+                        order_res = client.table("pending_orders").select("order_id, status").in_("order_id", order_ids).execute()
+                        status_map = {o["order_id"]: str(o.get("status", "")).lower() for o in (order_res.data or [])}
+
+                        for it in items_data:
+                            oid = it.get("order_id")
+                            st = status_map.get(oid, "pending")
+                            if st in RESERVATION_ELIGIBLE_STATUSES:
+                                active_reserved += float(it.get("quantity") or 0.0)
+                except Exception as db_err:
+                    logger.warning(f"Error querying DB for recalculate_reservations: {db_err}")
+
+            # Fallback/in-memory active reservation calculation
+            for memo in _IN_MEMORY_ORDERS:
+                m_st = str(memo.get("status", "")).lower()
+                if m_st in RESERVATION_ELIGIBLE_STATUSES:
+                    for it in memo.get("items", []):
+                        if str(it.get("sku", "")).strip().upper() == clean_sku:
+                            active_reserved += float(it.get("quantity") or 0.0)
+
+            p_res = client.table("products").select("id").eq("sku", clean_sku).limit(1).execute() if client else None
+            if p_res and p_res.data:
                 prod_id = p_res.data[0]["id"]
                 inv_res = client.table("inventory").select("id, quantity_on_hand").eq("product_id", prod_id).limit(1).execute()
-                if inv_res.data:
+                if inv_res and inv_res.data:
                     inv_id = inv_res.data[0]["id"]
-                    q_on_hand = float(inv_res.data[0].get("quantity_on_hand") or 0)
-                    q_avail = q_on_hand - active_reserved
-
                     client.table("inventory").update({
-                        "quantity_reserved": round(active_reserved, 4),
-                        "quantity_available": round(q_avail, 4)
+                        "quantity_reserved": round(active_reserved, 4)
                     }).eq("id", inv_id).execute()
         except Exception as e:
             logger.error(f"Error recalculating reservations for SKU {sku}: {e}")

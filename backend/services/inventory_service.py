@@ -1,10 +1,27 @@
-# backend/services/inventory_service.py
 import logging
+import uuid
+from datetime import datetime
 from typing import List, Dict, Any, Optional
 from repositories.inventory_repo import InventoryRepository
 from schemas.inventory import ProductCreateSchema, StockAdjustmentSchema
 
 logger = logging.getLogger("inventory_service")
+
+DEFAULT_LOCATION_ID = "92db6a9f-6a52-5df1-5748-70301279a94a"
+
+def is_valid_uuid(val: Any) -> bool:
+    if not val or not isinstance(val, str):
+        return False
+    try:
+        uuid.UUID(val)
+        return True
+    except (ValueError, AttributeError):
+        return False
+
+def resolve_location_id(loc_id: Optional[str]) -> Optional[str]:
+    if is_valid_uuid(loc_id):
+        return loc_id
+    return DEFAULT_LOCATION_ID
 
 class InventoryService:
 
@@ -33,26 +50,41 @@ class InventoryService:
             "is_active": True,
         }
 
-
         created_prod = InventoryRepository.insert_product(prod_data)
         prod_id = created_prod["id"]
 
         # Insert initial inventory record
         locations = InventoryRepository.get_locations()
-        loc_id = locations[0]["id"] if locations else None
+        raw_loc_id = locations[0]["id"] if locations else None
+        loc_id = resolve_location_id(raw_loc_id)
 
         from supabase_client import get_supabase_client
         client = get_supabase_client()
-        inv_data = {
-            "product_id": prod_id,
-            "location_id": loc_id,
-            "quantity_on_hand": qty,
-            "quantity_reserved": 0.0,
-            "quantity_available": qty,
-        }
-        client.table("inventory").insert(inv_data).execute()
+        if client:
+            inv_data = {
+                "product_id": prod_id,
+                "location_id": loc_id,
+                "quantity_on_hand": 0.0,
+                "quantity_reserved": 0.0,
+            }
+            client.table("inventory").insert(inv_data).execute()
 
-        return {"status": "created", "id": prod_id, "sku": product.sku}
+        # Invalidate inventory cache and record initial stock transaction if qty > 0
+        InventoryRepository.invalidate_cache()
+        if qty > 0:
+            from repositories.transaction_repo import TransactionRepository
+            TransactionRepository.record_stock_transaction({
+                "transaction_type": "inward",
+                "product_id": prod_id,
+                "location_id": loc_id,
+                "quantity": qty,
+                "unit_cost": cost_p,
+                "reference_type": "inward",
+                "notes": f"Initial SKU stock setup for {clean_sku}",
+                "created_at": datetime.utcnow().isoformat()
+            })
+
+        return {"status": "created", "id": prod_id, "sku": clean_sku}
 
     @staticmethod
     def get_dealers() -> List[Dict[str, Any]]:
@@ -109,21 +141,21 @@ class InventoryService:
         new_avail = new_quantity - reserved
 
         now_str = datetime.utcnow().isoformat()
+        target_loc_id = resolve_location_id(location_id or current_inv.get("location_id"))
 
         # Update physical stock & available stock atomically
         client.table("inventory").update({
             "quantity_on_hand": new_quantity,
-            "quantity_available": new_avail,
             "updated_at": now_str
         }).eq("product_id", product_id).execute()
 
         # Record audit transaction entry in stock_transactions
         tx_data = {
-            "transaction_type": "ADJUSTMENT",
+            "transaction_type": "adjustment",
             "product_id": product_id,
-            "location_id": location_id or current_inv.get("location_id"),
+            "location_id": target_loc_id,
             "quantity": new_quantity - old_on_hand,
-            "reference_type": "manual_adjustment",
+            "reference_type": "adjustment",
             "notes": f"Manual stock adjustment: {reason}",
             "created_at": now_str
         }
@@ -131,6 +163,8 @@ class InventoryService:
             TransactionRepository.record_stock_transaction(tx_data)
         except Exception as tx_err:
             logger.warning(f"Transaction ledger log failed during stock adjustment: {tx_err}")
+
+        InventoryRepository.invalidate_cache()
 
         return {
             "status": "success",
@@ -149,30 +183,69 @@ class InventoryService:
         reason: Optional[str] = "Stock Inward",
         notes: Optional[str] = None
     ) -> Dict[str, Any]:
-        from repositories.transaction_repo import transaction_repository
-        from repositories.inventory_repo import inventory_repository
+        from datetime import datetime
+        from supabase_client import get_supabase_client
+        from repositories.transaction_repo import TransactionRepository
+        from repositories.inventory_repo import InventoryRepository
 
+        client = get_supabase_client()
         processed_txs = []
+        now_str = datetime.utcnow().isoformat()
+
         for it in items:
-            pid = it.get("product_id") or it.get("productId")
+            raw_pid = it.get("product_id") or it.get("productId")
+            sku = it.get("sku")
             qty = round(float(it.get("quantity", 0)), 4)
-            if not pid or qty <= 0:
+            unit_cost = float(it.get("unit_cost") or it.get("unitCost") or 0.0)
+            if (not raw_pid and not sku) or qty <= 0:
                 continue
 
-            # Record stock in transaction
-            tx = transaction_repository.record_transaction(
-                product_id=pid,
-                transaction_type="STOCK_IN",
-                quantity=qty,
-                reason=reason or "Stock Inward",
-                supplier_or_recipient=supplier or "Direct Supplier",
-                reference_number=reference_number or "REC-IN",
-                notes=notes
-            )
-            processed_txs.append(tx)
+            pid = None
+            # Resolve product UUID if passed as SKU string or if invalid UUID
+            if is_valid_uuid(raw_pid):
+                pid = raw_pid
+            elif client:
+                search_key = (sku or raw_pid or "").strip().upper()
+                if search_key:
+                    pres = client.table("products").select("id").eq("sku", search_key).limit(1).execute()
+                    if pres.data:
+                        pid = pres.data[0]["id"]
+
+            if not pid:
+                raise ValueError(f"Product identifier '{raw_pid or sku}' could not be resolved to a valid product in catalog.")
+
+            old_on_hand = 0.0
+            reserved = 0.0
+            loc_id = None
+            if client:
+                inv_res = client.table("inventory").select("*").eq("product_id", pid).limit(1).execute()
+                if inv_res.data:
+                    inv_row = inv_res.data[0]
+                    old_on_hand = float(inv_row.get("quantity_on_hand") or 0.0)
+                    reserved = float(inv_row.get("quantity_reserved") or 0.0)
+                    loc_id = inv_row.get("location_id")
+
+            new_on_hand = old_on_hand + qty
+
+            if client:
+                tx = TransactionRepository.record_stock_transaction({
+                    "transaction_type": "inward",
+                    "product_id": pid,
+                    "location_id": resolve_location_id(loc_id),
+                    "quantity": qty,
+                    "unit_cost": unit_cost,
+                    "reference_type": "inward",
+                    "reference_id": reference_number if is_valid_uuid(reference_number) else None,
+                    "notes": f"{reason or 'Stock Inward'} | Supplier: {supplier or 'Direct Supplier'} | Ref: {reference_number or '-'} | {notes or ''}",
+                    "created_at": now_str
+                })
+                processed_txs.append(tx)
+
+        InventoryRepository.invalidate_cache()
 
         return {
             "status": "SUCCESS",
+            "processed_count": len(processed_txs),
             "transactions": processed_txs
         }
 
@@ -198,22 +271,26 @@ class InventoryService:
         sorted_items = sorted(items, key=lambda it: str(it.get("product_id") or it.get("productId") or it.get("sku") or ""))
 
         for it in sorted_items:
-            pid = it.get("product_id") or it.get("productId")
+            raw_pid = it.get("product_id") or it.get("productId")
             sku = it.get("sku")
             qty = round(float(it.get("quantity", 0)), 4)
-            if (not pid and not sku) or qty <= 0:
+            if (not raw_pid and not sku) or qty <= 0:
                 continue
 
-            # Resolve product ID if only SKU supplied
-            if not pid and sku and client:
-                pres = client.table("products").select("id").eq("sku", sku.strip().upper()).limit(1).execute()
-                if pres.data:
-                    pid = pres.data[0]["id"]
+            pid = None
+            if is_valid_uuid(raw_pid):
+                pid = raw_pid
+            elif client:
+                search_key = (sku or raw_pid or "").strip().upper()
+                if search_key:
+                    pres = client.table("products").select("id").eq("sku", search_key).limit(1).execute()
+                    if pres.data:
+                        pid = pres.data[0]["id"]
 
             if not pid:
-                continue
+                raise ValueError(f"Product identifier '{raw_pid or sku}' could not be resolved to a valid product in catalog.")
 
-            # Lock inventory row
+            # Lock inventory row & check available stock
             old_on_hand = 0.0
             reserved = 0.0
             loc_id = None
@@ -225,28 +302,33 @@ class InventoryService:
                     reserved = float(inv_row.get("quantity_reserved") or 0.0)
                     loc_id = inv_row.get("location_id")
 
+            avail_stock = old_on_hand - reserved
+            if qty > avail_stock:
+                raise ValueError(f"INSUFFICIENT_STOCK: Requested stock-out quantity ({qty}) exceeds available stock ({avail_stock}).")
+
             new_on_hand = old_on_hand - qty
-            new_avail = new_on_hand - reserved
 
             if client:
-                client.table("inventory").update({
-                    "quantity_on_hand": new_on_hand,
-                    "quantity_available": new_avail,
-                    "updated_at": now_str
-                }).eq("product_id", pid).execute()
-
-                # Record stock out transaction
+                # Record stock out transaction (positive quantity to comply with schema)
                 tx = TransactionRepository.record_stock_transaction({
-                    "transaction_type": "STOCK_OUT",
+                    "transaction_type": "sale",
                     "product_id": pid,
-                    "location_id": loc_id,
-                    "quantity": -qty,
-                    "reference_type": "stock_out",
-                    "reference_id": reference_number or "SO-OUT",
+                    "location_id": resolve_location_id(loc_id),
+                    "quantity": qty,
+                    "reference_type": "order",
+                    "reference_id": reference_number if is_valid_uuid(reference_number) else None,
                     "notes": f"{reason or 'Stock Out'} | Recipient: {recipient or 'Direct'} | Ref: {reference_number or '-'} | {notes or ''}",
                     "created_at": now_str
                 })
                 processed_txs.append(tx)
+
+                # Set canonical updated stock balance
+                client.table("inventory").update({
+                    "quantity_on_hand": new_on_hand,
+                    "updated_at": now_str
+                }).eq("product_id", pid).execute()
+
+        InventoryRepository.invalidate_cache()
 
         return {
             "status": "SUCCESS",
@@ -368,19 +450,18 @@ class InventoryService:
             if client:
                 client.table("inventory").update({
                     "quantity_on_hand": new_on_hand,
-                    "quantity_available": new_avail,
                     "updated_at": now_str
                 }).eq("product_id", prod_id).execute()
 
                 # Record positive stock movement in ledger
                 TransactionRepository.record_stock_transaction({
-                    "transaction_type": "RETURN_IN",
+                    "transaction_type": "return_in",
                     "product_id": prod_id,
-                    "location_id": loc_id,
+                    "location_id": resolve_location_id(loc_id),
                     "quantity": float(item.quantity),
                     "unit_cost": float(item.price),
                     "reference_type": "return",
-                    "reference_id": ret_code,
+                    "reference_id": ret_code if is_valid_uuid(ret_code) else None,
                     "notes": f"Restocked from return {ret_code} | Reason: {item.reason}",
                     "created_at": now_str
                 })

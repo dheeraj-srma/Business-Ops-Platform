@@ -333,7 +333,16 @@ class InventoryRepository:
         client = get_db_client()
         if client:
             try:
-                res = client.table("dealers").select("*").limit(1000).execute()
+                # 1. Authoritative view with verified location_id, city, state, and salesman mapping
+                res = client.table("salesman_customer_catalog").select("*").limit(2000).execute()
+                if res.data is not None and len(res.data) > 0:
+                    SnapshotService.record_successful_read("dealers", res.data)
+                    return res.data
+            except Exception as cat_err:
+                logger.warning(f"Error fetching from salesman_customer_catalog: {cat_err}, falling back to dealers")
+
+            try:
+                res = client.table("dealers").select("*").limit(2000).execute()
                 if res.data is not None and len(res.data) > 0:
                     SnapshotService.record_successful_read("dealers", res.data)
                     return res.data
