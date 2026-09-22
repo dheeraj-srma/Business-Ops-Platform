@@ -100,29 +100,90 @@ class InventoryRepository:
         logger.info(f"Loaded {len(records)} authoritative inventory items from disk.")
         return records
 
-    @staticmethod
-    def fetch_all_products_with_inventory() -> List[Dict[str, Any]]:
+    _CACHE_INVENTORY: Optional[List[Dict[str, Any]]] = None
+    _CACHE_TIMESTAMP: float = 0.0
+    _CACHE_TTL: float = 60.0
+
+    @classmethod
+    def invalidate_cache(cls):
+        cls._CACHE_INVENTORY = None
+        cls._CACHE_TIMESTAMP = 0.0
+
+    @classmethod
+    def fetch_all_products_with_inventory(cls, force_refresh: bool = False) -> List[Dict[str, Any]]:
+        import time
+        now = time.time()
+        if not force_refresh and cls._CACHE_INVENTORY is not None and (now - cls._CACHE_TIMESTAMP < cls._CACHE_TTL):
+            return cls._CACHE_INVENTORY
+
         client = get_db_client()
         prods = []
-        db_fetch_error = None
+        inv_rows = []
         if client:
             try:
-                offset = 0
-                while True:
-                    res = client.table("products").select(
-                        "id, sku, name, brand, category_id, cost_price, default_sale_price, unit_of_measure, is_active, updated_at"
-                    ).range(offset, offset + 999).execute()
-                    batch = res.data or []
-                    if not batch:
-                        break
-                    prods.extend(batch)
-                    if len(batch) < 1000:
-                        break
-                    offset += 1000
+                from concurrent.futures import ThreadPoolExecutor
+
+                def fetch_table_pages(table_name, select_cols, page_size=1000, max_pages=6):
+                    def fetch_page(p_idx):
+                        start = p_idx * page_size
+                        res = client.table(table_name).select(select_cols).range(start, start + page_size - 1).execute()
+                        return res.data or []
+
+                    with ThreadPoolExecutor(max_workers=max_pages) as executor:
+                        pages = list(executor.map(fetch_page, range(max_pages)))
+
+                    results = []
+                    for page_data in pages:
+                        results.extend(page_data)
+                    return results
+
+                with ThreadPoolExecutor(max_workers=2) as executor:
+                    fut_prods = executor.submit(
+                        fetch_table_pages,
+                        "products",
+                        "id, sku, name, brand, category_id, cost_price, default_sale_price, unit_of_measure, is_active, updated_at",
+                        1000,
+                        6
+                    )
+                    fut_inv = executor.submit(
+                        fetch_table_pages,
+                        "inventory",
+                        "product_id, quantity_on_hand, quantity_reserved, quantity_available",
+                        1000,
+                        6
+                    )
+                    prods = fut_prods.result()
+                    inv_rows = fut_inv.result()
             except Exception as err:
-                db_fetch_error = err
-                logger.warning(f"PostgreSQL products fetch failed: {err}")
-                SnapshotService.record_db_failure("inventory", err)
+                logger.warning(f"Concurrent PostgreSQL fetch failed, falling back to sequential: {err}")
+                try:
+                    offset = 0
+                    while True:
+                        res = client.table("products").select(
+                            "id, sku, name, brand, category_id, cost_price, default_sale_price, unit_of_measure, is_active, updated_at"
+                        ).range(offset, offset + 999).execute()
+                        batch = res.data or []
+                        if not batch:
+                            break
+                        prods.extend(batch)
+                        if len(batch) < 1000:
+                            break
+                        offset += 1000
+                    offset = 0
+                    while True:
+                        res = client.table("inventory").select(
+                            "product_id, quantity_on_hand, quantity_reserved, quantity_available"
+                        ).range(offset, offset + 999).execute()
+                        batch = res.data or []
+                        if not batch:
+                            break
+                        inv_rows.extend(batch)
+                        if len(batch) < 1000:
+                            break
+                        offset += 1000
+                except Exception as seq_err:
+                    logger.warning(f"PostgreSQL fetch failed: {seq_err}")
+                    SnapshotService.record_db_failure("inventory", seq_err)
 
         if not prods:
             # Check backend-owned last known snapshot before falling back to static disk files
@@ -139,26 +200,9 @@ class InventoryRepository:
                     item_copy["_read_only"] = True
                     snap_records.append(item_copy)
                 return snap_records
-            return InventoryRepository._load_master_inventory_from_disk()
+            return cls._load_master_inventory_from_disk()
 
-        inv_map = {}
-        if client:
-            try:
-                offset = 0
-                while True:
-                    res = client.table("inventory").select(
-                        "product_id, quantity_on_hand, quantity_reserved, quantity_available"
-                    ).range(offset, offset + 999).execute()
-                    batch = res.data or []
-                    if not batch:
-                        break
-                    for row in batch:
-                        inv_map[row["product_id"]] = row
-                    if len(batch) < 1000:
-                        break
-                    offset += 1000
-            except Exception as err:
-                logger.warning(f"PostgreSQL inventory map fetch failed: {err}")
+        inv_map = {row["product_id"]: row for row in inv_rows if row.get("product_id")}
 
         records = []
         seen_keys = set()
@@ -224,6 +268,8 @@ class InventoryRepository:
         if records:
             SnapshotService.record_successful_read("inventory", records)
 
+        cls._CACHE_INVENTORY = records
+        cls._CACHE_TIMESTAMP = now
         return records
 
     @staticmethod

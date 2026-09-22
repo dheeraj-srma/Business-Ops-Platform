@@ -76,7 +76,7 @@ def get_salesman_detail_performance(
 @router.get("/{salesman_id}/heatmap")
 def get_salesman_heatmap(
     salesman_id: str,
-    days: int = Query(365, ge=7, le=730),
+    days: int = Query(365, ge=1, le=730),
     current_user: dict = Depends(optional_auth)
 ):
     try:
