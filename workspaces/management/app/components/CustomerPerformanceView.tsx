@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Users,
   DollarSign,
@@ -17,12 +17,17 @@ import {
   AlertCircle,
   BarChart3,
   Award,
-  ChevronDown
+  ChevronDown,
+  MapPin,
+  UserCheck,
+  ChevronRight,
+  RefreshCw,
+  FileText
 } from 'lucide-react';
 import { useBi } from '../context/BiDataContext';
 import GithubHeatmap, { HeatmapDay } from './GithubHeatmap';
 import InteractiveChart from './InteractiveChart';
-import { DateRangeType, getDateRangeBounds, filterItemsByDateRange, parseCalendarDate, formatCalendarDate } from '../utils/dateRange';
+import { resolveDateRange, DateRangeType } from '../utils/dateRange';
 import { calculateAOV } from '../utils/metricCalculations';
 
 interface CustomerRecord {
@@ -44,12 +49,34 @@ interface CustomerRecord {
 export default function CustomerPerformanceView() {
   const { sales, kpis, dealersList, ordersList, customersAnalyticsList } = useBi();
 
-  // Search & Filter State
+  // Date Range Filter State (matching SalesmanPerformanceView)
+  const [dateRange, setDateRange] = useState<string>('30d');
+  const [customStart, setCustomStart] = useState<string>('');
+  const [customEnd, setCustomEnd] = useState<string>('');
+
+  // Selected Customer Focus State ('all' or customer_id)
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>('all');
+
+  // Heatmap State
+  const [heatmapDays, setHeatmapDays] = useState<HeatmapDay[]>([]);
+  const [heatmapRange, setHeatmapRange] = useState<string>('30d');
+  const [loadingHeatmap, setLoadingHeatmap] = useState<boolean>(false);
+
+  // Table Search & Filter State
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [dateRange, setDateRange] = useState<DateRangeType>('30d');
+  const [tierFilter, setTierFilter] = useState<string>('all');
   const [page, setPage] = useState<number>(1);
   const pageSize = 10;
+
+  // Chart Granularity for selected customer timeline
+  const [chartGranularity, setChartGranularity] = useState<'daily' | 'weekly' | 'monthly'>('daily');
+
+  // Authoritative calendar date strings derived from dateRange.ts
+  const { startDateStr, endDateStr, daysCount } = useMemo(() => {
+    const rangeType = (dateRange === 'this_year' ? 'ytd' : dateRange) as DateRangeType;
+    const res = resolveDateRange(rangeType, customStart, customEnd);
+    return { startDateStr: res.startDate, endDateStr: res.endDate, daysCount: res.daysCount };
+  }, [dateRange, customStart, customEnd]);
 
   // Authoritative Customer Catalog: Primary source is backend historical customer analytics (Rule 18)
   const customersData: CustomerRecord[] = useMemo(() => {
@@ -69,7 +96,7 @@ export default function CustomerPerformanceView() {
         const rev = Math.round(Number(c.revenue || 0));
         const ords = Number(c.voucher_count || 0);
         const avgOrd = Number(c.aov || (ords > 0 ? Math.round(rev / ords) : 0));
-        const units = 0;
+        const units = Number(c.units_sold || 0);
         const activeDays = Number(c.active_days || 1);
         const prodDiversity = Number(c.product_diversity || 1);
         const tier = rev > 250000 ? 'Platinum' : rev > 120000 ? 'Gold' : rev > 50000 ? 'Silver' : 'Bronze';
@@ -139,20 +166,86 @@ export default function CustomerPerformanceView() {
     return [];
   }, [customersAnalyticsList, dealersList]);
 
-  // Filtered Customers dropdown options based on search query
-  const filteredCustomerOptions = useMemo(() => {
-    if (!searchQuery.trim()) return customersData;
-    const q = searchQuery.toLowerCase();
-    return customersData.filter(
-      c => c.name.toLowerCase().includes(q) || c.id.toLowerCase().includes(q) || c.city.toLowerCase().includes(q) || c.salesman.toLowerCase().includes(q) || c.state.toLowerCase().includes(q)
-    );
-  }, [customersData, searchQuery]);
-
   // Current Selected Customer object (or null if "All Customers")
   const selectedCustomer = useMemo(() => {
     if (selectedCustomerId === 'all') return null;
     return customersData.find(c => c.id === selectedCustomerId) || null;
   }, [selectedCustomerId, customersData]);
+
+  // Filtered Customers for comparison table based on search query & tier filter
+  const filteredCustomerOptions = useMemo(() => {
+    let list = customersData;
+    if (tierFilter !== 'all') {
+      list = list.filter(c => c.tier.toLowerCase() === tierFilter.toLowerCase());
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      list = list.filter(
+        c => c.name.toLowerCase().includes(q) || c.id.toLowerCase().includes(q) || c.city.toLowerCase().includes(q) || c.salesman.toLowerCase().includes(q) || c.state.toLowerCase().includes(q)
+      );
+    }
+    return list;
+  }, [customersData, searchQuery, tierFilter]);
+
+  // Heatmap Fetcher from authoritative backend historical database
+  const fetchHeatmap = async (customerId: string, range: string) => {
+    setLoadingHeatmap(true);
+    try {
+      let daysParam = 30;
+      switch (range) {
+        case '7d':
+        case 'this_week':
+          daysParam = 7;
+          break;
+        case '30d':
+        case 'this_month':
+        case 'last_month':
+          daysParam = 30;
+          break;
+        case '3m':
+        case '90d':
+        case 'this_quarter':
+          daysParam = 90;
+          break;
+        case '6m':
+        case '180d':
+          daysParam = 180;
+          break;
+        case '12m':
+        case '1y':
+        case '365d':
+        case 'this_year':
+        case 'ytd':
+        case 'all':
+          daysParam = 365;
+          break;
+        default:
+          daysParam = 30;
+      }
+
+      const qCust = customerId && customerId !== 'all' ? encodeURIComponent(customerId) : 'all';
+      const url = `/api/analytics/customers/heatmap?customer_id=${qCust}&days=${daysParam}`;
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = await res.json();
+        setHeatmapDays(data.days || []);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingHeatmap(false);
+    }
+  };
+
+  // Sync heatmapRange when main dateRange changes
+  useEffect(() => {
+    setHeatmapRange(dateRange);
+  }, [dateRange]);
+
+  // Fetch heatmap on customer focus or range change
+  useEffect(() => {
+    fetchHeatmap(selectedCustomerId, heatmapRange);
+  }, [selectedCustomerId, heatmapRange]);
 
   // Calculated KPI Values: Pure sum from actual data
   const metrics = useMemo(() => {
@@ -184,7 +277,7 @@ export default function CustomerPerformanceView() {
     };
   }, [selectedCustomer, customersData, sales.top_products]);
 
-  // Top Customer Revenue Ranking (Horizontal Bar - Rule 18 & 26)
+  // Top Customer Revenue Ranking (Horizontal Bar)
   const topCustomersRankingData = useMemo(() => {
     return [...customersData]
       .sort((a, b) => b.revenue - a.revenue)
@@ -195,7 +288,7 @@ export default function CustomerPerformanceView() {
       }));
   }, [customersData]);
 
-  // Customer Purchase Frequency Distribution (Bar - Rule 18 & 26)
+  // Customer Purchase Frequency Distribution (Bar)
   const frequencyDistributionData = useMemo(() => {
     const buckets: Record<string, number> = {
       '1 Voucher': 0,
@@ -214,416 +307,389 @@ export default function CustomerPerformanceView() {
     return Object.entries(buckets).map(([name, value]) => ({ name, value }));
   }, [customersData]);
 
-  // Order Activity Heatmap: Derived from actual orders (Phase 13)
-  const heatmapDays: HeatmapDay[] = useMemo(() => {
-    const days: HeatmapDay[] = [];
-    const bounds = getDateRangeBounds(dateRange);
-    const start = parseCalendarDate(bounds.start);
-    const end = parseCalendarDate(bounds.end);
-
-    // Map actual order timestamps
-    const rangedOrders = filterItemsByDateRange(ordersList, dateRange, o => String(o.created_at || ''));
-    const relevantOrders = selectedCustomer
-      ? rangedOrders.filter(o => String(o.shop_name || o.customer_name || '').toLowerCase().includes(selectedCustomer.name.toLowerCase()))
-      : rangedOrders;
-
-    const dayOrdersMap: Record<string, { count: number; sales: number; customers: Set<string> }> = {};
-    relevantOrders.forEach(o => {
-      const d = String(o.created_at || '').slice(0, 10);
-      if (!d) return;
-      if (!dayOrdersMap[d]) {
-        dayOrdersMap[d] = { count: 0, sales: 0, customers: new Set() };
-      }
-      dayOrdersMap[d].count += 1;
-      dayOrdersMap[d].sales += Number(o.total_amount || 0);
-      dayOrdersMap[d].customers.add(String(o.shop_name || o.customer_name || ''));
-    });
-
-    for (let cur = new Date(start); cur <= end; cur.setDate(cur.getDate() + 1)) {
-      const dStr = formatCalendarDate(cur);
-      const isSunday = cur.getDay() === 0;
-      const dataPoint = dayOrdersMap[dStr];
-
-      if (dataPoint) {
-        days.push({
-          date: dStr,
-          orders: dataPoint.count,
-          sales: Math.round(dataPoint.sales),
-          customers: dataPoint.customers.size,
-        });
-      } else {
-        days.push({
-          date: dStr,
-          orders: 0,
-          sales: 0,
-          customers: 0,
-        });
-      }
-    }
-    return days;
-  }, [selectedCustomer, dateRange, ordersList]);
-
-  // Sales Over Time Data: Group actual orders by date (Phase 13)
-  const salesOverTimeData = useMemo(() => {
-    const rangedOrders = filterItemsByDateRange(ordersList, dateRange, o => String(o.created_at || ''));
-    const targetOrders = selectedCustomer
-      ? rangedOrders.filter(o => String(o.shop_name || o.customer_name || '').toLowerCase().includes(selectedCustomer.name.toLowerCase()))
-      : rangedOrders;
-
-    if (targetOrders.length === 0) {
-      // Fallback to daily sales if individual orders are not yet populated
-      const filteredDaily = filterItemsByDateRange(sales.daily_sales || [], dateRange, d => d.date);
-      return filteredDaily.map(d => ({
+  // Time-Series Trend Chart Data for Selected Customer
+  const chartData = useMemo(() => {
+    const raw = heatmapDays.filter(d => d.orders > 0 || d.sales > 0);
+    if (chartGranularity === 'daily') {
+      return raw.map(d => ({
         name: d.date.slice(5),
-        value: Math.round(d.revenue),
+        Sales: d.sales,
+        Orders: d.orders
       }));
     }
 
-    const dateMap: Record<string, number> = {};
-    targetOrders.forEach(o => {
-      const isApproved = ['approved', 'dispatched', 'delivered'].includes(String(o.status || '').toLowerCase());
-      if (!isApproved) return;
-      const d = String(o.created_at || '').slice(0, 10);
-      if (!d) return;
-      dateMap[d] = (dateMap[d] || 0) + Number(o.total_amount || 0);
-    });
+    if (chartGranularity === 'monthly') {
+      const monthMap = new Map<string, { sales: number; orders: number }>();
+      raw.forEach(d => {
+        const mKey = d.date.slice(0, 7);
+        const curr = monthMap.get(mKey) || { sales: 0, orders: 0 };
+        monthMap.set(mKey, {
+          sales: curr.sales + d.sales,
+          orders: curr.orders + d.orders
+        });
+      });
+      return Array.from(monthMap.entries()).map(([mKey, val]) => ({
+        name: mKey,
+        Sales: Math.round(val.sales),
+        Orders: val.orders
+      }));
+    }
 
-    return Object.keys(dateMap).sort().map(d => ({
-      name: d.slice(5),
-      value: Math.round(dateMap[d]),
-    }));
-  }, [ordersList, selectedCustomer, dateRange, sales.daily_sales]);
-
-  // Items Bought: Real products from order items
-  const itemsBoughtData = useMemo(() => {
-    const rangedOrders = filterItemsByDateRange(ordersList, dateRange, o => String(o.created_at || ''));
-    const targetOrders = selectedCustomer
-      ? rangedOrders.filter(o => String(o.shop_name || o.customer_name || '').toLowerCase().includes(selectedCustomer.name.toLowerCase()))
-      : rangedOrders;
-
-    const prodMap: Record<string, { category: string; qty: number; revenue: number }> = {};
-    targetOrders.forEach(o => {
-      const items = Array.isArray(o.items) ? o.items : [];
-      items.forEach((it: any) => {
-        const name = String(it.name || it.item_name || it.sku || 'Item').trim();
-        const cat = String(it.category || 'General').trim();
-        const qty = Number(it.quantity || 1);
-        const price = Number(it.unit_price || it.price || 0);
-        if (!prodMap[name]) prodMap[name] = { category: cat, qty: 0, revenue: 0 };
-        prodMap[name].qty += qty;
-        prodMap[name].revenue += (qty * price);
+    // Weekly aggregation
+    const weekMap = new Map<string, { sales: number; orders: number }>();
+    raw.forEach(d => {
+      const dt = new Date(`${d.date}T00:00:00Z`);
+      const dayOfWeek = (dt.getUTCDay() + 6) % 7;
+      const mon = new Date(dt.getTime() - dayOfWeek * 86400000);
+      const wKey = mon.toISOString().slice(5, 10);
+      const curr = weekMap.get(wKey) || { sales: 0, orders: 0 };
+      weekMap.set(wKey, {
+        sales: curr.sales + d.sales,
+        orders: curr.orders + d.orders
       });
     });
-
-    const result = Object.entries(prodMap).map(([name, val]) => ({
-      name,
-      category: val.category,
-      qty: val.qty,
-      revenue: Math.round(val.revenue),
-    })).sort((a, b) => b.revenue - a.revenue);
-
-    if (result.length > 0) return result.slice(0, 10);
-
-    return (sales.top_products || []).slice(0, 6).map(p => ({
-      name: p.name,
-      category: 'General',
-      qty: p.qty,
-      revenue: Math.round(p.qty * 380),
+    return Array.from(weekMap.entries()).map(([wKey, val]) => ({
+      name: `Wk ${wKey}`,
+      Sales: Math.round(val.sales),
+      Orders: val.orders
     }));
-  }, [ordersList, selectedCustomer, dateRange, sales.top_products]);
-
-  // Order History: Actual orders from database
-  const orderHistory = useMemo(() => {
-    const rangedOrders = filterItemsByDateRange(ordersList, dateRange, o => String(o.created_at || ''));
-    const targetOrders = selectedCustomer
-      ? rangedOrders.filter(o => String(o.shop_name || o.customer_name || '').toLowerCase().includes(selectedCustomer.name.toLowerCase()))
-      : rangedOrders;
-
-    return targetOrders.slice(0, 15).map(o => {
-      const dateStr = String(o.created_at || '').slice(0, 10);
-      const items = Array.isArray(o.items) ? o.items.length : 1;
-      return {
-        id: String(o.order_id || o.id || 'ORD-UNKNOWN'),
-        date: dateStr,
-        customer: String(o.shop_name || o.customer_name || 'Customer'),
-        items,
-        amount: Math.round(Number(o.total_amount || 0)),
-        status: String(o.status || 'Approved'),
-      };
-    });
-  }, [ordersList, selectedCustomer, dateRange]);
+  }, [heatmapDays, chartGranularity]);
 
   return (
     <div className="space-y-6 animate-fadeIn">
-      {/* ── Customer Selector Bar ───────────────────────────────────────── */}
-      <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 shadow-lg backdrop-blur-md flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
-        {/* Customer Search Input */}
-        <div className="relative flex-1 min-w-[280px]">
-          <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-            <Search size={16} />
+      {/* ── Top Unified Date Range & Selector Control Bar (Matching Salesman Layout) ── */}
+      <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 shadow-lg flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 backdrop-blur-md">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/40 rounded-xl text-indigo-600 dark:text-indigo-400">
+            <Calendar size={20} />
           </div>
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search 804 customers by name, code, city, state, or salesman..."
-            className="w-full pl-10 pr-4 py-2.5 bg-slate-800/80 border border-slate-700/60 rounded-xl text-xs font-medium text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-600 dark:border-indigo-500/50 transition-all"
-          />
+          <div>
+            <div className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Scope</div>
+            <div className="text-sm font-bold text-white flex items-center gap-2">
+              <span>Customer Performance</span>
+            </div>
+          </div>
         </div>
 
-        {/* Customer Dropdown */}
-        <div className="flex items-center gap-3 shrink-0">
-          <div className="relative min-w-[280px] max-w-[380px]">
+        {/* Filters */}
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Customer Focus Dropdown */}
+          <div className="flex items-center gap-2 bg-slate-950/80 px-3 py-2 rounded-xl border border-slate-800 text-xs">
+            <Users size={14} className="text-sky-400" />
             <select
               value={selectedCustomerId}
               onChange={(e) => setSelectedCustomerId(e.target.value)}
-              className="w-full appearance-none bg-slate-800/80 border border-slate-700/60 rounded-xl px-4 py-2.5 pr-9 text-xs font-bold text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-600 dark:border-indigo-500/50 cursor-pointer transition-all truncate"
+              className="bg-transparent text-white font-semibold focus:outline-none cursor-pointer max-w-[240px] truncate"
             >
-              <option value="all">👥 All Customers ({customersData.length} Accounts)</option>
-              {filteredCustomerOptions.map((c, idx) => (
-                <option key={`${c.id}-${idx}`} value={c.id}>
-                  {c.name} — {c.city} ({c.state})
+              <option value="all" className="bg-slate-900 text-white">All Customers ({customersData.length} Accounts)</option>
+              {customersData.map((c, idx) => (
+                <option key={`${c.id}-${idx}`} value={c.id} className="bg-slate-900 text-white">
+                  {c.name} ({c.city})
                 </option>
               ))}
             </select>
-            <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-slate-400">
-              <ChevronDown size={16} />
-            </div>
           </div>
 
-          {/* Interactive Header Time Range Selector */}
-          <div className="flex items-center bg-slate-800/80 p-1 rounded-xl border border-slate-700/60 text-xs font-semibold text-slate-400">
-            {[
-              { id: '7d' as DateRangeType, label: '7D' },
-              { id: '30d' as DateRangeType, label: '30D' },
-              { id: '90d' as DateRangeType, label: '90D' },
-              { id: 'ytd' as DateRangeType, label: 'YTD' },
-            ].map((r) => (
-              <button
-                key={r.id}
-                onClick={() => setDateRange(r.id)}
-                className={`px-3 py-1.5 rounded-lg uppercase tracking-wider text-[10px] font-bold transition-all ${
-                  dateRange === r.id
-                    ? 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800/60 font-bold shadow-xs'
-                    : 'hover:text-slate-200 hover:bg-slate-700/40'
-                }`}
-              >
-                {r.label}
-              </button>
-            ))}
+          {/* Date Range Selector */}
+          <div className="flex items-center gap-2 bg-slate-950/80 px-3 py-2 rounded-xl border border-slate-800 text-xs">
+            <span className="text-slate-400 font-medium">Period:</span>
+            <select
+              value={dateRange}
+              onChange={(e) => setDateRange(e.target.value)}
+              className="bg-transparent text-indigo-600 dark:text-indigo-400 font-bold focus:outline-none cursor-pointer"
+            >
+              <option value="today" className="bg-slate-900 text-white">Today</option>
+              <option value="7d" className="bg-slate-900 text-white">Last 7 Days</option>
+              <option value="30d" className="bg-slate-900 text-white">Last 30 Days</option>
+              <option value="this_month" className="bg-slate-900 text-white">This Month</option>
+              <option value="last_month" className="bg-slate-900 text-white">Last Month</option>
+              <option value="12m" className="bg-slate-900 text-white">Last 12 Months</option>
+              <option value="this_year" className="bg-slate-900 text-white">This Year</option>
+              <option value="custom" className="bg-slate-900 text-white">Custom Range</option>
+            </select>
           </div>
+
+          {dateRange === 'custom' && (
+            <div className="flex items-center gap-2 text-xs">
+              <input
+                type="date"
+                value={customStart}
+                onChange={(e) => setCustomStart(e.target.value)}
+                className="bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-1.5 text-white"
+              />
+              <span className="text-slate-500">to</span>
+              <input
+                type="date"
+                value={customEnd}
+                onChange={(e) => setCustomEnd(e.target.value)}
+                className="bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-1.5 text-white"
+              />
+            </div>
+          )}
+
+          <button
+            onClick={() => fetchHeatmap(selectedCustomerId, heatmapRange)}
+            className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl transition-all border border-slate-700/50"
+            title="Refresh Data"
+          >
+            <RefreshCw size={14} className={loadingHeatmap ? 'animate-spin' : ''} />
+          </button>
         </div>
       </div>
 
-      {/* Selected Customer Header Banner */}
-      {selectedCustomer && (
-        <div className="bg-cyan-950/30 border border-indigo-200 dark:border-indigo-800/60 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs transition-all">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-300 dark:border-indigo-700/60 flex items-center justify-center text-indigo-600 dark:text-indigo-400 font-extrabold text-sm shrink-0">
-              {selectedCustomer.name.charAt(0)}
-            </div>
+      {/* ── 1. Aggregate KPI Cards (Matching Salesman Performance Layout) ── */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+        <div className="bg-slate-900/70 border border-slate-800/80 rounded-2xl p-4 shadow-lg">
+          <div className="flex items-center justify-between text-slate-400 mb-2">
+            <span className="text-[11px] font-semibold uppercase tracking-wider">Total Sales</span>
+            <DollarSign size={16} className="text-indigo-600 dark:text-indigo-400" />
+          </div>
+          <div className="text-lg font-extrabold text-white">
+            ₹{metrics.totalSales.toLocaleString('en-IN')}
+          </div>
+          <div className="text-[10px] text-slate-500 mt-1">Live data</div>
+        </div>
+
+        <div className="bg-slate-900/70 border border-slate-800/80 rounded-2xl p-4 shadow-lg">
+          <div className="flex items-center justify-between text-slate-400 mb-2">
+            <span className="text-[11px] font-semibold uppercase tracking-wider">Orders</span>
+            <ShoppingCart size={16} className="text-sky-400" />
+          </div>
+          <div className="text-lg font-extrabold text-white">
+            {metrics.orders.toLocaleString('en-IN')}
+          </div>
+          <div className="text-[10px] text-slate-500 mt-1">Completed orders</div>
+        </div>
+
+        <div className="bg-slate-900/70 border border-slate-800/80 rounded-2xl p-4 shadow-lg">
+          <div className="flex items-center justify-between text-slate-400 mb-2">
+            <span className="text-[11px] font-semibold uppercase tracking-wider">Average Order</span>
+            <TrendingUp size={16} className="text-amber-400" />
+          </div>
+          <div className="text-lg font-extrabold text-white">
+            ₹{metrics.avgOrder.toLocaleString('en-IN')}
+          </div>
+          <div className="text-[10px] text-slate-500 mt-1">Average order value</div>
+        </div>
+
+        <div className="bg-slate-900/70 border border-slate-800/80 rounded-2xl p-4 shadow-lg">
+          <div className="flex items-center justify-between text-slate-400 mb-2">
+            <span className="text-[11px] font-semibold uppercase tracking-wider">Units Sold</span>
+            <Package size={16} className="text-indigo-400" />
+          </div>
+          <div className="text-lg font-extrabold text-white">
+            {metrics.unitsSold.toLocaleString('en-IN')}
+          </div>
+          <div className="text-[10px] text-slate-500 mt-1">Total units</div>
+        </div>
+
+        <div className="bg-slate-900/70 border border-slate-800/80 rounded-2xl p-4 shadow-lg">
+          <div className="flex items-center justify-between text-slate-400 mb-2">
+            <span className="text-[11px] font-semibold uppercase tracking-wider">{selectedCustomer ? 'Products' : 'Customers'}</span>
+            <Building2 size={16} className="text-purple-400" />
+          </div>
+          <div className="text-lg font-extrabold text-white">
+            {selectedCustomer ? `${metrics.products} SKUs` : `${customersData.length} Accounts`}
+          </div>
+          <div className="text-[10px] text-slate-500 mt-1">{selectedCustomer ? 'Distinct items' : 'Unique accounts'}</div>
+        </div>
+
+        <div className="bg-slate-900/70 border border-slate-800/80 rounded-2xl p-4 shadow-lg">
+          <div className="flex items-center justify-between text-slate-400 mb-2">
+            <span className="text-[11px] font-semibold uppercase tracking-wider">Active Days</span>
+            <Calendar size={16} className="text-teal-400" />
+          </div>
+          <div className="text-lg font-extrabold text-white">
+            {metrics.activeDays} Days
+          </div>
+          <div className="text-[10px] text-slate-500 mt-1">Purchase activity</div>
+        </div>
+      </div>
+
+      {/* ── 2. GitHub-Style Order Activity Heatmap (Identical Interactive Component) ── */}
+      <GithubHeatmap
+        days={heatmapDays}
+        title={selectedCustomerId === 'all' ? "Order Activity" : `Order Activity: ${selectedCustomer?.name || 'Customer'}`}
+        subtitle={selectedCustomerId === 'all' ? "Daily order activity for all customers" : `Daily order activity for ${selectedCustomer?.name || 'selected customer'}`}
+        selectedRange={heatmapRange}
+        onRangeChange={setHeatmapRange}
+        isLoading={loadingHeatmap}
+      />
+
+      {/* ── 3. Selected Customer Focus Analytics Detail View (Matching Salesman Detail) ── */}
+      {selectedCustomerId !== 'all' && selectedCustomer && (
+        <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-5">
+          {/* Header Card */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
             <div>
-              <div className="flex items-center gap-2">
-                <span className="font-extrabold text-sm text-slate-100">{selectedCustomer.name}</span>
-                <span className="px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800/60 font-bold text-[10px]">
-                  {selectedCustomer.tier} Partner
+              <div className="flex items-center gap-2 mb-1">
+                <span className={`px-2.5 py-0.5 rounded-md text-[10px] font-bold border uppercase ${
+                  selectedCustomer.tier === 'Platinum' ? 'bg-indigo-900/60 text-indigo-300 border-indigo-700/60' :
+                  selectedCustomer.tier === 'Gold' ? 'bg-amber-900/60 text-amber-300 border-amber-700/60' :
+                  selectedCustomer.tier === 'Silver' ? 'bg-slate-800 text-slate-300 border-slate-700' :
+                  'bg-slate-800 text-slate-400 border-slate-700'
+                }`}>
+                  {selectedCustomer.tier} Tier Account
                 </span>
-                <span className="text-[10px] text-slate-400 font-mono">[{selectedCustomer.id}]</span>
+                <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400">
+                  ACTIVE
+                </span>
               </div>
-              <p className="text-slate-400 text-[11px] mt-0.5">
-                {selectedCustomer.city}, {selectedCustomer.state} • Sales Rep: <span className="text-slate-200 font-semibold">{selectedCustomer.salesman}</span> • Phone: <span className="text-slate-300 font-mono">{selectedCustomer.phone}</span>
-              </p>
+              <h2 className="text-xl font-extrabold text-white tracking-tight flex items-center gap-2">
+                {selectedCustomer.name}
+                <span className="text-xs font-medium text-slate-400 font-mono">({selectedCustomer.id})</span>
+              </h2>
+              <div className="text-xs text-slate-400 mt-1 flex flex-wrap items-center gap-4">
+                <span className="flex items-center gap-1">
+                  <MapPin size={12} className="text-sky-400" />
+                  {selectedCustomer.city}, {selectedCustomer.state}
+                </span>
+                <span className="flex items-center gap-1">
+                  <UserCheck size={12} className="text-indigo-400" />
+                  Rep: {selectedCustomer.salesman}
+                </span>
+                <span className="text-slate-500 font-mono text-[11px]">
+                  {selectedCustomer.phone}
+                </span>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setSelectedCustomerId('all')}
+              className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl transition-all border border-slate-700/60 flex items-center gap-2 self-start sm:self-auto"
+            >
+              <span>View All Customers</span>
+              <ChevronRight size={14} />
+            </button>
+          </div>
+
+          {/* Exact Sales Breakdown Panel */}
+          <div>
+            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+              <FileText size={14} className="text-sky-400" />
+              Sales Breakdown
+            </h4>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+              <div className="bg-slate-950/60 p-3 rounded-xl border border-slate-800/80">
+                <div className="text-slate-400 mb-1">Gross Sales</div>
+                <div className="text-sm font-extrabold text-white">₹{selectedCustomer.revenue.toLocaleString('en-IN')}</div>
+              </div>
+              <div className="bg-slate-950/60 p-3 rounded-xl border border-slate-800/80">
+                <div className="text-slate-400 mb-1">Total Vouchers</div>
+                <div className="text-sm font-extrabold text-sky-400">{selectedCustomer.orders}</div>
+                <div className="text-[10px] text-slate-500 mt-0.5">Average ₹{selectedCustomer.avg_order.toLocaleString('en-IN')}</div>
+              </div>
+              <div className="bg-slate-950/60 p-3 rounded-xl border border-slate-800/80">
+                <div className="text-slate-400 mb-1">Units Dispatched</div>
+                <div className="text-sm font-extrabold text-amber-400">{selectedCustomer.units_sold.toLocaleString('en-IN')}</div>
+                <div className="text-[10px] text-slate-500 mt-0.5">Across {selectedCustomer.products_count} distinct SKUs</div>
+              </div>
+              <div className="bg-slate-950/60 p-3 rounded-xl border border-slate-800/80">
+                <div className="text-slate-400 mb-1">Active Days</div>
+                <div className="text-sm font-extrabold text-teal-400">{selectedCustomer.active_days} Days</div>
+                <div className="text-[10px] text-slate-500 mt-0.5">Purchase activity</div>
+              </div>
             </div>
           </div>
-          <button
-            onClick={() => setSelectedCustomerId('all')}
-            className="px-3 py-1.5 bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 rounded-lg font-bold text-[11px] transition-all border border-slate-700"
-          >
-            ← View All Customers
-          </button>
+
+          {/* Interactive Chart for Time-Series Trend */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                <BarChart3 size={14} className="text-indigo-600 dark:text-indigo-400" />
+                Sales Timeline
+              </h4>
+              <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-lg border border-slate-800 text-[11px]">
+                {(['daily', 'weekly', 'monthly'] as const).map(g => (
+                  <button
+                    key={g}
+                    onClick={() => setChartGranularity(g)}
+                    className={`px-2.5 py-1 rounded-md capitalize font-medium transition-all ${chartGranularity === g ? 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 font-bold' : 'text-slate-400 hover:text-white'}`}
+                  >
+                    {g}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <InteractiveChart
+              title={`Sales & Orders (${chartGranularity})`}
+              subtitle={`Order activity timeline for ${selectedCustomer.name}`}
+              data={chartData}
+              defaultChartType="area"
+              unit="₹"
+            />
+          </div>
         </div>
       )}
 
-      {/* ── 6 KPI Metric Cards ──────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5">
-        {/* Total Sales */}
-        <div className="bg-slate-900/70 border border-slate-800 rounded-xl p-4 shadow-md backdrop-blur-xs flex flex-col justify-between">
-          <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Total Sales</span>
-            <div className="p-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400">
-              <DollarSign size={15} />
-            </div>
-          </div>
-          <div className="text-lg sm:text-xl font-black text-indigo-600 dark:text-indigo-400 tracking-tight">
-            ₹{metrics.totalSales.toLocaleString('en-IN')}
-          </div>
-          <div className="text-[10px] text-slate-400 mt-1 font-medium flex items-center gap-1">
-            <TrendingUp size={11} className="text-indigo-600 dark:text-indigo-400" />
-            <span>Gross revenue ({dateRange.toUpperCase()})</span>
-          </div>
-        </div>
-
-        {/* Orders */}
-        <div className="bg-slate-900/70 border border-slate-800 rounded-xl p-4 shadow-md backdrop-blur-xs flex flex-col justify-between">
-          <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Orders</span>
-            <div className="p-1.5 rounded-lg bg-sky-500/10 text-sky-400">
-              <ShoppingCart size={15} />
-            </div>
-          </div>
-          <div className="text-lg sm:text-xl font-black text-sky-400 tracking-tight">
-            {metrics.orders.toLocaleString('en-IN')}
-          </div>
-          <div className="text-[10px] text-slate-400 mt-1 font-medium">Dispatches placed</div>
-        </div>
-
-        {/* Average Order */}
-        <div className="bg-slate-900/70 border border-slate-800 rounded-xl p-4 shadow-md backdrop-blur-xs flex flex-col justify-between">
-          <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Average Order</span>
-            <div className="p-1.5 rounded-lg bg-purple-500/10 text-purple-400">
-              <BarChart3 size={15} />
-            </div>
-          </div>
-          <div className="text-lg sm:text-xl font-black text-purple-400 tracking-tight">
-            ₹{metrics.avgOrder.toLocaleString('en-IN')}
-          </div>
-          <div className="text-[10px] text-slate-400 mt-1 font-medium">Avg ticket size</div>
-        </div>
-
-        {/* Units Sold */}
-        <div className="bg-slate-900/70 border border-slate-800 rounded-xl p-4 shadow-md backdrop-blur-xs flex flex-col justify-between">
-          <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Units Sold</span>
-            <div className="p-1.5 rounded-lg bg-amber-500/10 text-amber-400">
-              <Package size={15} />
-            </div>
-          </div>
-          <div className="text-lg sm:text-xl font-black text-amber-400 tracking-tight">
-            {metrics.unitsSold.toLocaleString('en-IN')}
-          </div>
-          <div className="text-[10px] text-slate-400 mt-1 font-medium">Total quantity</div>
-        </div>
-
-        {/* Products */}
-        <div className="bg-slate-900/70 border border-slate-800 rounded-xl p-4 shadow-md backdrop-blur-xs flex flex-col justify-between">
-          <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Products</span>
-            <div className="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-400">
-              <Building2 size={15} />
-            </div>
-          </div>
-          <div className="text-lg sm:text-xl font-black text-indigo-400 tracking-tight">
-            {metrics.products} SKUs
-          </div>
-          <div className="text-[10px] text-slate-400 mt-1 font-medium">Distinct items</div>
-        </div>
-
-        {/* Active Days */}
-        <div className="bg-slate-900/70 border border-slate-800 rounded-xl p-4 shadow-md backdrop-blur-xs flex flex-col justify-between">
-          <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Active Days</span>
-            <div className="p-1.5 rounded-lg bg-teal-500/10 text-teal-400">
-              <Calendar size={15} />
-            </div>
-          </div>
-          <div className="text-lg sm:text-xl font-black text-teal-400 tracking-tight">
-            {metrics.activeDays} Days
-          </div>
-          <div className="text-[10px] text-slate-400 mt-1 font-medium">Purchase activity</div>
-        </div>
-      </div>
-
-      {/* ── Order Activity Heatmap Section ──────────────────────────────── */}
-      <GithubHeatmap
-        days={heatmapDays}
-        customerName={selectedCustomer ? selectedCustomer.name : 'All Customers'}
-      />
-
-      {/* ── Analytics Grid: Sales Over Time & Items Bought ──────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        {/* Sales Over Time Chart */}
-        <div className="w-full">
+      {/* ── 4. Customer Analytical Charts (When All Customers Selected) ── */}
+      {selectedCustomerId === 'all' && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
           <InteractiveChart
-            title="Sales Over Time"
-            subtitle={selectedCustomer ? `Revenue trend for ${selectedCustomer.name} (${dateRange.toUpperCase()})` : `Combined customer sales revenue (${dateRange.toUpperCase()})`}
-            data={salesOverTimeData}
-            defaultChartType="area"
+            title="Top Customer Revenue Ranking"
+            subtitle="Top 10 highest-value dealer accounts ranked by cumulative gross revenue"
+            data={topCustomersRankingData}
+            defaultChartType="horizontal_bar"
             unit="₹"
           />
+
+          <InteractiveChart
+            title="Customer Purchase Frequency Distribution"
+            subtitle="Count of dealer accounts categorized by number of distinct purchase vouchers"
+            data={frequencyDistributionData}
+            defaultChartType="bar"
+            unit="Accounts"
+          />
         </div>
+      )}
 
-        {/* Items Bought Table & Breakdown */}
-        <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-5 shadow-lg backdrop-blur-sm flex flex-col justify-between">
+      {/* ── 5. Customer Directory & Comparison Table (Matching Salesman Table Layout) ── */}
+      <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-xl backdrop-blur-md">
+        {/* Table Filter Controls */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 pb-4 border-b border-slate-800">
           <div>
-            <div className="flex items-center justify-between mb-3">
-              <div>
-                <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
-                  <Package size={16} className="text-amber-400" />
-                  <span>Items Bought — {selectedCustomer ? selectedCustomer.name : 'All Customers'}</span>
-                </h3>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Top purchased products and sales volume breakdown ({dateRange.toUpperCase()})
-                </p>
-              </div>
-              <span className="text-[11px] font-bold text-slate-400 bg-slate-800/80 px-2.5 py-1 rounded-lg border border-slate-700/60">
-                Top SKUs
-              </span>
-            </div>
-
-            <div className="divide-y divide-slate-800/60">
-              {itemsBoughtData.map((item, idx) => (
-                <div key={idx} className="py-2.5 flex items-center justify-between gap-3 text-xs">
-                  <div className="min-w-0 flex-1">
-                    <div className="font-semibold text-slate-200 truncate">{item.name}</div>
-                    <div className="text-[10px] text-slate-400">{item.category}</div>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <div className="font-bold text-slate-100">{item.qty} units</div>
-                    {item.revenue > 0 && (
-                      <div className="text-[10px] text-indigo-600 dark:text-indigo-400 font-semibold">₹{item.revenue.toLocaleString('en-IN')}</div>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ── Customer Analytical Charts (Rule 18 & 26) ───────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        <InteractiveChart
-          title="Top Customer Revenue Ranking"
-          subtitle="Top 10 highest-value dealer accounts ranked by cumulative gross revenue"
-          data={topCustomersRankingData}
-          defaultChartType="horizontal_bar"
-          unit="₹"
-        />
-
-        <InteractiveChart
-          title="Customer Purchase Frequency Distribution"
-          subtitle="Count of dealer accounts categorized by number of distinct purchase vouchers"
-          data={frequencyDistributionData}
-          defaultChartType="bar"
-          unit="Accounts"
-        />
-      </div>
-
-      {/* ── Customer Accounts Directory Ledger (Rule 18) ────────────────── */}
-      <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-5 shadow-lg backdrop-blur-sm">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-          <div>
-            <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
-              <Users size={16} className="text-indigo-400" />
-              <span>Customer Accounts Directory ({filteredCustomerOptions.length} Accounts)</span>
+            <h3 className="text-base sm:text-lg font-bold text-white tracking-tight flex items-center gap-2">
+              <Users size={18} className="text-sky-400" />
+              Customer Accounts Directory
             </h3>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Authoritative historical sales ledger data at customer grain (1 row per account)
-            </p>
+            <p className="text-xs text-slate-400 mt-0.5">Authoritative performance ledger across all {customersData.length} customer accounts</p>
           </div>
-          <div className="flex items-center gap-2 text-xs text-slate-400">
-            <span>Page {page} of {Math.max(1, Math.ceil(filteredCustomerOptions.length / pageSize))}</span>
+
+          <div className="flex items-center gap-3">
+            {/* Search Input with Dynamic Placeholder */}
+            <div className="relative">
+              <Search size={14} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                placeholder={`Search ${customersData.length} customers...`}
+                value={searchQuery}
+                onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }}
+                className="pl-9 pr-3 py-1.5 bg-slate-950/80 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-sky-500 w-44 sm:w-60"
+              />
+            </div>
+
+            {/* Tier Filter */}
+            <div className="flex items-center gap-1.5 bg-slate-950/80 px-2.5 py-1.5 rounded-xl border border-slate-800 text-xs text-slate-400">
+              <Filter size={12} />
+              <select
+                value={tierFilter}
+                onChange={(e) => { setTierFilter(e.target.value); setPage(1); }}
+                className="bg-transparent text-white focus:outline-none cursor-pointer text-xs"
+              >
+                <option value="all" className="bg-slate-900">All Tiers</option>
+                <option value="Platinum" className="bg-slate-900">Platinum Tier</option>
+                <option value="Gold" className="bg-slate-900">Gold Tier</option>
+                <option value="Silver" className="bg-slate-900">Silver Tier</option>
+                <option value="Bronze" className="bg-slate-900">Bronze Tier</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* Pagination Bar */}
+        <div className="flex items-center justify-between text-xs text-slate-400 mb-3">
+          <span>Showing {filteredCustomerOptions.length === 0 ? 0 : (page - 1) * pageSize + 1} to {Math.min(page * pageSize, filteredCustomerOptions.length)} of {filteredCustomerOptions.length} customers</span>
+          <div className="flex items-center gap-2">
             <button
               disabled={page <= 1}
               onClick={() => setPage(p => Math.max(1, p - 1))}
@@ -631,6 +697,7 @@ export default function CustomerPerformanceView() {
             >
               Prev
             </button>
+            <span>Page {page} of {Math.max(1, Math.ceil(filteredCustomerOptions.length / pageSize))}</span>
             <button
               disabled={page >= Math.ceil(filteredCustomerOptions.length / pageSize)}
               onClick={() => setPage(p => p + 1)}
@@ -650,6 +717,7 @@ export default function CustomerPerformanceView() {
                 <th className="py-3 px-4">Sales Rep</th>
                 <th className="py-3 px-4 text-center">Tier</th>
                 <th className="py-3 px-4 text-center">Vouchers</th>
+                <th className="py-3 px-4 text-right">Units Sold</th>
                 <th className="py-3 px-4 text-right">AOV</th>
                 <th className="py-3 px-4 text-center">Diversity</th>
                 <th className="py-3 px-4 text-right">Total Revenue</th>
@@ -679,12 +747,13 @@ export default function CustomerPerformanceView() {
                     </span>
                   </td>
                   <td className="py-3 px-4 text-center font-semibold text-slate-200">{c.orders}</td>
+                  <td className="py-3 px-4 text-right font-medium text-amber-400">{c.units_sold.toLocaleString('en-IN')}</td>
                   <td className="py-3 px-4 text-right font-medium text-purple-400">₹{c.avg_order.toLocaleString('en-IN')}</td>
                   <td className="py-3 px-4 text-center text-slate-300">{c.products_count} SKUs</td>
                   <td className="py-3 px-4 text-right font-bold text-indigo-400">₹{c.revenue.toLocaleString('en-IN')}</td>
                   <td className="py-3 px-4 text-center">
                     <button
-                      onClick={() => setSelectedCustomerId(c.id)}
+                      onClick={() => { setSelectedCustomerId(c.id); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
                       className="px-2.5 py-1 rounded bg-indigo-950/60 hover:bg-indigo-900 text-indigo-400 border border-indigo-800/50 text-[10px] font-semibold transition-all"
                     >
                       Inspect
@@ -692,59 +761,17 @@ export default function CustomerPerformanceView() {
                   </td>
                 </tr>
               ))}
+              {filteredCustomerOptions.length === 0 && (
+                <tr>
+                  <td colSpan={10} className="py-8 text-center text-slate-500">
+                    No customers found matching "{searchQuery}"
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
       </div>
-
-      {/* ── Order History Ledger (Operational Orders) ──────────────────── */}
-      {orderHistory.length > 0 && (
-        <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-5 shadow-lg backdrop-blur-sm">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
-                <Clock size={16} className="text-sky-400" />
-                <span>Operational Dispatches — {selectedCustomer ? selectedCustomer.name : 'Recent Platform Orders'}</span>
-              </h3>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Real-time operational orders and fulfillment state ({dateRange.toUpperCase()})
-              </p>
-            </div>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs text-slate-300">
-              <thead className="bg-slate-800/60 text-slate-400 font-bold uppercase text-[10px] border-b border-slate-800">
-                <tr>
-                  <th className="py-3 px-4">Order ID</th>
-                  <th className="py-3 px-4">Date</th>
-                  <th className="py-3 px-4">Customer Account</th>
-                  <th className="py-3 px-4 text-center">Items</th>
-                  <th className="py-3 px-4 text-right">Amount</th>
-                  <th className="py-3 px-4 text-center">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/50 font-medium">
-                {orderHistory.map((row) => (
-                  <tr key={row.id} className="hover:bg-slate-800/30 transition-colors">
-                    <td className="py-3 px-4 font-bold text-slate-100">{row.id}</td>
-                    <td className="py-3 px-4 text-slate-400">{row.date}</td>
-                    <td className="py-3 px-4 font-semibold text-slate-200">{row.customer}</td>
-                    <td className="py-3 px-4 text-center text-slate-300">{row.items} SKUs</td>
-                    <td className="py-3 px-4 text-right font-bold text-indigo-600 dark:text-indigo-400">₹{row.amount.toLocaleString('en-IN')}</td>
-                    <td className="py-3 px-4 text-center">
-                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800/40">
-                        <CheckCircle2 size={11} />
-                        {row.status}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
