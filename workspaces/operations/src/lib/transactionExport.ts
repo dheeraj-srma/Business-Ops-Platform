@@ -15,6 +15,7 @@ export interface ExportableTransactionItem {
 }
 
 export interface ExportableConsignment {
+  groupId?: string;
   title?: string;
   referenceNumber: string;
   type: 'STOCK_IN' | 'STOCK_OUT' | 'ADJUSTMENT' | string;

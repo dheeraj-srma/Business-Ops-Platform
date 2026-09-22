@@ -36,9 +36,10 @@ class InventoryService:
         if existing:
             raise ValueError(f"Product with SKU '{clean_sku}' already exists in the canonical catalog.")
 
-        unit_p = round(float(product.unit_price), 2)
-        cost_p = round(float(product.cost_price or product.unit_price), 2)
-        qty = round(float(product.quantity), 4)
+        unit_p = round(float(product.unit_price if product.unit_price is not None else (product.price if product.price is not None else (product.unitCost or product.cost_price or 0.0))), 2)
+        cost_p = round(float(product.cost_price if product.cost_price is not None else (product.unitCost if product.unitCost is not None else unit_p)), 2)
+        qty = round(float(product.initialStock if product.initialStock is not None else (product.quantity or 0.0)), 4)
+        cat_name = str(product.category or product.categoryId or product.categoryName or "General")
 
         prod_data = {
             "sku": clean_sku,
@@ -89,7 +90,37 @@ class InventoryService:
                     "updated_at": datetime.utcnow().isoformat()
                 }).eq("product_id", prod_id).execute()
 
-        return {"status": "created", "id": prod_id, "sku": clean_sku}
+        prod_resp_obj = {
+            "id": str(prod_id),
+            "sku": clean_sku,
+            "name": product.name.strip(),
+            "category": cat_name,
+            "categoryId": cat_name,
+            "categoryName": cat_name,
+            "price": unit_p,
+            "unit_price": unit_p,
+            "cost_price": cost_p,
+            "unitCost": cost_p,
+            "stock": qty,
+            "currentStock": qty,
+            "physicalStock": qty,
+            "reservedStock": 0.0,
+            "availableStock": qty,
+            "minimumStock": float(product.minimumStock or 15.0),
+            "criticalStock": float(product.criticalStock or 5.0),
+            "unit": product.unit or "NOS",
+            "is_active": True,
+            "isActive": True,
+            "description": product.description
+        }
+
+        return {
+            "status": "created",
+            "success": True,
+            "id": prod_id,
+            "sku": clean_sku,
+            "product": prod_resp_obj
+        }
 
     @staticmethod
     def get_dealers() -> List[Dict[str, Any]]:
@@ -284,8 +315,17 @@ class InventoryService:
 
         return {
             "status": "SUCCESS",
+            "success": True,
             "processed_count": len(processed_txs),
-            "transactions": processed_txs
+            "transactions": processed_txs,
+            "transaction": processed_txs[0] if processed_txs else None,
+            "batchSummary": {
+                "supplier": supplier or "Direct Supplier",
+                "referenceNumber": reference_number or "REC-IN",
+                "date": now_str,
+                "totalItems": len(processed_txs),
+                "totalQuantity": sum(float(it.get("quantity", 0)) for it in items)
+            }
         }
 
     @staticmethod
@@ -385,8 +425,17 @@ class InventoryService:
 
         return {
             "status": "SUCCESS",
+            "success": True,
             "processed_count": len(processed_txs),
-            "transactions": processed_txs
+            "transactions": processed_txs,
+            "transaction": processed_txs[0] if processed_txs else None,
+            "batchSummary": {
+                "recipient": recipient or "Direct Consignee",
+                "referenceNumber": reference_number or "OUT-DISPATCH",
+                "date": now_str,
+                "totalItems": len(processed_txs),
+                "totalQuantity": sum(float(it.get("quantity", 0)) for it in items)
+            }
         }
 
     @staticmethod

@@ -213,7 +213,7 @@ export const api = {
       body: JSON.stringify(data),
     });
     const result = await res.json();
-    if (!res.ok) throw new Error(result.error || 'Failed to record stock entry');
+    if (!res.ok) throw new Error(result.error || result.message || result.detail || 'Failed to record stock entry');
     return result;
   },
 
@@ -240,7 +240,13 @@ export const api = {
       totalQuantity: number;
     };
   }> {
-    const result = await sharedRecordStockOut(data);
+    const res = await fetch('/api/inventory/stock-out', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    const result = await res.json();
+    if (!res.ok) throw new Error(result.error || result.message || result.detail || 'Failed to record stock dispatch');
     return result;
   },
 

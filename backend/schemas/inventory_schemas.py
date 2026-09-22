@@ -50,13 +50,28 @@ class StockAdjustmentRequest(BaseModel):
     location_id: Optional[str] = Field(None, description="Warehouse/Location ID")
     idempotency_key: Optional[str] = Field(None, description="Unique request idempotency key")
 
-class StockInRequest(BaseModel):
-    product_id: str = Field(..., description="Product ID for stock inward")
-    quantity: float = Field(..., gt=0.0, description="Inward stock quantity to add")
+class StockInItemSchema(BaseModel):
+    product_id: Optional[str] = Field(None, description="Product ID")
+    productId: Optional[str] = Field(None, description="CamelCase product ID alias")
+    sku: Optional[str] = Field(None, description="Product SKU")
+    quantity: float = Field(..., gt=0.0, description="Quantity to receive")
     unit_cost: Optional[float] = Field(0.0, ge=0.0, description="Unit cost price")
-    supplier_name: Optional[str] = Field("Direct Supplier", description="Supplier or vendor name")
-    reference_number: Optional[str] = Field("REC-IN", description="Purchase order or delivery note reference")
+    unitCost: Optional[float] = Field(None, description="CamelCase unit cost alias")
+
+class StockInRequest(BaseModel):
+    items: Optional[List[StockInItemSchema]] = Field(None, description="Batch line items")
+    product_id: Optional[str] = Field(None, description="Product ID for stock inward")
+    productId: Optional[str] = Field(None, description="CamelCase product ID alias")
+    sku: Optional[str] = Field(None, description="Product SKU")
+    quantity: Optional[float] = Field(None, gt=0.0, description="Inward stock quantity to add")
+    unit_cost: Optional[float] = Field(0.0, ge=0.0, description="Unit cost price")
+    unitCost: Optional[float] = Field(None, description="CamelCase unit cost alias")
+    supplier_name: Optional[str] = Field(None, description="Supplier or vendor name")
+    supplier: Optional[str] = Field(None, description="Supplier name alias")
+    reference_number: Optional[str] = Field(None, description="Purchase order or delivery note reference")
+    referenceNumber: Optional[str] = Field(None, description="CamelCase reference number alias")
     notes: Optional[str] = Field(None, description="Additional movement notes")
+    date: Optional[str] = Field(None, description="Movement date")
     idempotency_key: Optional[str] = Field(None, description="Unique request idempotency key")
 
 class StockMutationResponse(BaseModel):
@@ -78,9 +93,13 @@ class StockOutItemSchema(BaseModel):
 class StockOutRequest(BaseModel):
     items: Optional[List[StockOutItemSchema]] = Field(None, description="Batch line items list")
     product_id: Optional[str] = Field(None, description="Single product ID to stock out")
+    productId: Optional[str] = Field(None, description="CamelCase product ID alias")
+    sku: Optional[str] = Field(None, description="Product SKU")
     quantity: Optional[float] = Field(None, gt=0.0, description="Single product quantity")
     reason: Optional[str] = Field("Order Fulfillment", description="Dispatch or stock-out reason")
     recipient: Optional[str] = Field("Direct Consignee", description="Recipient or customer name")
     reference_number: Optional[str] = Field(None, description="Order ID or delivery reference")
+    referenceNumber: Optional[str] = Field(None, description="CamelCase reference number alias")
     notes: Optional[str] = Field(None, description="Movement notes")
+    date: Optional[str] = Field(None, description="Movement date")
     idempotency_key: Optional[str] = Field(None, description="Idempotency key")

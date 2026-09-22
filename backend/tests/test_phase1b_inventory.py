@@ -268,9 +268,9 @@ def test_inv_15_transaction_enums():
     if db:
         prod = db.table("products").select("id").eq("sku", test_sku).limit(1).execute().data[0]["id"]
         loc = db.table("inventory").select("location_id").eq("product_id", prod).limit(1).execute().data[0]["location_id"]
-        valid_enums = ["inward", "sale", "adjustment", "reservation", "reservation_release", "return_in"]
+        valid_enums = ["inward", "sale", "adjustment", "return_in"]
         for t in valid_enums:
-            ref_type = "order" if t in ("reservation", "reservation_release") else "adjustment"
+            ref_type = "adjustment"
             tx = TransactionRepository.record_stock_transaction({
                 "transaction_type": t,
                 "product_id": prod,

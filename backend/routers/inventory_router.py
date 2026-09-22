@@ -9,6 +9,7 @@ from schemas.inventory_schemas import (
     InventoryListResponse,
     StockAdjustmentRequest,
     StockInRequest,
+    StockInItemSchema,
     StockOutRequest,
     StockOutItemSchema,
     StockMutationResponse
@@ -292,15 +293,38 @@ def record_stock_inward(
 ):
     SnapshotService.assert_writable("stock inward")
     try:
+        raw_items = payload.items or []
+        if not raw_items and (payload.product_id or payload.productId or payload.sku) and payload.quantity:
+            cost = payload.unitCost if payload.unitCost is not None else (payload.unit_cost or 0.0)
+            raw_items = [
+                StockInItemSchema(
+                    product_id=payload.product_id or payload.productId,
+                    sku=payload.sku,
+                    quantity=payload.quantity,
+                    unit_cost=cost
+                )
+            ]
+        if not raw_items:
+            raise ValueError("No valid stock-in items provided in request.")
+
+        items_list = [
+            {
+                "product_id": it.product_id or it.productId,
+                "sku": it.sku,
+                "quantity": it.quantity,
+                "unit_cost": it.unitCost if it.unitCost is not None else (it.unit_cost or 0.0)
+            }
+            for it in raw_items
+        ]
+        supplier_val = payload.supplier or payload.supplier_name or "Direct Supplier"
+        ref_val = payload.referenceNumber or payload.reference_number or "REC-IN"
+
         res = InventoryService.record_stock_in(
-            items=[{
-                "product_id": payload.product_id,
-                "quantity": payload.quantity,
-                "unit_cost": payload.unit_cost
-            }],
-            supplier=payload.supplier_name,
-            reference_number=payload.reference_number,
-            notes=payload.notes
+            items=items_list,
+            supplier=supplier_val,
+            reference_number=ref_val,
+            notes=payload.notes,
+            actor=current_user
         )
         return res
     except ValueError as ve:
@@ -312,14 +336,21 @@ def record_stock_inward(
 @router.post("/inventory/stock-out", summary="Record stock-out dispatch", description="Records stock-out consignment dispatch, deducts physical stock, and releases reservation.")
 def record_stock_outward(
     payload: StockOutRequest,
-    current_user: dict = Depends(require_permission("orders.process"))
+    current_user: dict = Depends(require_permission(["orders.process", "inventory.manage"]))
 ):
     SnapshotService.assert_writable("stock outward")
     try:
         raw_items = payload.items or []
-        if not raw_items and payload.product_id and payload.quantity:
-            raw_items = [StockOutItemSchema(product_id=payload.product_id, quantity=payload.quantity)]
+        if not raw_items and (payload.product_id or payload.productId or payload.sku) and payload.quantity:
+            raw_items = [StockOutItemSchema(
+                product_id=payload.product_id or payload.productId,
+                sku=payload.sku,
+                quantity=payload.quantity
+            )]
             
+        if not raw_items:
+            raise ValueError("No valid stock-out items provided in request.")
+
         items_list = [
             {
                 "product_id": it.product_id or it.productId,
@@ -328,11 +359,12 @@ def record_stock_outward(
             }
             for it in raw_items
         ]
+        ref_val = payload.referenceNumber or payload.reference_number
         res = InventoryService.record_stock_out(
             items=items_list,
-            recipient=payload.recipient,
-            reference_number=payload.reference_number,
-            reason=payload.reason,
+            recipient=payload.recipient or "Direct Consignee",
+            reference_number=ref_val,
+            reason=payload.reason or "Order Fulfillment",
             notes=payload.notes,
             actor=current_user
         )

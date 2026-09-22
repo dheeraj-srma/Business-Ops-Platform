@@ -174,6 +174,7 @@ export const TransactionHistoryView: React.FC<TransactionHistoryViewProps> = ({
         existing.items.push(lineItem);
       } else {
         groupsMap.set(groupKey, {
+          groupId: groupKey,
           referenceNumber: refNum,
           type: txType,
           partyName: partyDisplayName,
@@ -510,16 +511,17 @@ export const TransactionHistoryView: React.FC<TransactionHistoryViewProps> = ({
           ) : viewMode === 'grouped' ? (
             /* 1. Grouped Consignments Cards */
             <div className="p-4 sm:p-5 space-y-3">
-              {groupedConsignments.map((group) => {
+              {groupedConsignments.map((group, groupIdx) => {
+                const groupUniqueKey = group.groupId || `${group.type}_${group.referenceNumber}_${group.partyName}_${groupIdx}`;
                 const isStockIn = group.type === 'STOCK_IN' || group.type === 'INWARD';
                 const isStockOut = group.type === 'STOCK_OUT' || group.type === 'SALE' || group.type === 'OUTWARD';
                 const isReturn = group.type === 'CUSTOMER_RETURN' || group.type === 'RETURN_IN';
-                const isExpanded = expandedGroupIds.has(group.referenceNumber);
+                const isExpanded = expandedGroupIds.has(groupUniqueKey);
                 const totalUnits = group.items.reduce((sum, it) => sum + (it.quantity || 0), 0);
 
                 return (
                   <div
-                    key={`${group.type}_${group.referenceNumber}_${group.partyName}`}
+                    key={groupUniqueKey}
                     className="rounded-2xl border border-slate-200 dark:border-slate-700/80 bg-slate-50/50 dark:bg-slate-900/40 hover:border-indigo-300 dark:hover:border-indigo-700/70 transition-all overflow-hidden"
                   >
                     {/* Card Header Row */}
@@ -617,7 +619,7 @@ export const TransactionHistoryView: React.FC<TransactionHistoryViewProps> = ({
                         {/* Expand / Collapse Button */}
                         <button
                           type="button"
-                          onClick={() => toggleGroupExpand(group.referenceNumber)}
+                          onClick={() => toggleGroupExpand(groupUniqueKey)}
                           className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
                           title={isExpanded ? 'Collapse items' : 'Expand line items'}
                         >

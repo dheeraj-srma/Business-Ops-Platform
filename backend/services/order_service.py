@@ -870,21 +870,6 @@ class OrderService:
             s = it.get("sku")
             if s:
                 OrderRepository.recalculate_reservations(s)
-                prod_info = inv_map.get(str(s).strip().upper())
-                if prod_info and prod_info.get("id"):
-                    try:
-                        TransactionRepository.record_stock_transaction({
-                            "transaction_type": "reservation_release",
-                            "product_id": prod_info["id"],
-                            "location_id": prod_info.get("location_id"),
-                            "quantity": -float(it.get("quantity") or 0.0),
-                            "reference_type": "order",
-                            "reference_id": order_id if is_valid_uuid(order_id) else None,
-                            "notes": f"Reservation released on order cancel: {order_id}",
-                            "created_at": now_str
-                        })
-                    except Exception as tx_err:
-                        logger.warning(f"Failed recording reservation release transaction: {tx_err}")
 
         InventoryRepository.invalidate_cache()
 
