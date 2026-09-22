@@ -593,7 +593,7 @@ export default function InteractiveChart({
   return (
     <div
       ref={containerRef}
-      className="bg-slate-900/70 border border-slate-800 rounded-xl p-4 shadow-lg backdrop-blur-sm flex flex-col min-h-[420px] h-auto w-full min-w-0 box-border gap-2 overflow-hidden"
+      className="bg-slate-900/70 border border-slate-800 rounded-xl p-4 shadow-lg backdrop-blur-sm flex flex-col min-h-[420px] h-full w-full min-w-0 box-border gap-2 overflow-hidden"
     >
       {/* ── Header Toolbar ─────────────────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800/80 pb-3">

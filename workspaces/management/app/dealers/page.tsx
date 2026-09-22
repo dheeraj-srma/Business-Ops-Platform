@@ -305,8 +305,8 @@ export default function CustomersPage() {
               unit="accounts"
             />
 
-            {/* ── Strategic Partner Spotlight Card (Natural Height, Fully Utilized) ── */}
-            <div className="bg-slate-900/70 border border-slate-800 rounded-xl p-4 shadow-lg backdrop-blur-sm flex flex-col justify-between h-full min-h-[420px] max-h-[420px] overflow-hidden">
+            {/* ── Strategic Partner Spotlight Card (Natural Height, Matches Grid Row Height) ── */}
+            <div className="bg-slate-900/70 border border-slate-800 rounded-xl p-4 shadow-lg backdrop-blur-sm flex flex-col justify-between h-full min-h-[420px]">
               <div className="space-y-2.5">
                 {/* Header */}
                 <div className="flex items-center justify-between gap-2">
