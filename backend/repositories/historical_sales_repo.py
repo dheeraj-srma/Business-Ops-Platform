@@ -12,6 +12,7 @@ import logging
 from pathlib import Path
 from decimal import Decimal
 from typing import Dict, Any, List, Optional, Tuple
+from datetime import datetime, timedelta
 
 logger = logging.getLogger("historical_sales_repo")
 
@@ -895,16 +896,19 @@ class HistoricalSalesRepository:
                 aov = round(rev / vch, 2) if vch > 0 else 0.0
                 pct = round((rev / total_rev) * 100, 2) if total_rev > 0 else 0.0
 
-                # Count distinct products for this customer
+                # Count distinct products and units sold for this customer
                 cust_name = r["customer_name"]
                 prod_count_q = """
-                    SELECT COUNT(DISTINCT i.product_name) as prod_count
+                    SELECT 
+                        COUNT(DISTINCT i.product_name) as prod_count,
+                        ROUND(COALESCE(SUM(i.quantity), 0), 1) as units_sold
                     FROM historical_sale_items i
                     JOIN historical_sales s ON i.historical_sale_id = s.id
                     WHERE COALESCE(NULLIF(s.customer_name, ''), 'Direct Counter Sales') = ?
                 """
                 prod_row = conn.execute(prod_count_q, [cust_name]).fetchone()
                 prod_diversity = int(prod_row["prod_count"]) if prod_row else 0
+                units_sold = float(prod_row["units_sold"]) if prod_row and prod_row["units_sold"] is not None else 0.0
 
                 results.append({
                     "customer_name": cust_name,
@@ -916,6 +920,7 @@ class HistoricalSalesRepository:
                     "gstin": r["customer_gstin"],
                     "revenue": rev,
                     "voucher_count": vch,
+                    "units_sold": units_sold,
                     "aov": aov,
                     "first_purchase": r["first_purchase"],
                     "last_purchase": r["last_purchase"],
@@ -924,6 +929,81 @@ class HistoricalSalesRepository:
                     "contribution_percent": pct,
                 })
             return results
+        finally:
+            conn.close()
+
+    @classmethod
+    def get_customer_order_heatmap_data(
+        cls,
+        customer_id: Optional[str] = None,
+        days_count: int = 365
+    ) -> Dict[str, Any]:
+        cls.init_db()
+        conn = cls.get_connection()
+        try:
+            where_parts = []
+            params = []
+            is_all = not customer_id or str(customer_id).lower() in ("all", "all customers", "")
+
+            if not is_all:
+                where_parts.append("(s.customer_id = ? OR s.customer_name = ?)")
+                params.extend([customer_id, customer_id])
+
+            where_sql = f"WHERE {' AND '.join(where_parts)}" if where_parts else ""
+
+            query = f"""
+                SELECT 
+                    s.voucher_date as date,
+                    COUNT(DISTINCT s.voucher_number) as orders,
+                    ROUND(SUM(s.voucher_amount), 2) as sales,
+                    COUNT(DISTINCT s.customer_name) as customers
+                FROM historical_sales s
+                {where_sql}
+                GROUP BY s.voucher_date
+                ORDER BY s.voucher_date ASC;
+            """
+            rows = conn.execute(query, params).fetchall()
+            orders_by_date = {
+                r["date"]: {
+                    "orders": int(r["orders"]),
+                    "sales": float(r["sales"]),
+                    "customers": int(r["customers"])
+                }
+                for r in rows
+            }
+
+            ref_date = datetime.strptime("2026-09-21", "%Y-%m-%d").date()
+            days_list = []
+            for i in range(days_count - 1, -1, -1):
+                d = ref_date - timedelta(days=i)
+                d_str = d.isoformat()
+                data_for_day = orders_by_date.get(d_str)
+                if data_for_day:
+                    days_list.append({
+                        "date": d_str,
+                        "orders": data_for_day["orders"],
+                        "sales": data_for_day["sales"],
+                        "customers": data_for_day["customers"]
+                    })
+                else:
+                    days_list.append({"date": d_str, "orders": 0, "sales": 0.0, "customers": 0})
+
+            total_orders = sum(d["orders"] for d in days_list)
+            active_days = len([d for d in days_list if d["orders"] > 0])
+            avg_per_day = round(total_orders / active_days, 1) if active_days > 0 else 0.0
+
+            return {
+                "days": days_list,
+                "summary": {
+                    "total_orders": total_orders,
+                    "active_days": active_days,
+                    "avg_orders_per_active_day": avg_per_day,
+                    "total_sales": round(sum(d["sales"] for d in days_list), 2)
+                }
+            }
+        except Exception as err:
+            logger.error(f"Error fetching customer heatmap: {err}")
+            return {"days": [], "summary": {}}
         finally:
             conn.close()
 

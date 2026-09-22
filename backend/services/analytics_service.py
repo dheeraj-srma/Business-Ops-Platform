@@ -572,6 +572,15 @@ class AnalyticsService:
         )
 
     @staticmethod
+    def get_customer_heatmap(
+        customer_id: Optional[str] = None,
+        days_count: int = 365
+    ) -> Dict[str, Any]:
+        return HistoricalSalesRepository.get_customer_order_heatmap_data(
+            customer_id=customer_id, days_count=days_count
+        )
+
+    @staticmethod
     def get_return_analytics(
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,

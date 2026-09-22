@@ -140,6 +140,30 @@ def customer_analytics(
         logger.error(f"Error generating customer analytics: {exc}")
         raise HTTPException(status_code=500, detail="Failed to retrieve customer analytics.")
 
+@router.get("/customers/heatmap")
+def customer_heatmap(
+    customer_id: Optional[str] = Query(None, description="Optional customer ID or name (or 'all')"),
+    days: int = Query(365, ge=1, le=730, description="Timeline horizon in days")
+):
+    """Activity heatmap and purchasing velocity for a customer or all customers."""
+    try:
+        return analytics_service.get_customer_heatmap(customer_id=customer_id, days_count=days)
+    except Exception as exc:
+        logger.error(f"Error generating customer heatmap: {exc}")
+        raise HTTPException(status_code=500, detail="Failed to generate customer activity heatmap.")
+
+@router.get("/customers/{customer_id}/heatmap")
+def customer_heatmap_by_id(
+    customer_id: str,
+    days: int = Query(365, ge=1, le=730, description="Timeline horizon in days")
+):
+    """Activity heatmap and purchasing velocity for a specific customer."""
+    try:
+        return analytics_service.get_customer_heatmap(customer_id=customer_id, days_count=days)
+    except Exception as exc:
+        logger.error(f"Error generating customer heatmap for '{customer_id}': {exc}")
+        raise HTTPException(status_code=500, detail="Failed to generate customer activity heatmap.")
+
 @router.get("/returns")
 def return_analytics(
     start_date: Optional[str] = Query(None),
