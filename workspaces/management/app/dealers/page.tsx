@@ -1,5 +1,5 @@
 'use client';
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { Store, Users, Award, ShieldCheck, BarChart3, MapPin, CheckCircle2, TrendingUp, Package, ShoppingCart } from 'lucide-react';
 import { useBi } from '../context/BiDataContext';
 import InteractiveChart from '../components/InteractiveChart';
@@ -8,6 +8,15 @@ import CustomerPerformanceView from '../components/CustomerPerformanceView';
 export default function CustomersPage() {
   const { sales, kpis, dealersList, customersAnalyticsList } = useBi();
   const [activeTab, setActiveTab] = useState<'performance' | 'overview'>('overview');
+  const [topProfile, setTopProfile] = useState<{
+    top_lines?: Array<{ line_name: string; skus: number; quantity: number; amount: number; share_pct: number }>;
+    return_rate_pct?: number;
+    acceptance_rate_pct?: number;
+    avg_cadence_days?: number;
+    days_since_last_order?: number;
+    tenor_days?: number;
+    net_sales?: number;
+  } | null>(null);
 
   // Authoritative Top Customer Account (Spotlight Account)
   const topAccount = useMemo(() => {
@@ -57,6 +66,23 @@ export default function CustomersPage() {
       lastPurchase: '19-Sep-2026',
     };
   }, [customersAnalyticsList]);
+
+  // Fetch Authoritative Profile for Top Key Account
+  useEffect(() => {
+    if (!topAccount.name) return;
+    let isMounted = true;
+    fetch(`/api/analytics/customers/profile?customer_id=${encodeURIComponent(topAccount.name)}`)
+      .then(r => (r.ok ? r.json() : null))
+      .then(data => {
+        if (isMounted && data) {
+          setTopProfile(data);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      isMounted = false;
+    };
+  }, [topAccount.name]);
 
   // Customer Rankings Data
   const customerRankData = useMemo(() => {
@@ -373,20 +399,40 @@ export default function CustomersPage() {
                 <div className="p-2.5 bg-slate-800/40 rounded-xl border border-slate-700/30 text-[11px] space-y-1">
                   <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between">
                     <span>Top Procured Lines</span>
-                    <span className="text-slate-500">Tenor: {topAccount.firstPurchase.slice(0, 7)} → {topAccount.lastPurchase.slice(0, 7)}</span>
+                    <span className="text-slate-500">
+                      {topProfile?.days_since_last_order !== undefined
+                        ? `Last order: ${topProfile.days_since_last_order}d ago • Cadence: ~${topProfile.avg_cadence_days}d`
+                        : `Tenor: ${topAccount.firstPurchase.slice(0, 7)} → ${topAccount.lastPurchase.slice(0, 7)}`}
+                    </span>
                   </div>
-                  <div className="flex items-center justify-between text-slate-300 text-[11px]">
-                    <span>NALKA CP Fittings</span>
-                    <span className="font-semibold text-indigo-400">₹3.80L (38%)</span>
-                  </div>
-                  <div className="flex items-center justify-between text-slate-300 text-[11px]">
-                    <span>HAHN Bathroom Fixtures</span>
-                    <span className="font-semibold text-sky-400">₹1.99L (20%)</span>
-                  </div>
-                  <div className="flex items-center justify-between text-slate-300 text-[11px]">
-                    <span>Nalka PTMT Polymers</span>
-                    <span className="font-semibold text-amber-400">₹1.94L (19%)</span>
-                  </div>
+                  {topProfile?.top_lines && topProfile.top_lines.length > 0 ? (
+                    topProfile.top_lines.slice(0, 3).map((line, idx) => {
+                      const colors = ['text-indigo-400', 'text-sky-400', 'text-amber-400'];
+                      return (
+                        <div key={line.line_name} className="flex items-center justify-between text-slate-300 text-[11px]">
+                          <span className="truncate pr-2">{line.line_name}</span>
+                          <span className={`font-semibold shrink-0 ${colors[idx % colors.length]}`}>
+                            ₹{(line.amount / 100000).toFixed(2)}L ({line.share_pct}%)
+                          </span>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <>
+                      <div className="flex items-center justify-between text-slate-300 text-[11px]">
+                        <span>NALKA CP Fittings</span>
+                        <span className="font-semibold text-indigo-400">₹3.80L (38%)</span>
+                      </div>
+                      <div className="flex items-center justify-between text-slate-300 text-[11px]">
+                        <span>HAHN Bathroom Fixtures</span>
+                        <span className="font-semibold text-sky-400">₹1.99L (20%)</span>
+                      </div>
+                      <div className="flex items-center justify-between text-slate-300 text-[11px]">
+                        <span>Nalka PTMT Polymers</span>
+                        <span className="font-semibold text-amber-400">₹1.94L (19%)</span>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
 
@@ -394,7 +440,11 @@ export default function CustomersPage() {
               <div className="pt-2 border-t border-slate-800 text-[11px] text-indigo-400 flex items-center justify-between">
                 <div className="flex items-center gap-1.5 truncate">
                   <ShieldCheck size={14} className="shrink-0 text-indigo-400" />
-                  <span className="truncate">Tier 1 Platinum Partner • Zero defaults</span>
+                  <span className="truncate">
+                    {topProfile?.acceptance_rate_pct !== undefined
+                      ? `Tier 1 Platinum Partner • ${topProfile.acceptance_rate_pct}% Acceptance (${topProfile.return_rate_pct}% returns)`
+                      : 'Tier 1 Platinum Partner • Zero defaults'}
+                  </span>
                 </div>
                 <button
                   onClick={() => setActiveTab('performance')}
