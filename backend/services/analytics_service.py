@@ -581,6 +581,14 @@ class AnalyticsService:
         )
 
     @staticmethod
+    def get_customer_profile(
+        customer_id_or_name: str
+    ) -> Optional[Dict[str, Any]]:
+        return HistoricalSalesRepository.get_customer_profile(
+            customer_id_or_name=customer_id_or_name
+        )
+
+    @staticmethod
     def get_return_analytics(
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,

@@ -164,6 +164,38 @@ def customer_heatmap_by_id(
         logger.error(f"Error generating customer heatmap for '{customer_id}': {exc}")
         raise HTTPException(status_code=500, detail="Failed to generate customer activity heatmap.")
 
+@router.get("/customers/profile")
+def customer_profile_query(
+    customer_id: str = Query(..., description="Customer ID or Customer Name")
+):
+    """Authoritative operational and commercial spotlight profile for a specific customer."""
+    try:
+        profile = analytics_service.get_customer_profile(customer_id_or_name=customer_id)
+        if not profile:
+            raise HTTPException(status_code=404, detail=f"Customer profile not found for '{customer_id}'")
+        return profile
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error(f"Error generating profile for '{customer_id}': {exc}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve customer operational profile.")
+
+@router.get("/customers/{customer_id}/profile")
+def customer_profile_path(
+    customer_id: str
+):
+    """Authoritative operational and commercial spotlight profile for a specific customer."""
+    try:
+        profile = analytics_service.get_customer_profile(customer_id_or_name=customer_id)
+        if not profile:
+            raise HTTPException(status_code=404, detail=f"Customer profile not found for '{customer_id}'")
+        return profile
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error(f"Error generating profile for '{customer_id}': {exc}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve customer operational profile.")
+
 @router.get("/returns")
 def return_analytics(
     start_date: Optional[str] = Query(None),

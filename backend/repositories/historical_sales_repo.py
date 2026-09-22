@@ -1008,6 +1008,156 @@ class HistoricalSalesRepository:
             conn.close()
 
     @classmethod
+    def get_customer_profile(
+        cls,
+        customer_id_or_name: str
+    ) -> Optional[Dict[str, Any]]:
+        """Authoritative single-customer operational profile with procured lines, SKUs, returns, and cadence."""
+        cls.init_db()
+        conn = cls.get_connection()
+        try:
+            base_q = """
+                SELECT 
+                    hs.customer_name,
+                    hs.customer_id,
+                    hs.customer_gstin,
+                    hs.city,
+                    hs.state,
+                    hs.region,
+                    hs.salesman_name,
+                    COUNT(DISTINCT hs.voucher_number) as voucher_count,
+                    MIN(hs.voucher_date) as first_purchase,
+                    MAX(hs.voucher_date) as last_purchase,
+                    ROUND(SUM(hs.voucher_amount), 2) as gross_sales,
+                    ROUND(AVG(hs.voucher_amount), 2) as avg_voucher,
+                    ROUND(MAX(hs.voucher_amount), 2) as max_voucher,
+                    ROUND(MIN(hs.voucher_amount), 2) as min_voucher,
+                    COUNT(DISTINCT hs.voucher_date) as active_days
+                FROM historical_sales hs
+                WHERE hs.customer_name = ? OR hs.customer_id = ?
+                GROUP BY hs.customer_name;
+            """
+            base_row = conn.execute(base_q, [customer_id_or_name, customer_id_or_name]).fetchone()
+            if not base_row:
+                return None
+
+            base = dict(base_row)
+            cust_name = base["customer_name"]
+            cust_id = base["customer_id"]
+
+            items_q = """
+                SELECT 
+                    COUNT(DISTINCT hsi.product_name) as distinct_skus,
+                    ROUND(COALESCE(SUM(hsi.quantity), 0), 1) as total_units
+                FROM historical_sale_items hsi
+                JOIN historical_sales hs ON hsi.historical_sale_id = hs.id
+                WHERE hs.customer_name = ? OR hs.customer_id = ?;
+            """
+            items_row = conn.execute(items_q, [cust_name, cust_id]).fetchone()
+            base["distinct_skus"] = int(items_row["distinct_skus"] or 0) if items_row else 0
+            base["total_units"] = float(items_row["total_units"] or 0.0) if items_row else 0.0
+
+            total_net_row = conn.execute("SELECT SUM(voucher_amount) FROM historical_sales;").fetchone()
+            net_total = float(total_net_row[0] or 1.0) if total_net_row else 1.0
+            base["network_share_pct"] = round((base["gross_sales"] / net_total) * 100, 2)
+
+            lines_q = """
+                SELECT 
+                    COALESCE(hsi.category_name, 'Other') as line_name,
+                    COUNT(DISTINCT hsi.product_name) as skus,
+                    ROUND(SUM(hsi.quantity), 1) as quantity,
+                    ROUND(SUM(hsi.line_amount), 2) as amount
+                FROM historical_sale_items hsi
+                JOIN historical_sales hs ON hsi.historical_sale_id = hs.id
+                WHERE hs.customer_name = ? OR hs.customer_id = ?
+                GROUP BY hsi.category_name
+                ORDER BY amount DESC
+                LIMIT 4;
+            """
+            lines_rows = conn.execute(lines_q, [cust_name, cust_id]).fetchall()
+            top_lines = []
+            for r in lines_rows:
+                amt = float(r["amount"] or 0.0)
+                pct = round((amt / base["gross_sales"]) * 100, 1) if base["gross_sales"] > 0 else 0.0
+                top_lines.append({
+                    "line_name": r["line_name"],
+                    "skus": int(r["skus"]),
+                    "quantity": float(r["quantity"]),
+                    "amount": amt,
+                    "share_pct": pct
+                })
+            base["top_lines"] = top_lines
+
+            prods_q = """
+                SELECT 
+                    hsi.product_name,
+                    COALESCE(hsi.category_name, 'General') as category,
+                    ROUND(SUM(hsi.quantity), 1) as quantity,
+                    COALESCE(hsi.unit, 'NOS') as unit,
+                    ROUND(SUM(hsi.line_amount), 2) as amount
+                FROM historical_sale_items hsi
+                JOIN historical_sales hs ON hsi.historical_sale_id = hs.id
+                WHERE hs.customer_name = ? OR hs.customer_id = ?
+                GROUP BY hsi.product_name
+                ORDER BY amount DESC
+                LIMIT 4;
+            """
+            prods_rows = conn.execute(prods_q, [cust_name, cust_id]).fetchall()
+            top_products = []
+            for r in prods_rows:
+                amt = float(r["amount"] or 0.0)
+                pct = round((amt / base["gross_sales"]) * 100, 1) if base["gross_sales"] > 0 else 0.0
+                top_products.append({
+                    "product_name": r["product_name"],
+                    "category": r["category"],
+                    "quantity": float(r["quantity"]),
+                    "unit": r["unit"],
+                    "amount": amt,
+                    "share_pct": pct
+                })
+            base["top_products"] = top_products
+
+            ret_q = """
+                SELECT 
+                    COUNT(*) as return_vouchers,
+                    ROUND(COALESCE(SUM(voucher_amount), 0), 2) as return_amount
+                FROM historical_returns
+                WHERE customer_name = ? OR customer_id = ?;
+            """
+            ret_row = conn.execute(ret_q, [cust_name, cust_id]).fetchone()
+            ret_amt = abs(float(ret_row["return_amount"] or 0.0)) if ret_row else 0.0
+            ret_vch = int(ret_row["return_vouchers"] or 0) if ret_row else 0
+            base["return_vouchers"] = ret_vch
+            base["return_amount"] = ret_amt
+            base["net_sales"] = round(base["gross_sales"] - ret_amt, 2)
+            base["return_rate_pct"] = round((ret_amt / base["gross_sales"]) * 100, 2) if base["gross_sales"] > 0 else 0.0
+            base["acceptance_rate_pct"] = round(100.0 - base["return_rate_pct"], 2)
+
+            if base.get("first_purchase") and base.get("last_purchase"):
+                d1 = datetime.strptime(base["first_purchase"], "%Y-%m-%d")
+                d2 = datetime.strptime(base["last_purchase"], "%Y-%m-%d")
+                span_days = max(1, (d2 - d1).days)
+                vch_cnt = max(1, base["voucher_count"])
+                base["tenor_days"] = span_days
+                base["avg_cadence_days"] = round(span_days / max(1, vch_cnt - 1), 1) if vch_cnt > 1 else span_days
+                ref_today = datetime.strptime("2026-09-22", "%Y-%m-%d")
+                base["days_since_last_order"] = max(0, (ref_today - d2).days)
+            else:
+                base["tenor_days"] = 0
+                base["avg_cadence_days"] = 0.0
+                base["days_since_last_order"] = 0
+
+            rev = base["gross_sales"]
+            base["tier"] = "Platinum" if rev > 250000 else "Gold" if rev > 120000 else "Silver" if rev > 50000 else "Bronze"
+
+            return base
+        except Exception as err:
+            logger.error(f"Error getting customer profile for {customer_id_or_name}: {err}")
+            return None
+        finally:
+            conn.close()
+
+    @classmethod
     def get_return_analytics(
         cls,
         start_date: Optional[str] = None,
