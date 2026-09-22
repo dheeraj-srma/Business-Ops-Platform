@@ -88,6 +88,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     try {
       let startDateStr: string;
       let endDateStr: string;
+      let numDays: number | undefined;
 
       if (range === 'custom') {
         const c = custom || customRange;
@@ -95,7 +96,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         endDateStr = c.end;
       } else {
         const daysMap = { '7d': 7, '14d': 14, '30d': 30 };
-        const numDays = daysMap[range];
+        numDays = daysMap[range];
         const end = new Date();
         const start = new Date();
         start.setDate(start.getDate() - (numDays - 1));
