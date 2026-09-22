@@ -305,130 +305,100 @@ export default function CustomersPage() {
               unit="accounts"
             />
 
-            {/* ── Strategic Partner Spotlight Card (Fully Populated with Live Telemetry) ── */}
-            <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-5 shadow-lg backdrop-blur-sm flex flex-col justify-between">
-              <div className="space-y-4">
+            {/* ── Strategic Partner Spotlight Card (Natural Height, Fully Utilized) ── */}
+            <div className="bg-slate-900/70 border border-slate-800 rounded-xl p-4 shadow-lg backdrop-blur-sm flex flex-col justify-between h-full min-h-[420px] max-h-[420px] overflow-hidden">
+              <div className="space-y-2.5">
                 {/* Header */}
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 text-purple-400 font-bold text-sm">
-                    <Award size={18} className="text-purple-400 shrink-0" />
+                    <Award size={17} className="shrink-0 text-purple-400" />
                     <span>Key Account Spotlight</span>
                   </div>
-                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-900/60 text-indigo-300 border border-indigo-700/60 uppercase tracking-wider">
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-900/60 text-indigo-300 border border-indigo-700/60 uppercase">
                     {topAccount.tier}
                   </span>
                 </div>
-                <p className="text-xs text-slate-400 -mt-2">
-                  Performance metrics for the highest volume regional distribution account.
+                <p className="text-[11px] text-slate-400 -mt-1 leading-tight">
+                  Performance metrics for the highest volume regional distribution customer account.
                 </p>
 
-                {/* Primary Account Entity Card */}
-                <div className="p-3.5 bg-slate-800/80 rounded-xl border border-slate-700/60 space-y-2">
+                {/* Primary Entity Box */}
+                <div className="p-3 bg-slate-800/70 rounded-xl border border-slate-700/50 space-y-1.5">
                   <div className="flex items-start justify-between gap-2">
                     <div>
-                      <div className="text-base font-black text-slate-100 tracking-tight">{topAccount.name}</div>
-                      <div className="text-xs text-slate-400 flex items-center gap-1.5 mt-0.5">
-                        <MapPin size={12} className="text-sky-400 shrink-0" />
-                        <span>{topAccount.city} ({topAccount.state})</span>
-                        <span className="text-slate-600">•</span>
-                        <span className="text-indigo-400 font-medium">Rep: {topAccount.salesman}</span>
+                      <div className="text-sm font-black text-slate-100">{topAccount.name} ({topAccount.city})</div>
+                      <div className="text-[11px] text-slate-400 mt-0.5">
+                        Primary territory: {topAccount.state} Hub • Rep: {topAccount.salesman}
                       </div>
                     </div>
-                    <span className="px-2 py-0.5 rounded bg-emerald-950/60 text-emerald-400 border border-emerald-800/50 text-[10px] font-bold shrink-0">
-                      {topAccount.share}% Network Share
+                    <span className="px-1.5 py-0.5 rounded bg-emerald-950/60 text-emerald-400 border border-emerald-800/50 text-[10px] font-bold shrink-0">
+                      {topAccount.share}% Share
                     </span>
                   </div>
 
-                  <div className="text-[11px] text-slate-400 font-mono bg-slate-900/70 px-2.5 py-1 rounded border border-slate-800/80 flex items-center justify-between">
-                    <span className="text-slate-500">GSTIN:</span>
-                    <span className="text-slate-300 font-semibold">{topAccount.gstin}</span>
+                  {/* 4 Compact Metric Points */}
+                  <div className="grid grid-cols-2 gap-x-2 gap-y-1.5 pt-2 border-t border-slate-700/40 text-xs">
+                    <div>
+                      <span className="text-slate-400 text-[11px]">Gross Sales: </span>
+                      <span className="font-bold text-indigo-400">₹{topAccount.revenue.toLocaleString('en-IN')}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 text-[11px]">Orders: </span>
+                      <span className="font-bold text-sky-400">{topAccount.orders} dispatches</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 text-[11px]">Avg Order: </span>
+                      <span className="font-bold text-purple-400">₹{topAccount.aov.toLocaleString('en-IN')}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 text-[11px]">Units Sold: </span>
+                      <span className="font-bold text-amber-400">{topAccount.units.toLocaleString('en-IN')}</span>
+                    </div>
+                  </div>
+
+                  {/* Secondary Details */}
+                  <div className="grid grid-cols-2 gap-x-2 pt-1.5 border-t border-slate-700/40 text-[11px] text-slate-400">
+                    <div>
+                      <span className="text-slate-500">Catalog: </span>
+                      <span className="font-semibold text-slate-300">{topAccount.skus} SKUs ({topAccount.activeDays} days)</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500">GSTIN: </span>
+                      <span className="font-mono text-slate-300 text-[10px]">{topAccount.gstin}</span>
+                    </div>
                   </div>
                 </div>
 
-                {/* 4 Core Financial & Fulfillment Metrics */}
-                <div className="grid grid-cols-2 gap-2.5 text-xs">
-                  <div className="bg-slate-800/50 p-2.5 rounded-xl border border-slate-700/40">
-                    <div className="text-[10px] text-slate-400 font-semibold uppercase">Cumulative Sales</div>
-                    <div className="text-sm font-extrabold text-indigo-400 mt-0.5">
-                      ₹{topAccount.revenue.toLocaleString('en-IN')}
-                    </div>
-                    <div className="text-[10px] text-slate-500 mt-0.5">₹{topAccount.aov.toLocaleString('en-IN')} avg/dispatch</div>
+                {/* Key Procured Lines Mini-Pill Bar (Filling Available Space without extra height) */}
+                <div className="p-2.5 bg-slate-800/40 rounded-xl border border-slate-700/30 text-[11px] space-y-1">
+                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between">
+                    <span>Top Procured Lines</span>
+                    <span className="text-slate-500">Tenor: {topAccount.firstPurchase.slice(0, 7)} → {topAccount.lastPurchase.slice(0, 7)}</span>
                   </div>
-
-                  <div className="bg-slate-800/50 p-2.5 rounded-xl border border-slate-700/40">
-                    <div className="text-[10px] text-slate-400 font-semibold uppercase">Dispatches Placed</div>
-                    <div className="text-sm font-extrabold text-sky-400 mt-0.5">
-                      {topAccount.orders} Vouchers
-                    </div>
-                    <div className="text-[10px] text-slate-500 mt-0.5">{topAccount.activeDays} distinct active days</div>
+                  <div className="flex items-center justify-between text-slate-300 text-[11px]">
+                    <span>NALKA CP Fittings</span>
+                    <span className="font-semibold text-indigo-400">₹3.80L (38%)</span>
                   </div>
-
-                  <div className="bg-slate-800/50 p-2.5 rounded-xl border border-slate-700/40">
-                    <div className="text-[10px] text-slate-400 font-semibold uppercase">Units Dispatched</div>
-                    <div className="text-sm font-extrabold text-amber-400 mt-0.5">
-                      {topAccount.units.toLocaleString('en-IN')} Units
-                    </div>
-                    <div className="text-[10px] text-slate-500 mt-0.5">Physical goods volume</div>
+                  <div className="flex items-center justify-between text-slate-300 text-[11px]">
+                    <span>HAHN Bathroom Fixtures</span>
+                    <span className="font-semibold text-sky-400">₹1.99L (20%)</span>
                   </div>
-
-                  <div className="bg-slate-800/50 p-2.5 rounded-xl border border-slate-700/40">
-                    <div className="text-[10px] text-slate-400 font-semibold uppercase">Product Diversity</div>
-                    <div className="text-sm font-extrabold text-purple-400 mt-0.5">
-                      {topAccount.skus} Distinct SKUs
-                    </div>
-                    <div className="text-[10px] text-slate-500 mt-0.5">Catalog penetration</div>
+                  <div className="flex items-center justify-between text-slate-300 text-[11px]">
+                    <span>Nalka PTMT Polymers</span>
+                    <span className="font-semibold text-amber-400">₹1.94L (19%)</span>
                   </div>
-                </div>
-
-                {/* Top Brand Realization Breakdown Mini-List */}
-                <div className="bg-slate-800/40 rounded-xl p-3 border border-slate-700/40 space-y-1.5 text-xs">
-                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between mb-1">
-                    <span>Key Procured Lines</span>
-                    <span className="text-slate-500">Volume Share</span>
-                  </div>
-                  <div className="flex items-center justify-between text-[11px]">
-                    <span className="font-semibold text-slate-200">NALKA CP Sanitary Fitting</span>
-                    <span className="font-bold text-indigo-400">₹3,80,389 (38%)</span>
-                  </div>
-                  <div className="w-full bg-slate-700/50 h-1.5 rounded-full overflow-hidden">
-                    <div className="bg-indigo-500 h-full rounded-full" style={{ width: '38%' }} />
-                  </div>
-
-                  <div className="flex items-center justify-between text-[11px] pt-1">
-                    <span className="font-semibold text-slate-200">HAHN Bathroom Fixtures</span>
-                    <span className="font-bold text-sky-400">₹1,99,477 (20%)</span>
-                  </div>
-                  <div className="w-full bg-slate-700/50 h-1.5 rounded-full overflow-hidden">
-                    <div className="bg-sky-500 h-full rounded-full" style={{ width: '20%' }} />
-                  </div>
-
-                  <div className="flex items-center justify-between text-[11px] pt-1">
-                    <span className="font-semibold text-slate-200">Nalka PTMT Polymers</span>
-                    <span className="font-bold text-amber-400">₹1,94,280 (19%)</span>
-                  </div>
-                  <div className="w-full bg-slate-700/50 h-1.5 rounded-full overflow-hidden">
-                    <div className="bg-amber-500 h-full rounded-full" style={{ width: '19%' }} />
-                  </div>
-                </div>
-
-                {/* Account Tenor & Lifecycle Details */}
-                <div className="flex items-center justify-between text-[11px] text-slate-400 px-1">
-                  <span>Tenor: {topAccount.firstPurchase} → {topAccount.lastPurchase}</span>
-                  <span className="text-emerald-400 font-semibold flex items-center gap-1">
-                    <CheckCircle2 size={12} /> Active Account
-                  </span>
                 </div>
               </div>
 
-              {/* Verified Footer */}
-              <div className="mt-4 pt-3 border-t border-slate-800 text-xs text-indigo-400 flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
-                  <ShieldCheck size={15} className="text-indigo-400 shrink-0" />
-                  <span className="font-semibold">Tier 1 Platinum Partner • Zero payment defaults</span>
+              {/* Footer Bar */}
+              <div className="pt-2 border-t border-slate-800 text-[11px] text-indigo-400 flex items-center justify-between">
+                <div className="flex items-center gap-1.5 truncate">
+                  <ShieldCheck size={14} className="shrink-0 text-indigo-400" />
+                  <span className="truncate">Tier 1 Platinum Partner • Zero defaults</span>
                 </div>
                 <button
                   onClick={() => setActiveTab('performance')}
-                  className="text-[11px] font-bold text-indigo-400 hover:text-indigo-300 transition-colors underline underline-offset-2 cursor-pointer"
+                  className="text-[11px] font-bold text-indigo-400 hover:text-indigo-300 transition-colors shrink-0 ml-2"
                 >
                   View Performance →
                 </button>
