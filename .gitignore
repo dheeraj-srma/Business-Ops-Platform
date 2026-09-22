@@ -40,3 +40,4 @@ backend/venv/
 backend/.env
 backend/data/snapshots/*.json
 backend/data/snapshots/*.tmp
+scratch/
