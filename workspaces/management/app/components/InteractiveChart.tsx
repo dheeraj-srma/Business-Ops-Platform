@@ -675,9 +675,64 @@ export default function InteractiveChart({
     return `${val}`;
   };
 
+  const chartId = useMemo(() => title.replace(/[^a-z0-9]/gi, '_'), [title]);
+
+  const lineGradientStops = useMemo(() => {
+    if (normalizedVisibleData.length === 0) {
+      return [
+        { offset: '0%', color: COLORS[0] },
+        { offset: '100%', color: COLORS[0] },
+      ];
+    }
+    if (normalizedVisibleData.length === 1) {
+      const col = normalizedVisibleData[0]?.color || COLORS[startIndex % COLORS.length];
+      return [
+        { offset: '0%', color: col },
+        { offset: '100%', color: col },
+      ];
+    }
+    const count = normalizedVisibleData.length;
+    return normalizedVisibleData.map((d, i) => ({
+      offset: `${Math.round((i / (count - 1)) * 100)}%`,
+      color: d.color || COLORS[(startIndex + i) % COLORS.length],
+    }));
+  }, [normalizedVisibleData, startIndex]);
+
+  const renderCustomLineDot = (props: any) => {
+    const { cx, cy, index, payload } = props;
+    if (cx === undefined || cy === undefined) return null;
+    const color = payload?.color || COLORS[(startIndex + index) % COLORS.length];
+    const isHovered = activeHoverIndex === index;
+    return (
+      <g key={`dot-${index}`}>
+        <circle
+          cx={cx}
+          cy={cy}
+          r={isHovered ? 6 : 4}
+          fill={color}
+          stroke="#0f172a"
+          strokeWidth={1.5}
+          style={{ transition: 'all 0.2s ease', cursor: 'pointer' }}
+        />
+        {isHovered && (
+          <circle
+            cx={cx}
+            cy={cy}
+            r={8.5}
+            fill="none"
+            stroke={color}
+            strokeWidth={1.5}
+            opacity={0.7}
+          />
+        )}
+      </g>
+    );
+  };
+
   const renderCustomTooltip = (props: any) => {
     const { active, payload, label } = props;
     if (active && payload && payload.length) {
+      const itemIndex = normalizedVisibleData.findIndex(d => d.name === label);
       return (
         <div
           className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-3 rounded-xl shadow-xl text-xs space-y-1 backdrop-blur-md"
@@ -694,9 +749,12 @@ export default function InteractiveChart({
             const formattedVal = typeof val === 'number'
               ? (unit === '₹' ? `₹${val.toLocaleString('en-IN')}` : `${val.toLocaleString('en-IN')} ${unit}`)
               : val;
+            const entryColor = multiSeries
+              ? (p.color || COLORS[(startIndex + idx) % COLORS.length])
+              : (itemIndex >= 0 ? (normalizedVisibleData[itemIndex]?.color || COLORS[(startIndex + itemIndex) % COLORS.length]) : (p.color || COLORS[0]));
             return (
-              <div key={idx} style={{ color: p.color || COLORS[(startIndex + idx) % COLORS.length], fontWeight: 700, fontSize: '0.88rem' }}>
-                {p.name ? `${p.name}: ` : ''}{formattedVal}
+              <div key={idx} style={{ color: entryColor, fontWeight: 700, fontSize: '0.88rem' }}>
+                {p.name && multiSeries ? `${p.name}: ` : ''}{formattedVal}
               </div>
             );
           })}
@@ -1134,16 +1192,23 @@ export default function InteractiveChart({
                     <defs>
                       {multiSeries ? (
                         multiSeries.map((s, idx) => (
-                          <linearGradient key={idx} id={`colorGrad_${title.replace(/[^a-z0-9]/gi, '')}_${s.key}`} x1="0" y1="0" x2="0" y2="1">
+                          <linearGradient key={idx} id={`colorGrad_${chartId}_${s.key}`} x1="0" y1="0" x2="0" y2="1">
                             <stop offset="5%" stopColor={s.color} stopOpacity={0.4} />
                             <stop offset="95%" stopColor={s.color} stopOpacity={0.0} />
                           </linearGradient>
                         ))
                       ) : (
-                        <linearGradient id={`colorGrad_${title.replace(/[^a-z0-9]/gi, '')}`} x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#6366f1" stopOpacity={0.45} />
-                          <stop offset="95%" stopColor="#6366f1" stopOpacity={0.0} />
-                        </linearGradient>
+                        <>
+                          <linearGradient id={`lineGrad_${chartId}`} x1="0%" y1="0%" x2="100%" y2="0%">
+                            {lineGradientStops.map((stop, sIdx) => (
+                              <stop key={sIdx} offset={stop.offset} stopColor={stop.color} />
+                            ))}
+                          </linearGradient>
+                          <linearGradient id={`areaGrad_${chartId}`} x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor={lineGradientStops[0]?.color || '#6366f1'} stopOpacity={0.35} />
+                            <stop offset="95%" stopColor={lineGradientStops[lineGradientStops.length - 1]?.color || '#6366f1'} stopOpacity={0.02} />
+                          </linearGradient>
+                        </>
                       )}
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.4} />
@@ -1171,10 +1236,10 @@ export default function InteractiveChart({
                     <Tooltip content={renderCustomTooltip} />
                     {multiSeries ? (
                       multiSeries.map((s, idx) => (
-                        <Area key={idx} yAxisId={hasSecondaryYAxis ? (s.yAxisId || 'left') : undefined} type="monotone" dataKey={s.key} name={s.label} stroke={s.color} strokeWidth={2} fillOpacity={1} fill={`url(#colorGrad_${title.replace(/[^a-z0-9]/gi, '')}_${s.key})`} />
+                        <Area key={idx} yAxisId={hasSecondaryYAxis ? (s.yAxisId || 'left') : undefined} type="monotone" dataKey={s.key} name={s.label} stroke={s.color} strokeWidth={2} fillOpacity={1} fill={`url(#colorGrad_${chartId}_${s.key})`} />
                       ))
                     ) : (
-                      <Area type="monotone" dataKey="value" stroke="#6366f1" strokeWidth={2.5} fillOpacity={1} fill={`url(#colorGrad_${title.replace(/[^a-z0-9]/gi, '')})`} />
+                      <Area type="monotone" dataKey="value" stroke={`url(#lineGrad_${chartId})`} strokeWidth={2.5} fillOpacity={1} fill={`url(#areaGrad_${chartId})`} dot={renderCustomLineDot} />
                     )}
                   </AreaChart>
                 </ResponsiveContainer>
@@ -1288,6 +1353,22 @@ export default function InteractiveChart({
               {isMounted ? (
                 <ResponsiveContainer width="100%" height="100%" minHeight={isEffectiveHero ? 340 : 250}>
                   <LineChart data={normalizedVisibleData} margin={{ top: 10, right: hasSecondaryYAxis ? 35 : 15, left: -5, bottom: xAxisConfig.bottomMargin }}>
+                    <defs>
+                      {multiSeries ? (
+                        multiSeries.map((s, idx) => (
+                          <linearGradient key={idx} id={`lineGrad_${chartId}_${s.key}`} x1="0" y1="0" x2="1" y2="0">
+                            <stop offset="0%" stopColor={s.color} />
+                            <stop offset="100%" stopColor={s.color} />
+                          </linearGradient>
+                        ))
+                      ) : (
+                        <linearGradient id={`lineGrad_${chartId}`} x1="0%" y1="0%" x2="100%" y2="0%">
+                          {lineGradientStops.map((stop, sIdx) => (
+                            <stop key={sIdx} offset={stop.offset} stopColor={stop.color} />
+                          ))}
+                        </linearGradient>
+                      )}
+                    </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.4} />
                     <XAxis
                       dataKey="name"
@@ -1313,10 +1394,10 @@ export default function InteractiveChart({
                     <Tooltip content={renderCustomTooltip} />
                     {multiSeries ? (
                       multiSeries.map((s, idx) => (
-                        <Line key={idx} yAxisId={hasSecondaryYAxis ? (s.yAxisId || 'left') : undefined} type="monotone" dataKey={s.key} name={s.label} stroke={s.color} strokeWidth={2} dot={{ r: 2 }} activeDot={{ r: 4 }} />
+                        <Line key={idx} yAxisId={hasSecondaryYAxis ? (s.yAxisId || 'left') : undefined} type="monotone" dataKey={s.key} name={s.label} stroke={s.color} strokeWidth={2.5} dot={{ r: 3, fill: s.color, stroke: '#0f172a', strokeWidth: 1.5 }} activeDot={{ r: 5, fill: s.color }} />
                       ))
                     ) : (
-                      <Line type="monotone" dataKey="value" stroke="#10b981" strokeWidth={2.5} dot={{ r: 3, fill: '#10b981' }} activeDot={{ r: 5 }} />
+                      <Line type="monotone" dataKey="value" stroke={`url(#lineGrad_${chartId})`} strokeWidth={2.5} dot={renderCustomLineDot} activeDot={{ r: 6 }} />
                     )}
                   </LineChart>
                 </ResponsiveContainer>
