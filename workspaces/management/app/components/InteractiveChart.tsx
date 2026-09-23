@@ -712,15 +712,15 @@ export default function InteractiveChart({
       className="bg-slate-900/70 border border-slate-800 rounded-xl p-4 shadow-lg backdrop-blur-sm flex flex-col min-h-[420px] h-full w-full min-w-0 box-border gap-2 overflow-hidden"
     >
       {/* ── Header Toolbar ─────────────────────────────────────────────────── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800/80 pb-3">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <BarChart3 className="text-indigo-600 dark:text-indigo-400 shrink-0" size={17} />
-            <h3 className="font-bold text-sm text-slate-100 truncate" title={title}>
+      <div className="flex items-center justify-between gap-2 border-b border-slate-800/80 pb-2.5 min-w-0">
+        <div className="min-w-0 flex-1 pr-1">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <BarChart3 className="text-indigo-600 dark:text-indigo-400 shrink-0" size={15} />
+            <h3 className="font-bold text-xs sm:text-sm text-slate-100 truncate" title={title}>
               {title}
             </h3>
             {statusBadge && (
-              <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold tracking-wider uppercase font-mono ${
+              <span className={`px-1.5 py-0.5 rounded text-[8px] sm:text-[9px] font-bold tracking-wider uppercase font-mono shrink-0 ${
                 statusBadge === 'LIVE' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
                 statusBadge === 'MODELLED' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
                 statusBadge === 'UNAVAILABLE' ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' :
@@ -732,27 +732,28 @@ export default function InteractiveChart({
             )}
           </div>
           {subtitle && (
-            <p className="text-xs text-slate-400 truncate mt-0.5" title={subtitle}>
+            <p className="text-[11px] text-slate-400 truncate mt-0.5" title={subtitle}>
               {subtitle}
             </p>
           )}
         </div>
 
-        <div className="flex items-center gap-1.5 flex-wrap sm:flex-nowrap">
+        <div className="flex items-center gap-1 shrink-0">
           {/* View Mode Selector */}
           <select
-            className="bg-slate-800 border border-slate-700 hover:border-slate-600 focus:border-indigo-600 dark:border-indigo-500 rounded-lg px-2 py-1 text-xs text-slate-200 outline-none transition-colors cursor-pointer"
+            className="bg-slate-800 border border-slate-700 hover:border-slate-600 focus:border-indigo-600 dark:border-indigo-500 rounded-lg px-1.5 py-1 text-[11px] font-medium text-slate-200 outline-none transition-colors cursor-pointer max-w-[82px] sm:max-w-[90px]"
             value={chartType}
             onChange={e => setChartType(e.target.value as any)}
+            title="Select Chart Type"
           >
-            <option value="area">Area Chart</option>
-            <option value="bar">Bar Chart</option>
-            <option value="horizontal_bar">Horizontal Bar</option>
-            <option value="line">Line Chart</option>
-            <option value="pie">Pie Chart</option>
-            <option value="donut">Donut Chart</option>
-            <option value="table">Table View</option>
-            <option value="kpi">KPI Summary</option>
+            <option value="area">Area</option>
+            <option value="bar">Bar</option>
+            <option value="horizontal_bar">H-Bar</option>
+            <option value="line">Line</option>
+            <option value="pie">Pie</option>
+            <option value="donut">Donut</option>
+            <option value="table">Table</option>
+            <option value="kpi">KPI</option>
           </select>
 
           {/* Time Range Dropdown */}
@@ -761,7 +762,7 @@ export default function InteractiveChart({
               <div className="w-3 h-3 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin shrink-0" />
             )}
             <select
-              className="bg-slate-800 border border-slate-700 hover:border-slate-600 focus:border-indigo-600 dark:border-indigo-500 rounded-lg px-2 py-1 text-xs text-slate-200 outline-none transition-colors cursor-pointer"
+              className="bg-slate-800 border border-slate-700 hover:border-slate-600 focus:border-indigo-600 dark:border-indigo-500 rounded-lg px-1.5 py-1 text-[11px] font-medium text-slate-200 outline-none transition-colors cursor-pointer max-w-[88px] sm:max-w-[96px]"
               value={timeRange}
               onChange={e => {
                 const newRange = e.target.value as DateRangeType;
@@ -777,27 +778,28 @@ export default function InteractiveChart({
                   onTimeRangeChange(newRange, b);
                 }
               }}
+              title="Select Time Range"
             >
               <option value="today">Today</option>
               <option value="yesterday">Yesterday</option>
-              <option value="7d">Last 7 Days</option>
+              <option value="7d">7 Days</option>
               <option value="this_week">This Week</option>
               <option value="this_month">This Month</option>
               <option value="last_month">Last Month</option>
-              <option value="30d">Last 30 Days</option>
-              <option value="60d">Last 60 Days</option>
-              <option value="90d">Last 90 Days</option>
+              <option value="30d">30 Days</option>
+              <option value="60d">60 Days</option>
+              <option value="90d">90 Days</option>
               <option value="this_quarter">This Quarter</option>
-              <option value="ytd">Year-to-Date (YTD)</option>
-              <option value="12m">Trailing 12 Months</option>
-              <option value="all">Full History</option>
-              <option value="custom">Custom Range...</option>
+              <option value="ytd">YTD</option>
+              <option value="12m">12 Months</option>
+              <option value="all">All Time</option>
+              <option value="custom">Custom...</option>
             </select>
           </div>
 
           {/* Reset Button */}
           <button
-            className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
+            className="p-1 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-400 hover:text-slate-200 transition-colors cursor-pointer shrink-0"
             onClick={() => {
               setChartType(defaultChartType);
               const defaultRange = defaultTimeRange || '30d';
@@ -812,7 +814,7 @@ export default function InteractiveChart({
             }}
             title="Reset Chart View"
           >
-            <RotateCw size={13} />
+            <RotateCw size={12} />
           </button>
         </div>
       </div>
