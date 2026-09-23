@@ -960,10 +960,10 @@ export const RestockPlannerView: React.FC<RestockPlannerViewProps> = ({
             <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50 text-sm">
               {isLoading ? (
                 <tr>
-                  <td colSpan={11} className="py-12 text-center text-slate-500 dark:text-slate-400">
-                    <div className="flex flex-col items-center justify-center gap-2">
-                      <RotateCcw className="w-6 h-6 animate-spin text-slate-400" />
-                      <span>Computing safety stock deficits & reorder quantities across master inventory...</span>
+                  <td colSpan={11} className="py-20 text-center text-slate-500 dark:text-slate-400">
+                    <div className="flex flex-col items-center justify-center gap-3 select-none">
+                      <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto" />
+                      <span className="text-sm font-normal tracking-wide text-slate-400">Computing safety stock deficits & reorder quantities...</span>
                     </div>
                   </td>
                 </tr>

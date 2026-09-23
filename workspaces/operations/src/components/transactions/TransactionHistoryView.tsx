@@ -499,9 +499,9 @@ export const TransactionHistoryView: React.FC<TransactionHistoryViewProps> = ({
         {/* Content View: Grouped Consignments vs Flat Table */}
         <div className={cn('overflow-x-auto', isFullScreen ? 'flex-1 overflow-y-auto' : '')}>
           {isLoading ? (
-            <div className="py-16 text-center text-slate-400 dark:text-slate-500">
-              <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-indigo-500" />
-              <p className="text-xs font-semibold">Loading inventory movement ledger...</p>
+            <div className="py-20 text-center text-slate-400 dark:text-slate-500 flex flex-col items-center justify-center gap-3 select-none">
+              <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto" />
+              <p className="text-sm font-normal tracking-wide text-slate-400">Loading Inventory Movement Ledger...</p>
             </div>
           ) : transactions.length === 0 ? (
             <div className="py-16 text-center text-slate-400 dark:text-slate-500">

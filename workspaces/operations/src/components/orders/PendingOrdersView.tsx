@@ -1374,9 +1374,9 @@ export const PendingOrdersView: React.FC<PendingOrdersViewProps> = ({
 
           {/* Orders List View */}
           {isLoading ? (
-            <div className="py-16 text-center text-slate-400 flex flex-col items-center justify-center gap-2">
-              <RefreshCw className="w-6 h-6 animate-spin text-indigo-500" />
-              <span className="text-xs font-medium">Checking pending orders queue...</span>
+            <div className="py-20 text-center text-slate-400 flex flex-col items-center justify-center gap-3 select-none">
+              <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto" />
+              <span className="text-sm font-normal tracking-wide">Loading Pending Orders Queue...</span>
             </div>
           ) : filteredPendingOrders.length === 0 ? (
             <div className="py-16 text-center bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center gap-3">

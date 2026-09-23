@@ -28,6 +28,7 @@ import {
 import { DashboardStats, Product, StockTransaction } from '../../types';
 import { formatNumber, formatDate, cn } from '../../lib/utils';
 import { api } from '../../lib/api';
+import { InScreenLoader } from '../common/InScreenLoader';
 
 interface DashboardViewProps {
   stats: DashboardStats | null;
@@ -166,14 +167,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   }, [isFullScreen]);
 
   if (isLoading || !stats) {
-    return (
-      <div className="p-8 flex items-center justify-center min-h-[400px]">
-        <div className="text-slate-400 text-sm flex items-center gap-2">
-          <div className="w-4 h-4 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
-          <span>Calculating real-time inventory statistics...</span>
-        </div>
-      </div>
-    );
+    return <InScreenLoader message="Loading Operations Dashboard..." />;
   }
 
   const totalSKUs = stats?.totalActiveSkus || stats?.totalProducts || 0;

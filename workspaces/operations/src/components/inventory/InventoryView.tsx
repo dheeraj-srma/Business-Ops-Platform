@@ -680,21 +680,11 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
             <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50 text-sm">
               {isLoading ? (
                 <tr>
-                  <td colSpan={10} className="py-16 text-center">
-                    <div className="flex flex-col items-center justify-center space-y-3">
-                      <div className="w-10 h-10 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-100 dark:border-indigo-800 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shadow-2xs">
-                        <RotateCcw className="w-5 h-5 animate-spin text-indigo-600 dark:text-indigo-400" style={{ animationDirection: 'reverse' }} />
-                      </div>
-                      <div className="flex items-center justify-center gap-1.5 text-sm font-bold text-slate-800 dark:text-slate-200 tracking-wide">
-                        <span>Getting Inventory</span>
-                        <span className="inline-flex gap-0.5 font-black text-indigo-600 dark:text-indigo-400">
-                          <span className="animate-bounce" style={{ animationDelay: '0ms', animationDuration: '1s' }}>.</span>
-                          <span className="animate-bounce" style={{ animationDelay: '200ms', animationDuration: '1s' }}>.</span>
-                          <span className="animate-bounce" style={{ animationDelay: '400ms', animationDuration: '1s' }}>.</span>
-                        </span>
-                      </div>
-                      <p className="text-xs text-slate-400 dark:text-slate-500 max-w-xs">
-                        Fetching live catalog items, stock balances, and valuation records...
+                  <td colSpan={10} className="py-20 text-center">
+                    <div className="flex flex-col items-center justify-center space-y-3 select-none">
+                      <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto" />
+                      <p className="text-sm text-slate-400 font-normal tracking-wide">
+                        Loading Master Inventory Catalog...
                       </p>
                     </div>
                   </td>

@@ -571,9 +571,9 @@ export default function SalesmanOrdersPanel({
 
       {/* Main Content Area */}
       {loading ? (
-        <div className="p-12 text-center bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-2xl">
-          <RefreshCw className="w-8 h-8 text-indigo-600 dark:text-indigo-500 animate-spin mx-auto mb-3" />
-          <p className="text-xs font-semibold text-slate-600 dark:text-slate-400">Loading salesman order history...</p>
+        <div className="py-20 text-center flex flex-col items-center justify-center gap-3 select-none">
+          <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-sm font-normal tracking-wide text-slate-400">Loading salesman order history...</p>
         </div>
       ) : filteredOrders.length === 0 ? (
         <div className="p-12 text-center bg-white dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 rounded-2xl">

@@ -696,9 +696,9 @@ export const CouponsView: React.FC<CouponsViewProps> = ({ role, products, catego
       {/* Main Coupon Records Table */}
       <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden">
         {isLoading ? (
-          <div className="p-12 text-center">
-            <RefreshCw className="w-8 h-8 mx-auto text-indigo-500 animate-spin mb-3" />
-            <p className="text-sm text-slate-500 dark:text-slate-400">Loading coupon records...</p>
+          <div className="py-20 text-center flex flex-col items-center justify-center gap-3 select-none">
+            <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto" />
+            <p className="text-sm font-normal tracking-wide text-slate-400">Loading coupon records...</p>
           </div>
         ) : filteredCoupons.length === 0 ? (
           <div className="p-12 text-center">
