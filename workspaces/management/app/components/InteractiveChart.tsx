@@ -293,8 +293,13 @@ export default function InteractiveChart({
   // Determine whether data represents a chronological time-series
   const isTimeSeries = useMemo(() => {
     if (!activeRawData || activeRawData.length === 0) return false;
-    return activeRawData.some(d => Boolean(getItemDate(d))) && (chartType === 'area' || chartType === 'line' || isHero === true || (!groupBy && !activeRawData.some(d => d.category || d.product || d.dealer || d.salesman)));
-  }, [activeRawData, chartType, isHero, groupBy]);
+    const hasDates = activeRawData.some(d => Boolean(getItemDate(d)));
+    if (!hasDates) return false;
+    if (groupBy && groupBy !== 'date' && groupBy !== 'name' && activeRawData.some(d => d[groupBy])) {
+      return false;
+    }
+    return true;
+  }, [activeRawData, groupBy]);
 
   // Automatically suppress horizontal axis data labels when color legends and hover tooltips identify items
   const shouldHideXAxisLabels = hideXAxisLabels !== undefined ? hideXAxisLabels : !isTimeSeries;
@@ -1024,7 +1029,7 @@ export default function InteractiveChart({
                     ) : (
                       <Bar dataKey="value" radius={[0, 4, 4, 0]}>
                         {normalizedVisibleData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color || COLORS[(startIndex + index) % COLORS.length]} />
+                          <Cell key={`cell-${index}`} fill={entry.color || (isTimeSeries ? '#6366f1' : COLORS[(startIndex + index) % COLORS.length])} />
                         ))}
                       </Bar>
                     )}
@@ -1344,7 +1349,7 @@ export default function InteractiveChart({
                     ) : (
                       <Bar dataKey="value" radius={[4, 4, 0, 0]}>
                         {normalizedVisibleData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color || COLORS[(startIndex + index) % COLORS.length]} />
+                          <Cell key={`cell-${index}`} fill={entry.color || (isTimeSeries ? '#6366f1' : COLORS[(startIndex + index) % COLORS.length])} />
                         ))}
                       </Bar>
                     )}
