@@ -885,6 +885,7 @@ export default function CustomerPerformanceView() {
               subtitle={`Order activity timeline for ${selectedCustomer.name}`}
               data={chartData}
               defaultChartType="area"
+              defaultTimeRange={dateRange as DateRangeType}
               unit="₹"
             />
           </div>
@@ -899,6 +900,7 @@ export default function CustomerPerformanceView() {
             subtitle="Top 10 highest-value dealer accounts ranked by cumulative gross revenue"
             data={topCustomersRankingData}
             defaultChartType="horizontal_bar"
+            defaultTimeRange={dateRange as DateRangeType}
             unit="₹"
           />
 
@@ -907,6 +909,7 @@ export default function CustomerPerformanceView() {
             subtitle="Count of dealer accounts categorized by number of distinct purchase vouchers"
             data={frequencyDistributionData}
             defaultChartType="bar"
+            defaultTimeRange={dateRange as DateRangeType}
             unit="Accounts"
           />
         </div>

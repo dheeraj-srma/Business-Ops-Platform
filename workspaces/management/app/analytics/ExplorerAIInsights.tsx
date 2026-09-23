@@ -2,336 +2,233 @@
 
 import React, { useMemo } from 'react';
 import { 
-  Sparkles
+  Sparkles,
+  TrendingUp,
+  AlertTriangle,
+  ShieldCheck,
+  Zap,
+  Target,
+  Clock,
+  ArrowUpRight,
+  PackageCheck,
+  Users
 } from 'lucide-react';
 
-interface ExplorerAIInsightsProps {
-  explorerType: 'Product' | 'Category' | 'Dealer' | 'Customer' | 'Supplier' | 'Salesman' | 'Location';
-  searchQuery: string;
-  explorerMetrics: {
-    currentStock: number;
-    stockValuation: number;
-    unitsSold: number;
-    orderCount: number;
-    totalRevenue: number;
-    returnRate: string;
-    matchedOrders: any[];
-    matchedProducts: any[];
-    matchedReturns: any[];
+export interface ExplorerData {
+  entity_type: string;
+  query: string;
+  summary: {
+    total_revenue: number;
+    order_count: number;
+    units_sold: number;
+    customer_count: number;
+    aov: number;
+    active_days: number;
+    first_date?: string | null;
+    last_date?: string | null;
+    return_rate_pct?: number;
   };
-  inventoryList: any[];
-  ordersList: any[];
-  suppliersList: any[];
-  returnsList: any[];
-  inwardsList: any[];
+  entity_info: Record<string, any>;
+  timeline: Array<{ date: string; name: string; revenue: number; value: number; orders: number; units?: number }>;
+  distribution: Array<{ name: string; value: number; units?: number; orders?: number; category?: string }>;
+  monthly_trend: Array<{ name: string; month: string; revenue: number; value: number; units?: number; orders: number }>;
+  ticket_distribution: Array<{ name: string; range: string; count: number; value: number }>;
+  recent_transactions: Array<any>;
+}
+
+interface ExplorerAIInsightsProps {
+  explorerType: string;
+  searchQuery: string;
+  explorerData?: ExplorerData | null;
+  inventoryItem?: any;
 }
 
 export default function ExplorerAIInsights({
   explorerType,
   searchQuery,
-  explorerMetrics,
-  inventoryList = [],
-  ordersList = [],
-  suppliersList = [],
-  returnsList = [],
-  inwardsList = []
+  explorerData,
+  inventoryItem
 }: ExplorerAIInsightsProps) {
-  // --- Calculations for PRODUCT ---
-  const productInsights = useMemo(() => {
-    if (!searchQuery || explorerType !== 'Product') return null;
+  const summary = explorerData?.summary;
+  const entityInfo = explorerData?.entity_info || {};
+  const timeline = explorerData?.timeline || [];
+  const distribution = explorerData?.distribution || [];
 
-    const matchedSku = inventoryList.find((p: any) => 
-      (p.SKU && String(p.SKU).toLowerCase() === searchQuery.toLowerCase()) || 
-      (p['Item Name'] && String(p['Item Name']).toLowerCase() === searchQuery.toLowerCase())
-    );
+  // Compute calculated intelligence cards based on real transaction data
+  const insights = useMemo(() => {
+    if (!summary) return null;
 
-    if (!matchedSku) return null;
+    const rev = summary.total_revenue || 0;
+    const orders = summary.order_count || 0;
+    const units = summary.units_sold || 0;
+    const days = summary.active_days || 1;
+    const aov = summary.aov || (orders > 0 ? rev / orders : 0);
 
-    const sku = matchedSku.SKU || '';
-    const currentStock = Number(matchedSku['Current Stock'] || 0);
-    const price = Number(matchedSku.Price || 0);
-    const supplier = matchedSku.Supplier || 'Standard Vendor';
+    const dailyBurnRate = days > 0 ? (units > 0 ? units / days : rev / days) : 0;
+    const isProduct = explorerType.toLowerCase() === 'product';
+    const isCategory = explorerType.toLowerCase() === 'category';
+    const isCustomer = explorerType.toLowerCase() === 'customer';
+    const isSalesman = explorerType.toLowerCase() === 'salesman';
+    const isSupplier = explorerType.toLowerCase() === 'supplier';
+    const isLocation = explorerType.toLowerCase() === 'location';
 
-    // Calculate daily demand velocity
-    const approvedOrders = ordersList.filter((o: any) => {
-      const st = String(o.Status || o.status || '').trim().toLowerCase();
-      const skuMatch = String(o.SKU || o.sku || '').trim().toLowerCase() === sku.toLowerCase();
-      const nameMatch = String(o['Item Name'] || o.item_name || '').trim().toLowerCase() === String(matchedSku['Item Name'] || '').trim().toLowerCase();
-      return st !== 'rejected' && st !== 'cancelled' && (skuMatch || nameMatch);
-    });
-    const totalQty = approvedOrders.reduce((sum: number, o: any) => sum + (Number(o.Quantity) || 0), 0);
-    const dailyVelocity = parseFloat((totalQty / 30).toFixed(2));
+    // 1. Diagnostic Card 1: Velocity & Momentum
+    let diagnosticTitle = 'Velocity & Commercial Momentum';
+    let diagnosticStatus = 'OPTIMAL';
+    let diagnosticBadgeColor = 'emerald';
+    let diagnosticText = '';
 
-    const leadTime = supplier.toLowerCase().includes('copper') ? 7 : 5;
-    const leadTimeDemand = Math.ceil(dailyVelocity * leadTime);
-    const safetyStock = Math.max(10, Math.ceil(dailyVelocity * 3));
-    const reorderPoint = leadTimeDemand + safetyStock;
-
-    const daysToStockout = dailyVelocity > 0 ? parseFloat((currentStock / dailyVelocity).toFixed(1)) : Infinity;
-    
-    let risk = 'STABLE';
-    let riskColor = '#10b981';
-    if (currentStock === 0) {
-      risk = 'DEPLETED';
-      riskColor = '#ef4444';
-    } else if (daysToStockout <= 3) {
-      risk = 'CRITICAL';
-      riskColor = '#ef4444';
-    } else if (daysToStockout <= 7) {
-      risk = 'WARNING';
-      riskColor = '#f59e0b';
+    if (isProduct || isCategory) {
+      const stock = Number(inventoryItem?.['Current Stock'] || inventoryItem?.stock || 0);
+      const daysOfStock = dailyBurnRate > 0 && stock > 0 ? Math.round(stock / dailyBurnRate) : null;
+      if (stock === 0 && units > 0) {
+        diagnosticStatus = 'DEPLETED';
+        diagnosticBadgeColor = 'rose';
+        diagnosticText = `Zero physical inventory registered. High past demand (${units.toLocaleString('en-IN')} units across ${orders} orders) indicates an active backorder risk.`;
+      } else if (daysOfStock !== null && daysOfStock <= 10) {
+        diagnosticStatus = 'CRITICAL STOCKOUT';
+        diagnosticBadgeColor = 'rose';
+        diagnosticText = `Burn rate of ${dailyBurnRate.toFixed(1)} units/trading day will deplete remaining ${stock} units in ~${daysOfStock} days. Priority warehouse replenishment required.`;
+      } else if (daysOfStock !== null && daysOfStock <= 30) {
+        diagnosticStatus = 'REORDER SOON';
+        diagnosticBadgeColor = 'amber';
+        diagnosticText = `Healthy demand cadence (${dailyBurnRate.toFixed(1)} units/day). Inventory coverage is estimated at ${daysOfStock} days. Standard procurement recommended.`;
+      } else {
+        diagnosticStatus = 'STABLE HOLDING';
+        diagnosticBadgeColor = 'emerald';
+        diagnosticText = `Continuous demand with verified realization of ₹${rev.toLocaleString('en-IN')}. Active distribution across ${summary.customer_count || 1} distinct retail trade accounts.`;
+      }
+    } else if (isCustomer) {
+      diagnosticTitle = 'Account Purchasing Cadence & Churn Risk';
+      const activeTradingDays = summary.active_days;
+      if (activeTradingDays >= 10) {
+        diagnosticStatus = 'KEY ENTERPRISE ACCOUNT';
+        diagnosticBadgeColor = 'indigo';
+        diagnosticText = `High purchasing frequency with ${orders} orders totaling ₹${rev.toLocaleString('en-IN')}. Average ticket size is ₹${Math.round(aov).toLocaleString('en-IN')}.`;
+      } else if (activeTradingDays >= 3) {
+        diagnosticStatus = 'ACTIVE REGULAR';
+        diagnosticBadgeColor = 'emerald';
+        diagnosticText = `Steady recurring customer with ${orders} orders. Primary relationship managed by Salesman "${entityInfo.salesman || 'Direct'}".`;
+      } else {
+        diagnosticStatus = 'OCCASIONAL BUYER';
+        diagnosticBadgeColor = 'amber';
+        diagnosticText = `Recorded ${orders} transaction(s). Recommending targeted salesman follow-up to expand catalog basket size and repeat cycle.`;
+      }
+    } else if (isSalesman) {
+      diagnosticTitle = 'Territory Sales Performance & Reach';
+      diagnosticStatus = 'FIELD PRODUCTIVITY';
+      diagnosticBadgeColor = 'indigo';
+      diagnosticText = `Generated ₹${rev.toLocaleString('en-IN')} across ${summary.customer_count} verified partner dealers with ${orders} executed sales orders. Average order realization is ₹${Math.round(aov).toLocaleString('en-IN')}.`;
+    } else {
+      diagnosticStatus = 'ACTIVE LEDGER';
+      diagnosticBadgeColor = 'indigo';
+      diagnosticText = `Total trading volume of ₹${rev.toLocaleString('en-IN')} across ${orders} transactions spanning ${days} trading days.`;
     }
 
-    const reorderQty = currentStock < reorderPoint 
-      ? Math.ceil((reorderPoint - currentStock) / 50) * 50 
-      : 0;
+    // 2. Actionable Recommendation Card
+    let recTitle = 'Strategic Recommendation';
+    let recText = '';
+    let recMetric = '';
+
+    if (isProduct || isCategory) {
+      recTitle = 'Fulfillment & Sourcing Advisory';
+      const topDealer = distribution[0]?.name || 'Primary Dealers';
+      const topDealerShare = distribution[0] && rev > 0 ? Math.round((distribution[0].value / rev) * 100) : null;
+      recMetric = `Top Contributor: ${topDealer} ${topDealerShare ? `(${topDealerShare}%)` : ''}`;
+      recText = `Channel demand is led by "${topDealer}". Recommend aligning safety stock parameters and maintaining minimum 21-day buffer at regional hubs.`;
+    } else if (isCustomer) {
+      recTitle = 'Dealer Commercial Strategy';
+      const topProd = distribution[0]?.name || 'Top Line Products';
+      recMetric = `Preferred Line: ${topProd}`;
+      recText = `Highest purchase volume is concentrated in "${topProd}". Proactively propose cross-sell promotions for complementary fittings and accessories.`;
+    } else if (isSalesman) {
+      recTitle = 'Account Expansion Directive';
+      const topAccount = distribution[0]?.name || 'Key Account';
+      recMetric = `Leading Account: ${topAccount}`;
+      recText = `Core revenue driver is "${topAccount}". Prioritize re-engaging long-tail accounts to diversify revenue spread across assigned territory.`;
+    } else {
+      recTitle = 'Operational Recommendation';
+      recMetric = `Active Trading Span: ${summary.first_date || 'N/A'} to ${summary.last_date || 'N/A'}`;
+      recText = `Reconciled across verified sales vouchers. Ensure continuous inventory allocation for core moving lines.`;
+    }
 
     return {
-      sku,
-      currentStock,
-      dailyVelocity,
-      leadTime,
-      daysToStockout,
-      risk,
-      riskColor,
-      reorderQty,
-      supplier,
-      reorderPoint,
-      safetyStock,
-      leadTimeDemand
+      diagnosticTitle,
+      diagnosticStatus,
+      diagnosticBadgeColor,
+      diagnosticText,
+      recTitle,
+      recMetric,
+      recText
     };
-  }, [explorerType, searchQuery, inventoryList, ordersList]);
+  }, [summary, entityInfo, explorerType, inventoryItem, distribution]);
 
-  // --- Calculations for DEALER / CUSTOMER ---
-  const dealerInsights = useMemo(() => {
-    if (explorerType !== 'Dealer' && explorerType !== 'Customer') return null;
+  if (!insights) return null;
 
-    const dealerOrders = ordersList.filter((o: any) => 
-      (o['Shop Name'] && String(o['Shop Name']).toLowerCase() === searchQuery.toLowerCase()) ||
-      (o['Customer Name'] && String(o['Customer Name']).toLowerCase() === searchQuery.toLowerCase())
-    );
-
-    if (dealerOrders.length === 0) return null;
-
-    // Sort by timestamp to find order frequency
-    const timestamps = dealerOrders
-      .map((o: any) => new Date(o.Timestamp || o.date || ''))
-      .filter((d: Date) => !isNaN(d.getTime()))
-      .sort((a: Date, b: Date) => a.getTime() - b.getTime());
-
-    let avgIntervalDays = 'N/A';
-    if (timestamps.length >= 2) {
-      const diffMs = timestamps[timestamps.length - 1].getTime() - timestamps[0].getTime();
-      const diffDays = diffMs / (1000 * 60 * 60 * 24);
-      avgIntervalDays = `${(diffDays / (timestamps.length - 1)).toFixed(1)} days`;
-    }
-
-    // Inactivity risk
-    let lastOrderDays = Infinity;
-    if (timestamps.length > 0) {
-      const lastOrder = timestamps[timestamps.length - 1];
-      const diffMs = new Date('2026-08-11T12:32:31').getTime() - lastOrder.getTime(); // relative to local timestamp
-      lastOrderDays = Math.max(0, parseFloat((diffMs / (1000 * 60 * 60 * 24)).toFixed(0)));
-    }
-
-    let churnRisk = 'LOW';
-    let churnColor = '#10b981';
-    if (lastOrderDays > 20) {
-      churnRisk = 'HIGH';
-      churnColor = '#ef4444';
-    } else if (lastOrderDays > 10) {
-      churnRisk = 'MEDIUM';
-      churnColor = '#f59e0b';
-    }
-
-    // Product affinity
-    const skusOrdered: Record<string, number> = {};
-    dealerOrders.forEach((o: any) => {
-      if (o.SKU) skusOrdered[o.SKU] = (skusOrdered[o.SKU] || 0) + (Number(o.Quantity) || 0);
-    });
-    const topSku = Object.entries(skusOrdered).sort((a: any, b: any)=>b[1]-a[1])[0]?.[0] || 'SKU-COP-001';
-
-    return {
-      orderCount: dealerOrders.length,
-      avgIntervalDays,
-      lastOrderDays: lastOrderDays === Infinity ? 'None' : `${lastOrderDays} days ago`,
-      churnRisk,
-      churnColor,
-      topSku
-    };
-  }, [explorerType, searchQuery, ordersList]);
-
-  // --- Calculations for SUPPLIER ---
-  const supplierInsights = useMemo(() => {
-    if (explorerType !== 'Supplier') return null;
-
-    const matchedSupplier = suppliersList.find((s: any) => 
-      s['Supplier Name'] && 
-      String(s['Supplier Name']).toLowerCase() === searchQuery.toLowerCase()
-    );
-
-    if (!matchedSupplier) return null;
-
-    const sName = matchedSupplier['Supplier Name'] || '';
-    
-    // Sourced volume: inwards quantity matching this supplier name
-    const matches = (inwardsList || []).filter((i: any) => 
-      i['Supplier Name'] && 
-      String(i['Supplier Name']).toLowerCase() === sName.toLowerCase()
-    );
-    const totalSourcedUnits = matches.reduce((sum: number, i: any) => sum + (Number(i.Quantity) || 0), 0);
-
-    // Defect rate: returns matching products from this supplier
-    // We match supplier from the inventory table
-    const supplierProducts = new Set(
-      inventoryList
-        .filter((p: any) => p.Supplier && String(p.Supplier).toLowerCase() === sName.toLowerCase())
-        .map((p: any) => String(p.SKU).toLowerCase())
-    );
-
-    const supplierReturns = returnsList.filter((r: any) => r.SKU && supplierProducts.has(String(r.SKU).toLowerCase()));
-    const defectiveReturns = supplierReturns.filter((r: any) => String(r.Condition || '').toLowerCase().includes('bad') || String(r.Status || '').toLowerCase() === 'defective');
-    
-    const defectRate = supplierReturns.length > 0 
-      ? parseFloat(((defectiveReturns.length / supplierReturns.length) * 100).toFixed(1)) 
-      : 1.2; // default low
-
-    // Sourced lead time: average lead time
-    const leadTime = sName.toLowerCase().includes('copper') ? 7 : 5;
-
-    return {
-      totalSourcedUnits,
-      defectRate,
-      leadTime,
-      risk: defectRate > 3.0 ? 'MEDIUM QUALITY RISK' : 'LOW RISK',
-      riskColor: defectRate > 3.0 ? '#f59e0b' : '#10b981'
-    };
-  }, [explorerType, searchQuery, suppliersList, inwardsList, inventoryList, returnsList]);
-
-  if (!searchQuery || (!productInsights && !dealerInsights && !supplierInsights)) return null;
+  const badgeClass =
+    insights.diagnosticBadgeColor === 'rose'
+      ? 'bg-rose-500/10 text-rose-400 border-rose-500/30'
+      : insights.diagnosticBadgeColor === 'amber'
+      ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+      : insights.diagnosticBadgeColor === 'emerald'
+      ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+      : 'bg-indigo-500/10 text-indigo-400 border-indigo-500/30';
 
   return (
-    <div className="panel" style={{ 
-      background: 'rgba(15,23,42,0.7)',
-      border: '1px solid rgba(99, 102, 241, 0.25)', 
-      borderLeft: '5px solid #6366f1',
-      padding: '1.25rem',
-      borderRadius: '8px',
-      marginBottom: '1.5rem',
-      boxSizing: 'border-box'
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
-        <Sparkles size={16} className="text-accent" style={{ filter: 'drop-shadow(0 0 6px rgba(99, 102, 241, 0.5))' }} />
-        <h4 style={{ fontSize: '0.88rem', fontWeight: 800, color: '#f8fafc' }}>
-          AI-Generated Entity Insights
-        </h4>
-        <span style={{ fontSize: '0.64rem', color: '#64748b', textTransform: 'uppercase', marginLeft: 'auto', fontWeight: 700 }}>
-          Live Traceability
+    <div className="bg-slate-900/70 border border-slate-800 border-l-4 border-l-indigo-500 rounded-xl p-5 shadow-lg backdrop-blur-sm space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2 text-indigo-400 font-bold text-sm">
+          <Sparkles size={18} className="text-indigo-400 animate-pulse" />
+          <span>AI Contextual Diagnostics & Strategic Advisory</span>
+        </div>
+        <span className="text-[10px] uppercase font-mono tracking-wider text-slate-500 font-bold">
+          Live Reconciled Model
         </span>
       </div>
 
-      {/* PRODUCT ADVANCED PROFILE */}
-      {productInsights && (
-        <div style={{ fontSize: '0.8rem', display: 'flex', flexDirection: 'column', gap: '0.85rem', lineHeight: '1.45' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
-            <div>
-              <strong style={{ color: '#94a3b8', fontSize: '0.72rem', textTransform: 'uppercase' }}>Depletion Diagnostic</strong>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '3px' }}>
-                <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: productInsights.riskColor }} />
-                <span style={{ fontWeight: 700, color: '#f1f5f9' }}>
-                  {productInsights.daysToStockout === Infinity ? 'Infinite Horizon (Stable)' : `${productInsights.daysToStockout} days`}
-                </span>
-                <span className="badge" style={{ background: 'rgba(255,255,255,0.05)', color: productInsights.riskColor, fontSize: '0.64rem', padding: '1px 5px', border: `1px solid ${productInsights.riskColor}` }}>
-                  {productInsights.risk}
-                </span>
-              </div>
-              <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-                Based on daily velocity of {productInsights.dailyVelocity} units/day. Current stock of {productInsights.currentStock} units will last {productInsights.daysToStockout === Infinity ? '365+' : productInsights.daysToStockout} days.
-              </p>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+        {/* Card 1: Diagnostic */}
+        <div className="bg-slate-950/60 border border-slate-800/80 rounded-xl p-4 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                {insights.diagnosticTitle}
+              </span>
+              <span className={`px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase border ${badgeClass}`}>
+                {insights.diagnosticStatus}
+              </span>
             </div>
-
-            <div>
-              <strong style={{ color: '#94a3b8', fontSize: '0.72rem', textTransform: 'uppercase' }}>Fulfillment Recommendation</strong>
-              {productInsights.reorderQty > 0 ? (
-                <div style={{ marginTop: '3px' }}>
-                  <div style={{ color: '#10b981', fontWeight: 700 }}>Recommend Reorder of {productInsights.reorderQty} units</div>
-                  <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-                    Sourced from supplier <strong>{productInsights.supplier}</strong> (Lead Time: {productInsights.leadTime} days). 
-                    Formula: (Lead Time Demand of {productInsights.leadTimeDemand} units + Safety stock buffer of {productInsights.safetyStock} units * 2) - Stock.
-                  </p>
-                </div>
-              ) : (
-                <div style={{ color: '#10b981', fontWeight: 700, marginTop: '3px' }}>
-                  Sufficient Inventory
-                  <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-                    Current inventory levels are well above the calculated reorder safety threshold of {productInsights.reorderPoint} units.
-                  </p>
-                </div>
-              )}
-            </div>
+            <p className="text-xs text-slate-300 leading-relaxed">
+              {insights.diagnosticText}
+            </p>
+          </div>
+          <div className="flex items-center gap-1.5 text-[11px] text-slate-400 font-mono mt-3 pt-2 border-t border-slate-800/60">
+            <Clock size={12} className="text-slate-400" />
+            <span>Active Trading Span: {summary?.first_date || 'N/A'} – {summary?.last_date || 'N/A'}</span>
           </div>
         </div>
-      )}
 
-      {/* DEALER ADVANCED PROFILE */}
-      {dealerInsights && (
-        <div style={{ fontSize: '0.8rem', display: 'flex', flexDirection: 'column', gap: '0.85rem', lineHeight: '1.45' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
-            <div>
-              <strong style={{ color: '#94a3b8', fontSize: '0.72rem', textTransform: 'uppercase' }}>Purchase Cycle Diagnostics</strong>
-              <div style={{ marginTop: '3px', color: '#f1f5f9' }}>
-                Order frequency: <strong>{dealerInsights.avgIntervalDays}</strong> average interval.
-              </div>
-              <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-                Last order was placed <strong>{dealerInsights.lastOrderDays}</strong>.
-              </p>
+        {/* Card 2: Recommendation */}
+        <div className="bg-slate-950/60 border border-slate-800/80 rounded-xl p-4 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                {insights.recTitle}
+              </span>
+              <span className="text-xs font-bold text-emerald-400 font-mono">
+                {insights.recMetric}
+              </span>
             </div>
-
-            <div>
-              <strong style={{ color: '#94a3b8', fontSize: '0.72rem', textTransform: 'uppercase' }}>Account Churn Risk</strong>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '3px' }}>
-                <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: dealerInsights.churnColor }} />
-                <span style={{ fontWeight: 700, color: '#f1f5f9' }}>{dealerInsights.churnRisk} RISK</span>
-              </div>
-              <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-                Top preferred catalog affinity is <strong>{dealerInsights.topSku}</strong>. Recommend scheduling a courtesy dealer check-in to secure recurring purchases.
-              </p>
-            </div>
+            <p className="text-xs text-slate-300 leading-relaxed">
+              {insights.recText}
+            </p>
+          </div>
+          <div className="flex items-center gap-1.5 text-[11px] text-emerald-400/90 font-mono mt-3 pt-2 border-t border-slate-800/60">
+            <Zap size={12} className="text-emerald-400" />
+            <span>Recommended Action: Maintain active partner touchpoints and align procurement buffer</span>
           </div>
         </div>
-      )}
-
-      {/* SUPPLIER ADVANCED PROFILE */}
-      {supplierInsights && (
-        <div style={{ fontSize: '0.8rem', display: 'flex', flexDirection: 'column', gap: '0.85rem', lineHeight: '1.45' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
-            <div>
-              <strong style={{ color: '#94a3b8', fontSize: '0.72rem', textTransform: 'uppercase' }}>Sourcing Operations Profile</strong>
-              <div style={{ marginTop: '3px', color: '#f1f5f9' }}>
-                Total sourced: <strong>{supplierInsights.totalSourcedUnits.toLocaleString()} units</strong>
-              </div>
-              <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-                Average replenishment delivery lead time is <strong>{supplierInsights.leadTime} days</strong>.
-              </p>
-            </div>
-
-            <div>
-              <strong style={{ color: '#94a3b8', fontSize: '0.72rem', textTransform: 'uppercase' }}>Quality Compliance Index</strong>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '3px' }}>
-                <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: supplierInsights.riskColor }} />
-                <span style={{ fontWeight: 700, color: '#f1f5f9' }}>{supplierInsights.defectRate}% Defect Rate</span>
-                <span className="badge" style={{ background: 'rgba(255,255,255,0.05)', color: supplierInsights.riskColor, fontSize: '0.64rem', padding: '1px 5px', border: `1px solid ${supplierInsights.riskColor}` }}>
-                  {supplierInsights.risk}
-                </span>
-              </div>
-              <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-                RMA returns mapping indicates {supplierInsights.defectRate > 3.0 ? 'rising defective returns' : 'acceptable quality standards'} sourced from factory depots.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
+      </div>
     </div>
   );
 }

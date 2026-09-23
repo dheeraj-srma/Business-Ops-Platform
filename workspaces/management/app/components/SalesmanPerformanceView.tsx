@@ -689,6 +689,7 @@ export default function SalesmanPerformanceView() {
               subtitle={`Sales over time for ${salesmanDetail.header.name}`}
               data={chartData}
               defaultChartType="area"
+              defaultTimeRange={dateRange as DateRangeType}
               unit="₹"
             />
           </div>

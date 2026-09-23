@@ -5,6 +5,7 @@ import { useBi } from '../context/BiDataContext';
 import AIDecisionIntelligence from '../analytics/AIDecisionIntelligence';
 import DataFreshnessBadge from '../components/DataFreshnessBadge';
 import { Sparkles, Brain, Cpu, TrendingUp } from 'lucide-react';
+import { InScreenLoader } from '../components/common/InScreenLoader';
 
 export default function DemandForecastPage() {
   const {
@@ -18,14 +19,7 @@ export default function DemandForecastPage() {
   } = useBi();
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 border-4 border-indigo-600 dark:border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
-          <p className="text-sm text-slate-400">Loading AI Demand Intelligence Model...</p>
-        </div>
-      </div>
-    );
+    return <InScreenLoader message="Loading AI Demand Forecast & Predictive Modeling..." />;
   }
 
   return (

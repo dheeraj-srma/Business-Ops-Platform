@@ -5,6 +5,7 @@ import { useBi } from '../context/BiDataContext';
 import InteractiveChart from '../components/InteractiveChart';
 import DataFreshnessBadge from '../components/DataFreshnessBadge';
 import { fmtDayMonth } from '../utils/formatters';
+import { InScreenLoader } from '../components/common/InScreenLoader';
 
 interface ReturnAnalyticsData {
   total_returns: number;
@@ -19,7 +20,7 @@ interface ReturnAnalyticsData {
 }
 
 export default function QualityReturnsPage() {
-  const { ret, sales, kpis, returnsList, activeBounds } = useBi();
+  const { ret, sales, kpis, returnsList, activeBounds, loading, selectedRange } = useBi();
   const [retData, setRetData] = useState<ReturnAnalyticsData | null>(null);
 
   useEffect(() => {
@@ -117,6 +118,10 @@ export default function QualityReturnsPage() {
   const totalReturnCount = retData?.total_returns ?? (returnsList?.length || 0);
   const totalReturnValue = retData?.total_value ?? 0;
 
+  if (loading && !retData) {
+    return <InScreenLoader message="Loading Returns & Quality Diagnostics..." />;
+  }
+
   return (
     <div className="space-y-6 pb-12">
       {/* ── Page Header ─────────────────────────────────────────────────── */}
@@ -153,6 +158,7 @@ export default function QualityReturnsPage() {
           title="Customer Returns Value Timeline"
           subtitle="Chronological return claims aggregated from historical return vouchers"
           data={returnsTimelineData}
+          defaultTimeRange={selectedRange}
           fetchData={async (bounds) => {
             const res = await fetch(`/api/analytics/returns?start_date=${bounds.start}&end_date=${bounds.end}`);
             if (!res.ok) return [];
@@ -177,6 +183,7 @@ export default function QualityReturnsPage() {
           title="Returns by Product Category"
           subtitle="Financial return claim value distributed across product lines"
           data={returnCategoryData}
+          defaultTimeRange={selectedRange}
           fetchData={async (bounds) => {
             const res = await fetch(`/api/analytics/returns?start_date=${bounds.start}&end_date=${bounds.end}`);
             if (!res.ok) return [];
@@ -195,6 +202,7 @@ export default function QualityReturnsPage() {
           title="Top Returned Products"
           subtitle="Products with highest cumulative return claim values"
           data={topReturnedProducts}
+          defaultTimeRange={selectedRange}
           fetchData={async (bounds) => {
             const res = await fetch(`/api/analytics/returns?start_date=${bounds.start}&end_date=${bounds.end}`);
             if (!res.ok) return [];
@@ -213,6 +221,7 @@ export default function QualityReturnsPage() {
           title="Returns by Customer"
           subtitle="Customer accounts with highest logged return values"
           data={returnsByCustomerData}
+          defaultTimeRange={selectedRange}
           fetchData={async (bounds) => {
             const res = await fetch(`/api/analytics/returns?start_date=${bounds.start}&end_date=${bounds.end}`);
             if (!res.ok) return [];
@@ -231,6 +240,7 @@ export default function QualityReturnsPage() {
           title="Supplier Defect Rate (%)"
           subtitle="Percentage of defective items sourced per manufacturing partner"
           data={[]}
+          defaultTimeRange={selectedRange}
           defaultChartType="line"
           unit="%"
           unavailable={true}
@@ -242,6 +252,7 @@ export default function QualityReturnsPage() {
           title="Geographic Return Hotspots"
           subtitle="Regional distribution of logged customer returns across dealer network"
           data={[]}
+          defaultTimeRange={selectedRange}
           defaultChartType="pie"
           unit="claims"
           unavailable={true}

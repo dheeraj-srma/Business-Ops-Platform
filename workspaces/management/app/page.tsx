@@ -21,9 +21,10 @@ import InteractiveChart from './components/InteractiveChart';
 import DataFreshnessBadge from './components/DataFreshnessBadge';
 import { KpiDetailModal, KpiModalData, KpiType } from './components/dashboard/KpiDetailModal';
 import { fmtDayMonth } from './utils/formatters';
+import { InScreenLoader } from './components/common/InScreenLoader';
 
 export default function DashboardPage() {
-  const { kpis, sales, inv, proc, ordersList, dealersList, aiFeed } = useBi();
+  const { kpis, sales, inv, proc, ordersList, dealersList, aiFeed, loading, selectedRange } = useBi();
   const [selectedKpi, setSelectedKpi] = useState<KpiModalData | null>(null);
 
   // Authoritative Multi-series timeline for Business Performance (Phase 16)
@@ -302,6 +303,10 @@ export default function DashboardPage() {
     };
   }, [kpis, sales, inv, proc, ordersList]);
 
+  if (loading) {
+    return <InScreenLoader message="Loading Executive Business Insights Dashboard..." />;
+  }
+
   return (
     <div className="space-y-6 pb-12">
       {/* ── Top Hero Banner: Executive Business Intelligence ───────────── */}
@@ -497,9 +502,24 @@ export default function DashboardPage() {
           subtitle="Authoritative timeline tracking daily sales revenue and inventory movements across historical ledger"
           data={execTimelineData}
           defaultChartType="area"
+          defaultTimeRange={selectedRange}
           unit="₹"
           multiSeries={execMultiSeries}
           isHero={true}
+          fetchData={async (bounds) => {
+            const res = await fetch(`/api/analytics/bi?start_date=${bounds.start}&end_date=${bounds.end}`);
+            if (!res.ok) return [];
+            const data = await res.json();
+            const daily = data?.sales_intelligence?.daily_sales || data?.daily_sales || data?.sales?.daily_sales || [];
+            return daily.map((d: any) => ({
+              date: d.date,
+              name: fmtDayMonth(d.date),
+              revenue: Number(d.revenue) || 0,
+              orders: Number(d.orders) || 0,
+              stock_in: Number(d.stock_in) || 0,
+              stock_out: Number(d.stock_out || d.outward_qty) || 0,
+            }));
+          }}
         />
       </div>
 
@@ -510,6 +530,7 @@ export default function DashboardPage() {
           title="Revenue by Core Brand & Category"
           subtitle="Sales revenue distribution across primary product lines (HAHN, FINOLEX, FLOTO, UNIK, etc.)"
           data={brandRevenueData}
+          defaultTimeRange={selectedRange}
           fetchData={async (bounds) => {
             const res = await fetch(`/api/analytics/categories?start_date=${bounds.start}&end_date=${bounds.end}`);
             if (!res.ok) return [];

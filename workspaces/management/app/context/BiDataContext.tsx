@@ -277,7 +277,7 @@ export const BiDataProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         fetch(`/api/returns${queryString}`).then(r => (r.ok ? r.json() : [])),
         fetch('/api/orders').then(r => (r.ok ? r.json() : [])),
         fetch('/api/inwards').then(r => (r.ok ? r.json() : [])),
-        fetch(`/api/analytics/customers?limit=500${queryString ? `&${queryParams.toString()}` : ''}`).then(r => (r.ok ? r.json() : [])),
+        fetch(`/api/analytics/customers?limit=500${queryParams.toString() ? `&${queryParams.toString()}` : ''}`).then(r => (r.ok ? r.json() : [])),
       ]);
 
       if (biFetch.status === 'fulfilled' && biFetch.value.ok) {
@@ -296,14 +296,12 @@ export const BiDataProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           }
           setSnapshotUpdatedAt(val.snapshot_updated_at || snapHeaderTime || null);
         } else {
-          setBiData(EMPTY_BI_DATA);
-          setDataStatus('UNAVAILABLE');
-          setDataAsOf(null);
+          setBiData(prev => (prev && Object.keys(prev).length > 0 ? prev : EMPTY_BI_DATA));
+          setDataStatus(prev => (prev === 'LIVE' ? 'SNAPSHOT' : 'UNAVAILABLE'));
         }
       } else {
-        setBiData(EMPTY_BI_DATA);
-        setDataStatus('UNAVAILABLE');
-        setDataAsOf(null);
+        setBiData(prev => (prev && Object.keys(prev).length > 0 ? prev : EMPTY_BI_DATA));
+        setDataStatus(prev => (prev === 'LIVE' ? 'SNAPSHOT' : 'UNAVAILABLE'));
       }
 
       // Record last sync time in Asia/Kolkata

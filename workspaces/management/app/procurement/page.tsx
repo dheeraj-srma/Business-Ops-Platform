@@ -5,6 +5,7 @@ import { useBi } from '../context/BiDataContext';
 import InteractiveChart from '../components/InteractiveChart';
 import DataFreshnessBadge from '../components/DataFreshnessBadge';
 import { fmtDayMonth } from '../utils/formatters';
+import { InScreenLoader } from '../components/common/InScreenLoader';
 
 interface ProcurementData {
   total_purchases: number;
@@ -20,7 +21,7 @@ interface ProcurementData {
 }
 
 export default function ProcurementPage() {
-  const { proc, sales, kpis, inwardsList, activeBounds } = useBi();
+  const { proc, sales, kpis, inwardsList, activeBounds, loading, selectedRange } = useBi();
   const [procData, setProcData] = useState<ProcurementData | null>(null);
 
   useEffect(() => {
@@ -160,6 +161,10 @@ export default function ProcurementPage() {
   const totalPurchaseValue = procData?.total_value ?? Number(kpis.purchase_value || 0);
   const totalVendors = procData?.unique_suppliers ?? Number(kpis.active_suppliers || 0);
 
+  if (loading && !procData) {
+    return <InScreenLoader message="Loading Procurement & Vendor Intelligence..." />;
+  }
+
   return (
     <div className="space-y-6 pb-12">
       {/* ── Page Header ─────────────────────────────────────────────────── */}
@@ -192,6 +197,7 @@ export default function ProcurementPage() {
           title="Purchase Spend Trend Over Time"
           subtitle="Authoritative procurement spend timeline tracking historical purchase vouchers"
           data={spendTrendData}
+          defaultTimeRange={selectedRange}
           fetchData={async (bounds) => {
             const res = await fetch(`/api/analytics/procurement?start_date=${bounds.start}&end_date=${bounds.end}`);
             if (!res.ok) return [];
@@ -216,6 +222,7 @@ export default function ProcurementPage() {
           title="Supplier Spend Contribution"
           subtitle="Total procurement purchase capital allocation split by primary manufacturing partner"
           data={supplierSpendData}
+          defaultTimeRange={selectedRange}
           fetchData={async (bounds) => {
             const res = await fetch(`/api/analytics/procurement?start_date=${bounds.start}&end_date=${bounds.end}`);
             if (!res.ok) return [];
@@ -234,6 +241,7 @@ export default function ProcurementPage() {
           title="Purchase Value by Category"
           subtitle="Procurement spend split across primary product lines"
           data={categoryPurchData}
+          defaultTimeRange={selectedRange}
           fetchData={async (bounds) => {
             const res = await fetch(`/api/analytics/procurement?start_date=${bounds.start}&end_date=${bounds.end}`);
             if (!res.ok) return [];
@@ -252,6 +260,7 @@ export default function ProcurementPage() {
           title="Monthly Sourcing Capital Outflow"
           subtitle="Monthly procurement expenditure and inward voucher volume trajectory"
           data={monthlyOutflowData}
+          defaultTimeRange={selectedRange}
           fetchData={async (bounds) => {
             const res = await fetch(`/api/analytics/procurement?start_date=${bounds.start}&end_date=${bounds.end}`);
             if (!res.ok) return [];
@@ -271,6 +280,7 @@ export default function ProcurementPage() {
           title="Consignment Value Distribution"
           subtitle="Authoritative purchase voucher ticket size tier allocation"
           data={consignmentBracketData}
+          defaultTimeRange={selectedRange}
           fetchData={async (bounds) => {
             const res = await fetch(`/api/analytics/procurement?start_date=${bounds.start}&end_date=${bounds.end}`);
             if (!res.ok) return [];
@@ -290,6 +300,7 @@ export default function ProcurementPage() {
           title="Top Procured Items by Volume"
           subtitle="Authoritative purchase line items ranking by inward units ordered"
           data={topItemsByVolumeData}
+          defaultTimeRange={selectedRange}
           fetchData={async (bounds) => {
             const res = await fetch(`/api/analytics/procurement?start_date=${bounds.start}&end_date=${bounds.end}`);
             if (!res.ok) return [];

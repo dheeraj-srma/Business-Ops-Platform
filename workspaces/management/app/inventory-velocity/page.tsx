@@ -6,9 +6,10 @@ import InteractiveChart from '../components/InteractiveChart';
 import DataFreshnessBadge from '../components/DataFreshnessBadge';
 import { calculateABC } from '../utils/metricCalculations';
 import { fmtDayMonth } from '../utils/formatters';
+import { InScreenLoader } from '../components/common/InScreenLoader';
 
 export default function InventoryVelocityPage() {
-  const { inv, sales, kpis, inventoryList } = useBi();
+  const { inv, sales, kpis, inventoryList, loading, selectedRange } = useBi();
 
   const movementTimelineData = useMemo(() => {
     return (sales.daily_sales || []).map(d => ({
@@ -128,6 +129,10 @@ export default function InventoryVelocityPage() {
     ];
   }, [inventoryList]);
 
+  if (loading) {
+    return <InScreenLoader message="Loading Inventory Movement & Velocity Analytics..." />;
+  }
+
   return (
     <div className="space-y-6 pb-12">
       {/* ── Page Header ─────────────────────────────────────────────────── */}
@@ -163,10 +168,22 @@ export default function InventoryVelocityPage() {
           subtitle="Daily volume comparison of stock receipts (inward consignments) against customer dispatches"
           data={movementTimelineData}
           defaultChartType="area"
+          defaultTimeRange={selectedRange}
           unit="units"
           multiSeries={movementSeries}
           isHero={true}
           statusBadge="LIVE"
+          fetchData={async (bounds) => {
+            const res = await fetch(`/api/analytics/bi?start_date=${bounds.start}&end_date=${bounds.end}`);
+            if (!res.ok) return [];
+            const d = await res.json();
+            return (d.sales_intelligence?.daily_sales || d.daily_sales || []).map((s: any) => ({
+              date: s.date,
+              name: fmtDayMonth(s.date),
+              stock_in: Number(s.stock_in) || 0,
+              stock_out: Number(s.stock_out) || Number(s.outward_qty) || Number(s.qty) || 0,
+            }));
+          }}
         />
       </div>
 
@@ -176,6 +193,7 @@ export default function InventoryVelocityPage() {
           title="Fast Moving SKUs"
           subtitle="Highest turnover catalog items by units dispatched in current period"
           data={fastMoversData}
+          defaultTimeRange={selectedRange}
           fetchData={async (bounds) => {
             const res = await fetch(`/api/analytics/bi?start_date=${bounds.start}&end_date=${bounds.end}`);
             if (!res.ok) return [];
@@ -194,6 +212,7 @@ export default function InventoryVelocityPage() {
           title="Slow Moving SKUs"
           subtitle="Low sales velocity items requiring promotional liquidation"
           data={slowMoversData}
+          defaultTimeRange={selectedRange}
           fetchData={async (bounds) => {
             const res = await fetch(`/api/analytics/bi?start_date=${bounds.start}&end_date=${bounds.end}`);
             if (!res.ok) return [];
@@ -217,6 +236,7 @@ export default function InventoryVelocityPage() {
           title="Dead Stock Capital Lockup"
           subtitle="Valuation locked in items with zero sales movements in the historical period"
           data={deadStockData}
+          defaultTimeRange={selectedRange}
           defaultChartType="donut"
           unit="₹"
           statusBadge="LIVE"
@@ -226,6 +246,7 @@ export default function InventoryVelocityPage() {
           title="Inventory Health Status Distribution"
           subtitle="Authoritative classification: Healthy buffer, Low stock, and Out-of-stock items"
           data={agingData}
+          defaultTimeRange={selectedRange}
           defaultChartType="pie"
           unit="SKUs"
           statusBadge="LIVE"
@@ -235,6 +256,7 @@ export default function InventoryVelocityPage() {
           title="Category-wise Valuation"
           subtitle="Total physical stock capital distributed across core product categories"
           data={categoryValueData}
+          defaultTimeRange={selectedRange}
           defaultChartType="horizontal_bar"
           unit="₹"
           statusBadge="LIVE"
@@ -244,6 +266,7 @@ export default function InventoryVelocityPage() {
           title="ABC Inventory Classification"
           subtitle="Pareto classification: Class A (70% value), Class B (20%), Class C (10%)"
           data={abcAnalysisData}
+          defaultTimeRange={selectedRange}
           defaultChartType="donut"
           unit="₹"
           statusBadge="LIVE"

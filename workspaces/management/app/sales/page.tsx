@@ -6,9 +6,10 @@ import InteractiveChart from '../components/InteractiveChart';
 import SalesmanPerformanceView from '../components/SalesmanPerformanceView';
 import DataFreshnessBadge from '../components/DataFreshnessBadge';
 import { fmtDayMonth } from '../utils/formatters';
+import { InScreenLoader } from '../components/common/InScreenLoader';
 
 export default function SalesPage() {
-  const { sales, kpis, activeBounds } = useBi();
+  const { sales, kpis, activeBounds, loading, selectedRange } = useBi();
   const [activeTab, setActiveTab] = useState<'overview' | 'salesman'>('salesman');
 
   useEffect(() => {
@@ -97,6 +98,10 @@ export default function SalesPage() {
     }));
   }, [orderDist]);
 
+  if (loading) {
+    return <InScreenLoader message="Loading Sales & Revenue Intelligence..." />;
+  }
+
   return (
     <div className="space-y-6 pb-12">
       {/* ── Page Header ─────────────────────────────────────────────────── */}
@@ -162,8 +167,21 @@ export default function SalesPage() {
               subtitle="Daily sales revenue"
               data={dailySalesData}
               defaultChartType="area"
+              defaultTimeRange={selectedRange}
               unit="₹"
               isHero={true}
+              statusBadge="LIVE"
+              fetchData={async (bounds) => {
+                const res = await fetch(`/api/analytics/bi?start_date=${bounds.start}&end_date=${bounds.end}`);
+                if (!res.ok) return [];
+                const d = await res.json();
+                return (d.sales_intelligence?.daily_sales || d.daily_sales || []).map((s: any) => ({
+                  date: s.date,
+                  name: fmtDayMonth(s.date),
+                  revenue: Number(s.revenue) || 0,
+                  value: Number(s.revenue) || 0,
+                }));
+              }}
             />
           </div>
 
@@ -173,6 +191,7 @@ export default function SalesPage() {
               title="Sales by Category"
               subtitle="Sales split by brand and category"
               data={catRevenueData}
+              defaultTimeRange={selectedRange}
               fetchData={async (bounds) => {
                 const res = await fetch(`/api/analytics/categories?start_date=${bounds.start}&end_date=${bounds.end}`);
                 if (!res.ok) return [];
@@ -181,12 +200,14 @@ export default function SalesPage() {
               }}
               defaultChartType="donut"
               unit="₹"
+              statusBadge="LIVE"
             />
 
             <InteractiveChart
               title="Top Products"
               subtitle="Products with highest quantity sold"
               data={topProductsData}
+              defaultTimeRange={selectedRange}
               fetchData={async (bounds) => {
                 const res = await fetch(`/api/analytics/bi?start_date=${bounds.start}&end_date=${bounds.end}`);
                 if (!res.ok) return [];
@@ -198,12 +219,14 @@ export default function SalesPage() {
               }}
               defaultChartType="bar"
               unit="units"
+              statusBadge="LIVE"
             />
 
             <InteractiveChart
               title="Top Customers"
               subtitle="Highest buying customer accounts by realized sales"
               data={topCustomersData}
+              defaultTimeRange={selectedRange}
               fetchData={async (bounds) => {
                 const res = await fetch(`/api/analytics/customers?limit=25&start_date=${bounds.start}&end_date=${bounds.end}`);
                 if (!res.ok) return [];
@@ -223,6 +246,7 @@ export default function SalesPage() {
               title="Salesmen Ranking"
               subtitle="Total sales contribution per attributed salesman"
               data={salesmanRankData}
+              defaultTimeRange={selectedRange}
               fetchData={async (bounds) => {
                 const res = await fetch(`/api/analytics/salesmen?start_date=${bounds.start}&end_date=${bounds.end}`);
                 if (!res.ok) return [];
@@ -238,6 +262,7 @@ export default function SalesPage() {
               title="Sales by Region"
               subtitle="Authoritative sales realization per territory"
               data={regionData}
+              defaultTimeRange={selectedRange}
               fetchData={async (bounds) => {
                 const res = await fetch(`/api/analytics/geography?start_date=${bounds.start}&end_date=${bounds.end}`);
                 if (!res.ok) return [];
@@ -253,6 +278,7 @@ export default function SalesPage() {
               title="Order Size Distribution"
               subtitle="Historical sales vouchers grouped by invoice value"
               data={orderValueDistribution}
+              defaultTimeRange={selectedRange}
               fetchData={async (bounds) => {
                 const res = await fetch(`/api/analytics/order-distribution?start_date=${bounds.start}&end_date=${bounds.end}`);
                 if (!res.ok) return [];

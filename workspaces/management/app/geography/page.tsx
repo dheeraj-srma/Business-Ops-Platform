@@ -5,9 +5,10 @@ import { useBi } from '../context/BiDataContext';
 import InteractiveChart from '../components/InteractiveChart';
 import IndiaMapChart from '../components/IndiaMapChart';
 import DataFreshnessBadge from '../components/DataFreshnessBadge';
+import { InScreenLoader } from '../components/common/InScreenLoader';
 
 export default function GeographyPage() {
-  const { sales, kpis, dealersList } = useBi();
+  const { sales, kpis, dealersList, loading, selectedRange } = useBi();
 
   // 1. Authoritative State Revenue Ranking from Historical Sales Ledger
   const stateRevenueData = useMemo(() => {
@@ -41,6 +42,10 @@ export default function GeographyPage() {
   const primaryTerritoryLabel = topState
     ? `${topState.state} (${topState.share_percent}%)`
     : 'Haryana';
+
+  if (loading) {
+    return <InScreenLoader message="Loading Geographic Intelligence & GIS Mapping..." />;
+  }
 
   return (
     <div className="space-y-6 pb-12">
@@ -83,6 +88,7 @@ export default function GeographyPage() {
           title="Revenue by State Territory"
           subtitle="Authoritative sales realization per state territory"
           data={stateRevenueData}
+          defaultTimeRange={selectedRange}
           fetchData={async (bounds) => {
             const res = await fetch(`/api/analytics/geography?start_date=${bounds.start}&end_date=${bounds.end}`);
             if (!res.ok) return [];
@@ -98,6 +104,7 @@ export default function GeographyPage() {
           title="Revenue by City Hub"
           subtitle="Top contributing metro and city commercial centers"
           data={cityRevenueData}
+          defaultTimeRange={selectedRange}
           fetchData={async (bounds) => {
             const res = await fetch(`/api/analytics/geography?start_date=${bounds.start}&end_date=${bounds.end}`);
             if (!res.ok) return [];
@@ -113,6 +120,7 @@ export default function GeographyPage() {
           title="Dealer Outlet Density"
           subtitle="Verified partner outlet distribution across territories"
           data={dealerDensityData}
+          defaultTimeRange={selectedRange}
           defaultChartType="donut"
           unit="dealers"
           statusBadge="LIVE"
@@ -122,6 +130,7 @@ export default function GeographyPage() {
           title="Manufacturing Supplier Sourcing Hubs"
           subtitle="Location density of active manufacturing vendor factories"
           data={[]}
+          defaultTimeRange={selectedRange}
           defaultChartType="donut"
           unit="vendors"
           unavailable={true}
@@ -133,6 +142,7 @@ export default function GeographyPage() {
           title="Regional Return Rate (%)"
           subtitle="Customer return percentages categorized by destination territory"
           data={[]}
+          defaultTimeRange={selectedRange}
           defaultChartType="bar"
           unit="%"
           unavailable={true}
@@ -144,6 +154,7 @@ export default function GeographyPage() {
           title="Regional Inventory Valuation"
           subtitle="Physical asset capital allocation stored per regional warehouse depot"
           data={[]}
+          defaultTimeRange={selectedRange}
           defaultChartType="bar"
           unit="₹"
           unavailable={true}

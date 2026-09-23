@@ -842,6 +842,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   </td>
                 </tr>
               ) : (
+                recentMovements.map((tx: any) => {
                   const rawType = String(tx.transactionType || (tx as any).transaction_type || '').toUpperCase();
                   const isStockIn = ['STOCK_IN', 'INWARD', 'INITIAL_STOCK', 'ADJUSTMENT_INCREASE'].includes(rawType);
                   const isReturn = ['CUSTOMER_RETURN', 'RETURN_IN'].includes(rawType);
@@ -906,8 +907,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       {tx.createdByName || (tx as any).created_by_name}
                     </td>
                   </tr>
-                ))
-              )}
+                );
+              })
+            )}
             </tbody>
           </table>
         </div>

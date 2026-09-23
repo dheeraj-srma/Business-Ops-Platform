@@ -4,9 +4,10 @@ import { Store, Users, Award, ShieldCheck, BarChart3, MapPin, CheckCircle2, Tren
 import { useBi } from '../context/BiDataContext';
 import InteractiveChart from '../components/InteractiveChart';
 import CustomerPerformanceView from '../components/CustomerPerformanceView';
+import { InScreenLoader } from '../components/common/InScreenLoader';
 
 export default function CustomersPage() {
-  const { sales, kpis, dealersList, customersAnalyticsList } = useBi();
+  const { sales, kpis, dealersList, customersAnalyticsList, loading, selectedRange } = useBi();
   const [activeTab, setActiveTab] = useState<'performance' | 'overview'>('overview');
   const [topProfile, setTopProfile] = useState<{
     top_lines?: Array<{ line_name: string; skus: number; quantity: number; amount: number; share_pct: number }>;
@@ -216,6 +217,10 @@ export default function CustomersPage() {
     ];
   }, [customersAnalyticsList]);
 
+  if (loading) {
+    return <InScreenLoader message="Loading Customer Partner Network & Collections..." />;
+  }
+
   return (
     <div className="space-y-6 pb-12">
       {/* ── Page Header ─────────────────────────────────────────────────── */}
@@ -284,6 +289,7 @@ export default function CustomersPage() {
               subtitle="Sales by customer account"
               data={customerRankData}
               defaultChartType="bar"
+              defaultTimeRange={selectedRange}
               unit="₹"
               isHero={true}
               fetchData={async (bounds) => {
@@ -306,6 +312,7 @@ export default function CustomersPage() {
               subtitle="Orders placed by customer"
               data={customerOrderFreqData}
               defaultChartType="donut"
+              defaultTimeRange={selectedRange}
               unit="orders"
               fetchData={async (bounds) => {
                 const res = await fetch(`/api/analytics/customers?start_date=${bounds.start}&end_date=${bounds.end}`);
@@ -327,6 +334,7 @@ export default function CustomersPage() {
               subtitle="Revenue contribution percentage by customer"
               data={customerGrowthData}
               defaultChartType="bar"
+              defaultTimeRange={selectedRange}
               unit="%"
               fetchData={async (bounds) => {
                 const res = await fetch(`/api/analytics/customers?start_date=${bounds.start}&end_date=${bounds.end}`);
@@ -346,6 +354,7 @@ export default function CustomersPage() {
               subtitle="Customer count by region"
               data={customerGeoData}
               defaultChartType="pie"
+              defaultTimeRange={selectedRange}
               unit="customers"
               fetchData={async (bounds) => {
                 const res = await fetch(`/api/analytics/geography?start_date=${bounds.start}&end_date=${bounds.end}`);
@@ -364,8 +373,25 @@ export default function CustomersPage() {
               subtitle="Re-order distribution across accounts"
               data={customerRetentionData}
               defaultChartType="donut"
+              defaultTimeRange={selectedRange}
               unit="accounts"
               statusBadge="LIVE"
+              fetchData={async (bounds) => {
+                const res = await fetch(`/api/analytics/customers?start_date=${bounds.start}&end_date=${bounds.end}`);
+                if (!res.ok) return [];
+                const data = await res.json();
+                const list = data.customers || (Array.isArray(data) ? data : []);
+                const total = list.length;
+                const repeat = list.filter((c: any) => Number(c.voucher_count || 0) > 1).length;
+                const single = total - repeat;
+                const frequent = list.filter((c: any) => Number(c.voucher_count || 0) >= 5).length;
+                const regular = repeat - frequent;
+                return [
+                  { name: 'High Volume Re-orders (5+ Orders)', value: frequent },
+                  { name: 'Regular Repeat Orders (2-4 Orders)', value: regular },
+                  { name: 'Single Voucher Accounts (1 Order)', value: single },
+                ];
+              }}
             />
 
             <InteractiveChart
@@ -373,6 +399,7 @@ export default function CustomersPage() {
               subtitle="Accounts grouped by historical sales volume"
               data={customerSegmentationData}
               defaultChartType="bar"
+              defaultTimeRange={selectedRange}
               unit="accounts"
               fetchData={async (bounds) => {
                 const res = await fetch(`/api/analytics/customers?start_date=${bounds.start}&end_date=${bounds.end}`);

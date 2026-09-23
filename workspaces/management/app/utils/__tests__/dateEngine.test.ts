@@ -227,7 +227,7 @@ describe('Global Date Intelligence Engine (DATE-01 to DATE-30)', () => {
 
   // DATE-19: Empty dataset gap filling
   test('DATE-19: fillTimeSeriesGaps generates complete continuous array with zero-fills for empty dataset', () => {
-    const filled = fillTimeSeriesGaps([], '2026-09-17', '2026-09-23', ['revenue', 'orders']);
+    const filled = fillTimeSeriesGaps<{ date: string; revenue?: number; orders?: number }>([], '2026-09-17', '2026-09-23', ['revenue', 'orders']);
     assert.equal(filled.length, 7);
     assert.equal(filled[0].date, '2026-09-17');
     assert.equal(filled[6].date, '2026-09-23');

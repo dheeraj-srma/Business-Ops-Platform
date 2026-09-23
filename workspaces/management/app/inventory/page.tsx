@@ -4,6 +4,8 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { useApp } from '../context/AppContext';
 import { InventoryView } from '../components/inventory/InventoryView';
 
+import { InScreenLoader } from '../components/common/InScreenLoader';
+
 function InventoryContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -44,7 +46,7 @@ function InventoryContent() {
 
 export default function InventoryPage() {
   return (
-    <Suspense fallback={<div className="p-8 text-center text-slate-400">Loading catalog...</div>}>
+    <Suspense fallback={<InScreenLoader message="Loading Master Catalog Reference..." />}>
       <InventoryContent />
     </Suspense>
   );

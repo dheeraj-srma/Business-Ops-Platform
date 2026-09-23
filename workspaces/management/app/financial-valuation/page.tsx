@@ -5,6 +5,7 @@ import { useBi } from '../context/BiDataContext';
 import InteractiveChart from '../components/InteractiveChart';
 import DataFreshnessBadge from '../components/DataFreshnessBadge';
 import { fmtDayMonth } from '../utils/formatters';
+import { InScreenLoader } from '../components/common/InScreenLoader';
 import {
   CircleDollarSign,
   TrendingUp,
@@ -42,13 +43,13 @@ interface FinancialData {
 }
 
 export default function FinancialValuationPage() {
-  const { kpis, sales, inventoryList, loading, activeBounds } = useBi();
+  const { kpis, sales, fin, inventoryList, loading, activeBounds, selectedRange } = useBi();
   const [procTimeline, setProcTimeline] = useState<Array<{ date: string; value: number }>>([]);
   const [finData, setFinData] = useState<FinancialData | null>(null);
 
   useEffect(() => {
     const params = new URLSearchParams();
-    if (activeBounds?.isValid) {
+    if (activeBounds?.isValid && selectedRange !== 'all') {
       params.set('start_date', activeBounds.start);
       params.set('end_date', activeBounds.end);
     }
@@ -57,7 +58,7 @@ export default function FinancialValuationPage() {
     fetch(`/api/analytics/financials${q}`)
       .then(res => res.ok ? res.json() : null)
       .then(data => {
-        if (data && typeof data === 'object') {
+        if (data && typeof data === 'object' && Object.keys(data).length > 0) {
           setFinData(data);
         }
       })
@@ -71,7 +72,11 @@ export default function FinancialValuationPage() {
         }
       })
       .catch(() => {});
-  }, [activeBounds]);
+  }, [activeBounds, selectedRange]);
+
+  const activeFin = useMemo(() => {
+    return (finData || fin) as FinancialData | undefined;
+  }, [finData, fin]);
 
   // 1. Authoritative Revenue Realization Timeline (No fabricated COGS)
   const finPerformanceData = useMemo(() => {
@@ -131,65 +136,65 @@ export default function FinancialValuationPage() {
 
   // 4. Gross Margin % by Product Brand [ACTUAL: Real line items margin]
   const grossMarginData = useMemo(() => {
-    if (finData && finData.gross_margin_by_brand && finData.gross_margin_by_brand.length > 0) {
-      return finData.gross_margin_by_brand.map(b => ({
-        name: b.name,
-        value: b.value,
+    if (activeFin && activeFin.gross_margin_by_brand && activeFin.gross_margin_by_brand.length > 0) {
+      return activeFin.gross_margin_by_brand.map(b => ({
+        name: b.name || (b as any).brand,
+        value: b.value ?? (b as any).margin_pct ?? 0,
         sales: b.sales,
         purchases: b.purchases,
-        surplus: b.surplus,
+        surplus: (b as any).surplus ?? Math.round(b.sales - b.purchases),
       }));
     }
     return [];
-  }, [finData]);
+  }, [activeFin]);
 
   // 5. Working Capital & Asset Allocation [ACTUAL: Active stock vs dead stock vs commercial surplus]
   const workingCapitalData = useMemo(() => {
-    if (finData && finData.working_capital_allocation && finData.working_capital_allocation.length > 0) {
-      return finData.working_capital_allocation.map(w => ({
+    if (activeFin && activeFin.working_capital_allocation && activeFin.working_capital_allocation.length > 0) {
+      return activeFin.working_capital_allocation.map(w => ({
         name: w.name,
         value: Math.round(w.value),
       }));
     }
     return [];
-  }, [finData]);
+  }, [activeFin]);
 
   // 6. Net Margin Contribution by Brand [ACTUAL: Absolute gross profit contribution in ₹]
   const netMarginContribData = useMemo(() => {
-    if (finData && finData.net_margin_contribution && finData.net_margin_contribution.length > 0) {
-      return finData.net_margin_contribution.map(m => ({
-        name: m.name,
-        value: Math.round(m.value),
-        sales: m.sales,
+    if (activeFin && activeFin.net_margin_contribution && activeFin.net_margin_contribution.length > 0) {
+      return activeFin.net_margin_contribution.map(m => ({
+        name: m.name || (m as any).brand,
+        value: Math.round(m.value ?? (m as any).net_margin ?? 0),
+        sales: m.sales || 0,
       }));
     }
     return [];
-  }, [finData]);
+  }, [activeFin]);
 
   // 7. Inventory Carrying Cost Overhead [ACTUAL: 20% annualized holding overhead on physical stock]
   const carryingCostData = useMemo(() => {
-    if (finData && finData.carrying_cost_breakdown && finData.carrying_cost_breakdown.length > 0) {
-      return finData.carrying_cost_breakdown.map(c => ({
+    if (activeFin && activeFin.carrying_cost_breakdown && activeFin.carrying_cost_breakdown.length > 0) {
+      return activeFin.carrying_cost_breakdown.map(c => ({
         name: c.name,
         value: Math.round(c.value),
       }));
     }
     return [];
-  }, [finData]);
+  }, [activeFin]);
 
   // 8. Monthly Capital Cashflow & Trade Surplus [ACTUAL: Chronological inflow vs outflow]
   const monthlyCashflowData = useMemo(() => {
-    if (finData && finData.monthly_cashflow && finData.monthly_cashflow.length > 0) {
-      return finData.monthly_cashflow.map(m => ({
-        name: m.name,
+    if (activeFin && activeFin.monthly_cashflow && activeFin.monthly_cashflow.length > 0) {
+      return activeFin.monthly_cashflow.map(m => ({
+        name: m.name || (m as any).month,
         sales: Math.round(m.sales),
         purchases: Math.round(m.purchases),
-        net_surplus: Math.round(m.net_surplus),
-        value: Math.round(m.net_surplus),
+        net_surplus: Math.round(m.net_surplus ?? ((m as any).surplus || 0)),
+        value: Math.round(m.net_surplus ?? ((m as any).surplus || 0)),
       }));
     }
     return [];
-  }, [finData]);
+  }, [activeFin]);
 
   const cashflowSeries = [
     { key: 'sales', label: 'Sales Inflow (₹)', color: '#10b981' },
@@ -199,31 +204,24 @@ export default function FinancialValuationPage() {
 
   // 9. Revenue Realization by Order Ticket Size Bracket [ACTUAL: Order value distribution]
   const orderTicketData = useMemo(() => {
-    if (finData && finData.order_ticket_distribution && finData.order_ticket_distribution.length > 0) {
-      return finData.order_ticket_distribution.map(t => ({
-        name: t.name,
-        value: Math.round(t.value),
-        orders: t.orders,
+    if (activeFin && activeFin.order_ticket_distribution && activeFin.order_ticket_distribution.length > 0) {
+      return activeFin.order_ticket_distribution.map(t => ({
+        name: t.name || (t as any).range,
+        value: Math.round(t.value ?? (t as any).revenue ?? 0),
+        orders: t.orders ?? (t as any).count ?? 0,
       }));
     }
     return [];
-  }, [finData]);
+  }, [activeFin]);
 
-  const totalAssetVal = Number(kpis.inventory_value || finData?.summary?.total_inventory_valuation || 0);
-  const totalRev = Number(kpis.total_revenue || finData?.summary?.total_sales || 0);
-  const totalPur = Number(kpis.purchase_value || finData?.summary?.total_purchases || 0);
-  const realizedMarginPct = finData?.summary?.gross_margin_pct ?? (totalRev > 0 ? Math.round(((totalRev - totalPur) / totalRev) * 1000) / 10 : 18.5);
-  const realizedSurplus = finData?.summary?.net_trading_surplus ?? Math.round(totalRev - totalPur);
+  const totalAssetVal = Number(kpis.inventory_value || activeFin?.summary?.total_inventory_valuation || 0);
+  const totalRev = Number(kpis.total_revenue || activeFin?.summary?.total_sales || 0);
+  const totalPur = Number(kpis.purchase_value || activeFin?.summary?.total_purchases || 0);
+  const realizedMarginPct = activeFin?.summary?.gross_margin_pct ?? (totalRev > 0 ? Math.round(((totalRev - totalPur) / totalRev) * 1000) / 10 : 18.5);
+  const realizedSurplus = activeFin?.summary?.net_trading_surplus ?? Math.round(totalRev - totalPur);
 
-  if (loading && !finData) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 border-4 border-indigo-600 dark:border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
-          <p className="text-sm text-slate-400">Loading Financial Valuation Models...</p>
-        </div>
-      </div>
-    );
+  if (loading && !activeFin && (!sales.daily_sales || sales.daily_sales.length === 0)) {
+    return <InScreenLoader message="Loading Financial Valuation & Capital Allocation..." />;
   }
 
   return (
@@ -313,10 +311,22 @@ export default function FinancialValuationPage() {
           subtitle="Authoritative daily sales revenue from reconciled historical sales ledger"
           data={finPerformanceData}
           defaultChartType="area"
+          defaultTimeRange={selectedRange}
           unit="₹"
           multiSeries={finPerformanceSeries}
           isHero={true}
           statusBadge="LIVE"
+          fetchData={async (bounds) => {
+            const res = await fetch(`/api/analytics/bi?start_date=${bounds.start}&end_date=${bounds.end}`);
+            if (!res.ok) return [];
+            const d = await res.json();
+            const list = d?.sales_intelligence?.daily_sales || d?.sales?.daily_sales || d?.daily_sales || [];
+            return list.map((s: any) => ({
+              date: s.date,
+              name: fmtDayMonth(s.date),
+              revenue: Number(s.revenue) || 0,
+            }));
+          }}
         />
       </div>
 
@@ -327,8 +337,18 @@ export default function FinancialValuationPage() {
           subtitle="Warehouse inventory capital distribution across canonical product brands"
           data={stockValuationByGroup}
           defaultChartType="donut"
+          defaultTimeRange={selectedRange}
           unit="₹"
           statusBadge="LIVE"
+          fetchData={async (bounds) => {
+            const res = await fetch(`/api/analytics/financials?start_date=${bounds.start}&end_date=${bounds.end}`);
+            if (!res.ok) return [];
+            const d = await res.json();
+            return (d?.gross_margin_by_brand || []).map((b: any) => ({
+              name: b.name,
+              value: b.purchases > 0 ? Math.round(b.purchases) : Math.round(b.sales),
+            }));
+          }}
         />
 
         <InteractiveChart
@@ -336,15 +356,39 @@ export default function FinancialValuationPage() {
           subtitle="Chronological comparison of verified sourcing expenditure against realized sales"
           data={purchaseVsSalesData}
           defaultChartType="line"
+          defaultTimeRange={selectedRange}
           unit="₹"
           multiSeries={purchaseVsSalesSeries}
           statusBadge="LIVE"
+          fetchData={async (bounds) => {
+            const [biRes, procRes] = await Promise.all([
+              fetch(`/api/analytics/bi?start_date=${bounds.start}&end_date=${bounds.end}`).then(r => r.ok ? r.json() : null),
+              fetch(`/api/analytics/procurement?start_date=${bounds.start}&end_date=${bounds.end}`).then(r => r.ok ? r.json() : null),
+            ]);
+            const salesMap = new Map<string, number>();
+            const dailyList = biRes?.sales_intelligence?.daily_sales || biRes?.sales?.daily_sales || biRes?.daily_sales || [];
+            dailyList.forEach((d: any) => {
+              salesMap.set(d.date, Number(d.revenue || 0));
+            });
+            const purMap = new Map<string, number>();
+            (procRes?.timeline || []).forEach((p: any) => {
+              purMap.set(p.date, (purMap.get(p.date) || 0) + Number(p.value || 0));
+            });
+            const dates = new Set<string>([...salesMap.keys(), ...purMap.keys()]);
+            return Array.from(dates).sort().map(date => ({
+              name: fmtDayMonth(date),
+              date: date,
+              sales: salesMap.get(date) || 0,
+              purchase: purMap.get(date) || 0,
+            }));
+          }}
         />
 
         <InteractiveChart
           title="Gross Margin % by Product Line"
           subtitle="Realized gross trade margin percentages across core product brand categories"
           data={grossMarginData}
+          defaultTimeRange={selectedRange}
           fetchData={async (bounds) => {
             const res = await fetch(`/api/analytics/financials?start_date=${bounds.start}&end_date=${bounds.end}`);
             if (!res.ok) return [];
@@ -366,6 +410,7 @@ export default function FinancialValuationPage() {
           title="Working Capital & Asset Allocation"
           subtitle="Distribution between active inventory assets, dead stock capital lockup, and realized surplus"
           data={workingCapitalData}
+          defaultTimeRange={selectedRange}
           fetchData={async (bounds) => {
             const res = await fetch(`/api/analytics/financials?start_date=${bounds.start}&end_date=${bounds.end}`);
             if (!res.ok) return [];
@@ -384,6 +429,7 @@ export default function FinancialValuationPage() {
           title="Net Margin Contribution"
           subtitle="Absolute commercial profit surplus generated per product brand"
           data={netMarginContribData}
+          defaultTimeRange={selectedRange}
           fetchData={async (bounds) => {
             const res = await fetch(`/api/analytics/financials?start_date=${bounds.start}&end_date=${bounds.end}`);
             if (!res.ok) return [];
@@ -403,6 +449,7 @@ export default function FinancialValuationPage() {
           title="Inventory Carrying Cost Overhead"
           subtitle="Annualized storage, facility rent, capital holding, and shrinkage overhead (20% standard rate)"
           data={carryingCostData}
+          defaultTimeRange={selectedRange}
           fetchData={async (bounds) => {
             const res = await fetch(`/api/analytics/financials?start_date=${bounds.start}&end_date=${bounds.end}`);
             if (!res.ok) return [];
@@ -421,6 +468,7 @@ export default function FinancialValuationPage() {
           title="Monthly Capital Cashflow & Trade Surplus"
           subtitle="Chronological trajectory of monthly revenue, procurement outflow, and net cash margin"
           data={monthlyCashflowData}
+          defaultTimeRange={selectedRange}
           fetchData={async (bounds) => {
             const res = await fetch(`/api/analytics/financials?start_date=${bounds.start}&end_date=${bounds.end}`);
             if (!res.ok) return [];
@@ -443,6 +491,7 @@ export default function FinancialValuationPage() {
           title="Revenue Realization by Order Ticket Size"
           subtitle="Sales revenue split across transaction ticket size brackets"
           data={orderTicketData}
+          defaultTimeRange={selectedRange}
           fetchData={async (bounds) => {
             const res = await fetch(`/api/analytics/financials?start_date=${bounds.start}&end_date=${bounds.end}`);
             if (!res.ok) return [];
