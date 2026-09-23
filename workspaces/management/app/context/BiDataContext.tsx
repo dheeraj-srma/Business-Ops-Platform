@@ -1,5 +1,13 @@
 'use client';
-import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import {
+  DateRangeType,
+  DateRangeBounds,
+  getDateRangeBounds,
+  getBusinessTodayDate,
+  BUSINESS_TIMEZONE,
+  EARLIEST_DATA_DATE,
+} from '../utils/dateRange';
 
 export type DataQualityStatus = 'LIVE' | 'SNAPSHOT' | 'UNAVAILABLE';
 
@@ -29,6 +37,7 @@ export interface SalesIntelligence {
     date: string;
     revenue: number;
     orders: number;
+    outward_qty?: number;
     stock_in?: number;
     stock_out?: number;
     adjustments?: number;
@@ -70,16 +79,39 @@ export interface ProcurementIntelligence {
   top_suppliers?: Array<{ supplier: string; value: number }>;
 }
 
+export interface FinancialIntelligence {
+  summary?: {
+    total_sales: number;
+    total_purchases: number;
+    net_trading_surplus: number;
+    gross_margin_pct: number;
+    total_inventory_valuation: number;
+    annual_carrying_cost: number;
+    dead_stock_locked_capital: number;
+    active_working_capital: number;
+  };
+  gross_margin_by_brand?: Array<{ brand: string; sales: number; purchases: number; margin: number; margin_pct: number }>;
+  net_margin_contribution?: Array<{ brand: string; net_margin: number }>;
+  working_capital_allocation?: Array<{ name: string; value: number; color?: string }>;
+  carrying_cost_breakdown?: Array<{ name: string; value: number; pct: number }>;
+  monthly_cashflow?: Array<{ month: string; sales: number; purchases: number; surplus: number }>;
+  order_ticket_distribution?: Array<{ range: string; count: number; revenue: number }>;
+}
+
 export interface BIData {
   status?: string;
   data_mode?: string;
   data_as_of?: string;
+  data_min_date?: string;
+  generated_at?: string;
   snapshot_updated_at?: string;
+  applied_filters?: Record<string, any>;
   core_kpis?: CoreKPIs;
   sales_intelligence?: SalesIntelligence;
   inventory_intelligence?: InventoryIntelligence;
   returns_intelligence?: ReturnsIntelligence;
   procurement_intelligence?: ProcurementIntelligence;
+  financial_intelligence?: FinancialIntelligence;
   ai_insights?: string[] | Array<{ type?: string; title?: string; message?: string }>;
 }
 
@@ -133,8 +165,19 @@ interface BiDataContextType {
   loading: boolean;
   dataStatus: DataQualityStatus;
   dataAsOf: string | null;
+  dataMinDate: string;
+  referenceDate: string;
   snapshotUpdatedAt: string | null;
+  lastSyncedAt: string;
   isOffline: boolean;
+  
+  // Date range state
+  selectedRange: DateRangeType;
+  customStart: string | null;
+  customEnd: string | null;
+  activeBounds: DateRangeBounds;
+  setSelectedRange: (range: DateRangeType, customStart?: string, customEnd?: string) => void;
+
   inventoryList: any[];
   categoriesList: any[];
   dealersList: any[];
@@ -148,9 +191,11 @@ interface BiDataContextType {
   inv: InventoryIntelligence;
   ret: ReturnsIntelligence;
   proc: ProcurementIntelligence;
+  fin?: FinancialIntelligence;
   aiFeed: any[];
   skuMap: Record<string, { name: string; category: string; price: number }>;
   refreshBiData: () => Promise<void>;
+  invalidateAnalytics: (scope?: string) => Promise<void>;
 }
 
 const BiDataContext = createContext<BiDataContextType | null>(null);
@@ -160,8 +205,16 @@ export const BiDataProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [loading, setLoading] = useState<boolean>(true);
   const [dataStatus, setDataStatus] = useState<DataQualityStatus>('LIVE');
   const [dataAsOf, setDataAsOf] = useState<string | null>(null);
+  const [dataMinDate, setDataMinDate] = useState<string>(EARLIEST_DATA_DATE);
   const [snapshotUpdatedAt, setSnapshotUpdatedAt] = useState<string | null>(null);
+  const [lastSyncedAt, setLastSyncedAt] = useState<string>('');
   const [dataQuality, setDataQuality] = useState<DataQualityReport | null>(null);
+  
+  // Global Canonical Date Range State
+  const [selectedRange, setSelectedRangeState] = useState<DateRangeType>('30d');
+  const [customStart, setCustomStart] = useState<string | null>(null);
+  const [customEnd, setCustomEnd] = useState<string | null>(null);
+
   const [inventoryList, setInventoryList] = useState<any[]>([]);
   const [categoriesList, setCategoriesList] = useState<any[]>([]);
   const [dealersList, setDealersList] = useState<any[]>([]);
@@ -171,21 +224,60 @@ export const BiDataProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [inwardsList, setInwardsList] = useState<any[]>([]);
   const [customersAnalyticsList, setCustomersAnalyticsList] = useState<any[]>([]);
 
+  const referenceDate = useMemo(() => getBusinessTodayDate(BUSINESS_TIMEZONE), []);
+
+  const activeBounds = useMemo(() => {
+    return getDateRangeBounds(
+      selectedRange,
+      referenceDate,
+      customStart || undefined,
+      customEnd || undefined,
+      dataMinDate
+    );
+  }, [selectedRange, referenceDate, customStart, customEnd, dataMinDate]);
+
+  const setSelectedRange = useCallback((range: DateRangeType, cStart?: string, cEnd?: string) => {
+    setSelectedRangeState(range);
+    if (range === 'custom') {
+      setCustomStart(cStart || null);
+      setCustomEnd(cEnd || null);
+    } else {
+      setCustomStart(null);
+      setCustomEnd(null);
+    }
+  }, []);
+
   const fetchAllData = useCallback(async () => {
     try {
       setLoading(true);
 
+      const bounds = getDateRangeBounds(
+        selectedRange,
+        referenceDate,
+        customStart || undefined,
+        customEnd || undefined,
+        dataMinDate
+      );
+
+      const queryParams = new URLSearchParams();
+      if (bounds.isValid && selectedRange !== 'all') {
+        queryParams.set('start_date', bounds.start);
+        queryParams.set('end_date', bounds.end);
+      }
+
+      const queryString = queryParams.toString() ? `?${queryParams.toString()}` : '';
+
       const [biFetch, dqFetch, invRes, catRes, dlrRes, supRes, retRes, ordRes, inwRes, custRes] = await Promise.allSettled([
-        fetch('/api/analytics/bi'),
+        fetch(`/api/analytics/bi${queryString}`),
         fetch('/api/analytics/data-quality'),
         fetch('/api/inventory').then(r => (r.ok ? r.json() : [])),
         fetch('/api/categories').then(r => (r.ok ? r.json() : [])),
         fetch('/api/dealers?limit=1000').then(r => (r.ok ? r.json() : [])),
         fetch('/api/suppliers').then(r => (r.ok ? r.json() : [])),
-        fetch('/api/returns').then(r => (r.ok ? r.json() : [])),
+        fetch(`/api/returns${queryString}`).then(r => (r.ok ? r.json() : [])),
         fetch('/api/orders').then(r => (r.ok ? r.json() : [])),
         fetch('/api/inwards').then(r => (r.ok ? r.json() : [])),
-        fetch('/api/analytics/customers?limit=500').then(r => (r.ok ? r.json() : [])),
+        fetch(`/api/analytics/customers?limit=500${queryString ? `&${queryParams.toString()}` : ''}`).then(r => (r.ok ? r.json() : [])),
       ]);
 
       if (biFetch.status === 'fulfilled' && biFetch.value.ok) {
@@ -198,7 +290,10 @@ export const BiDataProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           setBiData(val);
           const isSnapshot = val.data_mode === 'SNAPSHOT' || val.status === 'SNAPSHOT' || dbMode === 'READ_ONLY';
           setDataStatus(isSnapshot ? 'SNAPSHOT' : 'LIVE');
-          setDataAsOf(val.data_as_of || new Date().toISOString().slice(0, 10));
+          setDataAsOf(val.data_as_of || null);
+          if (val.data_min_date) {
+            setDataMinDate(val.data_min_date);
+          }
           setSnapshotUpdatedAt(val.snapshot_updated_at || snapHeaderTime || null);
         } else {
           setBiData(EMPTY_BI_DATA);
@@ -209,6 +304,20 @@ export const BiDataProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         setBiData(EMPTY_BI_DATA);
         setDataStatus('UNAVAILABLE');
         setDataAsOf(null);
+      }
+
+      // Record last sync time in Asia/Kolkata
+      try {
+        const nowFormatted = new Intl.DateTimeFormat('en-IN', {
+          timeZone: BUSINESS_TIMEZONE,
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: true,
+        }).format(new Date());
+        setLastSyncedAt(nowFormatted);
+      } catch {
+        setLastSyncedAt(new Date().toLocaleTimeString());
       }
 
       if (dqFetch.status === 'fulfilled' && dqFetch.value.ok) {
@@ -263,18 +372,55 @@ export const BiDataProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [selectedRange, referenceDate, customStart, customEnd, dataMinDate]);
 
+  // Initial fetch and fetch on range change
   useEffect(() => {
     fetchAllData();
   }, [fetchAllData]);
 
-  // Strict Authoritative Metrics: No fallback to synthetic numbers
+  // Automatic refresh on tab focus / window visibility
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        fetchAllData();
+      }
+    };
+    const handleFocus = () => {
+      fetchAllData();
+    };
+
+    if (typeof window !== 'undefined') {
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+      window.addEventListener('focus', handleFocus);
+      return () => {
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+        window.removeEventListener('focus', handleFocus);
+      };
+    }
+  }, [fetchAllData]);
+
+  // Periodic refresh every 60s
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        fetchAllData();
+      }
+    }, 60000);
+    return () => clearInterval(interval);
+  }, [fetchAllData]);
+
+  const invalidateAnalytics = useCallback(async (scope?: string) => {
+    await fetchAllData();
+  }, [fetchAllData]);
+
+  // Strict Authoritative Metrics
   const kpis: CoreKPIs = useMemo(() => biData.core_kpis || {}, [biData.core_kpis]);
   const sales: SalesIntelligence = useMemo(() => biData.sales_intelligence || EMPTY_BI_DATA.sales_intelligence!, [biData.sales_intelligence]);
   const inv: InventoryIntelligence = useMemo(() => biData.inventory_intelligence || EMPTY_BI_DATA.inventory_intelligence!, [biData.inventory_intelligence]);
   const ret: ReturnsIntelligence = useMemo(() => biData.returns_intelligence || EMPTY_BI_DATA.returns_intelligence!, [biData.returns_intelligence]);
   const proc: ProcurementIntelligence = useMemo(() => biData.procurement_intelligence || EMPTY_BI_DATA.procurement_intelligence!, [biData.procurement_intelligence]);
+  const fin: FinancialIntelligence | undefined = useMemo(() => biData.financial_intelligence, [biData.financial_intelligence]);
 
   const aiFeed = useMemo(() => {
     if (Array.isArray(biData.ai_insights) && biData.ai_insights.length > 0) {
@@ -310,8 +456,16 @@ export const BiDataProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         loading,
         dataStatus,
         dataAsOf,
+        dataMinDate,
+        referenceDate,
         snapshotUpdatedAt,
+        lastSyncedAt,
         isOffline: dataStatus !== 'LIVE',
+        selectedRange,
+        customStart,
+        customEnd,
+        activeBounds,
+        setSelectedRange,
         inventoryList,
         categoriesList,
         dealersList,
@@ -325,9 +479,11 @@ export const BiDataProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         inv,
         ret,
         proc,
+        fin,
         aiFeed,
         skuMap,
         refreshBiData: fetchAllData,
+        invalidateAnalytics,
       }}
     >
       {children}

@@ -4,6 +4,7 @@ import { Compass, MapPin } from 'lucide-react';
 import { useBi } from '../context/BiDataContext';
 import InteractiveChart from '../components/InteractiveChart';
 import IndiaMapChart from '../components/IndiaMapChart';
+import DataFreshnessBadge from '../components/DataFreshnessBadge';
 
 export default function GeographyPage() {
   const { sales, kpis, dealersList } = useBi();
@@ -58,14 +59,11 @@ export default function GeographyPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
+          <DataFreshnessBadge />
           <div className="px-3.5 py-2 bg-slate-800/60 rounded-xl border border-slate-700/50">
             <div className="text-[10px] text-slate-400 uppercase font-semibold">Primary Territory</div>
             <div className="text-base font-extrabold text-indigo-600 dark:text-indigo-400">{primaryTerritoryLabel}</div>
-          </div>
-          <div className="px-3.5 py-2 bg-slate-800/60 rounded-xl border border-slate-700/50">
-            <div className="text-[10px] text-slate-400 uppercase font-semibold">Total Outlets</div>
-            <div className="text-base font-extrabold text-purple-400">{dealersList.length || kpis.active_dealers || 0} Verified</div>
           </div>
         </div>
       </div>

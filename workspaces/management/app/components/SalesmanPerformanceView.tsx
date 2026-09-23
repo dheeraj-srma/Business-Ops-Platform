@@ -477,12 +477,18 @@ export default function SalesmanPerformanceView() {
               className="bg-transparent text-indigo-600 dark:text-indigo-400 font-bold focus:outline-none cursor-pointer"
             >
               <option value="today" className="bg-slate-900 text-white">Today</option>
+              <option value="yesterday" className="bg-slate-900 text-white">Yesterday</option>
               <option value="7d" className="bg-slate-900 text-white">Last 7 Days</option>
-              <option value="30d" className="bg-slate-900 text-white">Last 30 Days</option>
+              <option value="this_week" className="bg-slate-900 text-white">This Week</option>
               <option value="this_month" className="bg-slate-900 text-white">This Month</option>
               <option value="last_month" className="bg-slate-900 text-white">Last Month</option>
+              <option value="30d" className="bg-slate-900 text-white">Last 30 Days</option>
+              <option value="60d" className="bg-slate-900 text-white">Last 60 Days</option>
+              <option value="90d" className="bg-slate-900 text-white">Last 90 Days</option>
+              <option value="this_quarter" className="bg-slate-900 text-white">This Quarter</option>
+              <option value="ytd" className="bg-slate-900 text-white">Year-to-Date (YTD)</option>
               <option value="12m" className="bg-slate-900 text-white">Last 12 Months</option>
-              <option value="this_year" className="bg-slate-900 text-white">This Year</option>
+              <option value="all" className="bg-slate-900 text-white">All History</option>
               <option value="custom" className="bg-slate-900 text-white">Custom Range</option>
             </select>
           </div>

@@ -3,6 +3,7 @@ import React, { useMemo } from 'react';
 import { Activity, Zap, Clock, AlertTriangle } from 'lucide-react';
 import { useBi } from '../context/BiDataContext';
 import InteractiveChart from '../components/InteractiveChart';
+import DataFreshnessBadge from '../components/DataFreshnessBadge';
 import { calculateABC } from '../utils/metricCalculations';
 import { fmtDayMonth } from '../utils/formatters';
 
@@ -11,10 +12,10 @@ export default function InventoryVelocityPage() {
 
   const movementTimelineData = useMemo(() => {
     return (sales.daily_sales || []).map(d => ({
-      name: fmtDayMonth(d.date),
       date: d.date,
+      name: fmtDayMonth(d.date),
       inward: Number(d.stock_in || 0),
-      outward: Number(d.stock_out || 0),
+      outward: Number(d.stock_out || d.outward_qty || 0),
     }));
   }, [sales.daily_sales]);
 
@@ -39,7 +40,7 @@ export default function InventoryVelocityPage() {
     // Sort ascending by actual units sold to identify slow movers
     return [...positiveSold]
       .sort((a, b) => a.qty - b.qty)
-      .slice(0, 5)
+      .slice(0, 10)
       .map(p => ({
         name: p.name.length > 20 ? p.name.slice(0, 20) + '…' : p.name,
         value: p.qty,
@@ -63,7 +64,7 @@ export default function InventoryVelocityPage() {
       })
       .filter(x => x.value > 0)
       .sort((a, b) => b.value - a.value);
-    return candidates.slice(0, 5);
+    return candidates.slice(0, 10);
   }, [inventoryList, sales.top_products]);
 
   const agingData = useMemo(() => {
@@ -144,17 +145,12 @@ export default function InventoryVelocityPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
+          <DataFreshnessBadge />
           <div className="px-3.5 py-2 bg-slate-800/60 rounded-xl border border-slate-700/50">
             <div className="text-[10px] text-slate-400 uppercase font-semibold">Turnover Ratio</div>
             <div className="text-base font-extrabold text-indigo-600 dark:text-indigo-400">
               {kpis.inventory_turnover_ratio ? `${kpis.inventory_turnover_ratio}x` : '—'}
-            </div>
-          </div>
-          <div className="px-3.5 py-2 bg-slate-800/60 rounded-xl border border-slate-700/50">
-            <div className="text-[10px] text-slate-400 uppercase font-semibold">Total Stock Units</div>
-            <div className="text-base font-extrabold text-sky-400">
-              {kpis.total_units ? Number(kpis.total_units).toLocaleString('en-IN') : '—'}
             </div>
           </div>
         </div>

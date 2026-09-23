@@ -34,8 +34,9 @@ export default function DashboardPage() {
       const rev = Number(d.revenue) || 0;
       const ords = Number(d.orders) || 0;
       const sIn = Number(d.stock_in) || 0;
-      const sOut = Number(d.stock_out) || 0;
+      const sOut = Number(d.stock_out || d.outward_qty) || 0;
       return {
+        date: d.date,
         name: fmtDayMonth(d.date),
         revenue: rev,
         orders: ords,

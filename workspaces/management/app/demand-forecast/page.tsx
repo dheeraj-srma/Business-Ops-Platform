@@ -3,6 +3,7 @@
 import React from 'react';
 import { useBi } from '../context/BiDataContext';
 import AIDecisionIntelligence from '../analytics/AIDecisionIntelligence';
+import DataFreshnessBadge from '../components/DataFreshnessBadge';
 import { Sparkles, Brain, Cpu, TrendingUp } from 'lucide-react';
 
 export default function DemandForecastPage() {
@@ -41,14 +42,11 @@ export default function DemandForecastPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-3 self-start md:self-auto">
+        <div className="flex items-center gap-3 self-start md:self-auto flex-wrap">
+          <DataFreshnessBadge />
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 border border-cyan-800/40 text-xs text-indigo-700 dark:text-indigo-300 font-mono">
             <Brain size={14} className="text-indigo-600 dark:text-indigo-400" />
-            <span>Engine: Scenario Forecast Simulator</span>
-          </div>
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-xs text-slate-300">
-            <Cpu size={14} className="text-indigo-600 dark:text-indigo-400" />
-            <span>Heuristic Demand Projection</span>
+            <span>Scenario Simulator</span>
           </div>
         </div>
       </div>

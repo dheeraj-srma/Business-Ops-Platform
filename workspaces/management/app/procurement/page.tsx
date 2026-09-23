@@ -3,6 +3,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { Truck, ShieldCheck, Award, AlertCircle } from 'lucide-react';
 import { useBi } from '../context/BiDataContext';
 import InteractiveChart from '../components/InteractiveChart';
+import DataFreshnessBadge from '../components/DataFreshnessBadge';
 import { fmtDayMonth } from '../utils/formatters';
 
 interface ProcurementData {
@@ -19,11 +20,18 @@ interface ProcurementData {
 }
 
 export default function ProcurementPage() {
-  const { proc, sales, kpis, inwardsList } = useBi();
+  const { proc, sales, kpis, inwardsList, activeBounds } = useBi();
   const [procData, setProcData] = useState<ProcurementData | null>(null);
 
   useEffect(() => {
-    fetch('/api/analytics/procurement')
+    const params = new URLSearchParams();
+    if (activeBounds?.isValid) {
+      params.set('start_date', activeBounds.start);
+      params.set('end_date', activeBounds.end);
+    }
+    const q = params.toString() ? `?${params.toString()}` : '';
+
+    fetch(`/api/analytics/procurement${q}`)
       .then(res => res.ok ? res.json() : null)
       .then(data => {
         if (data && typeof data === 'object') {
@@ -31,7 +39,7 @@ export default function ProcurementPage() {
         }
       })
       .catch(() => {});
-  }, []);
+  }, [activeBounds]);
 
   // 1. Authoritative purchase spend trend from historical purchases ledger
   const spendTrendData = useMemo(() => {
@@ -169,14 +177,11 @@ export default function ProcurementPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
+          <DataFreshnessBadge />
           <div className="px-3.5 py-2 bg-slate-800/60 rounded-xl border border-slate-700/50">
             <div className="text-[10px] text-slate-400 uppercase font-semibold">Total Sourcing Spend</div>
             <div className="text-base font-extrabold text-amber-400">₹{totalPurchaseValue.toLocaleString('en-IN')}</div>
-          </div>
-          <div className="px-3.5 py-2 bg-slate-800/60 rounded-xl border border-slate-700/50">
-            <div className="text-[10px] text-slate-400 uppercase font-semibold">Connected Vendors</div>
-            <div className="text-base font-extrabold text-sky-400">{totalVendors} Vendors</div>
           </div>
         </div>
       </div>

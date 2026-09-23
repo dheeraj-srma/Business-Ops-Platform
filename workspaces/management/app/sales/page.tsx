@@ -4,10 +4,11 @@ import { TrendingUp, Users, DollarSign, Award, BarChart3, UserCheck } from 'luci
 import { useBi } from '../context/BiDataContext';
 import InteractiveChart from '../components/InteractiveChart';
 import SalesmanPerformanceView from '../components/SalesmanPerformanceView';
+import DataFreshnessBadge from '../components/DataFreshnessBadge';
 import { fmtDayMonth } from '../utils/formatters';
 
 export default function SalesPage() {
-  const { sales, kpis, ordersList, dealersList } = useBi();
+  const { sales, kpis, activeBounds } = useBi();
   const [activeTab, setActiveTab] = useState<'overview' | 'salesman'>('salesman');
 
   useEffect(() => {
@@ -22,9 +23,9 @@ export default function SalesPage() {
 
   const dailySalesData = useMemo(() => {
     return (sales.daily_sales || []).map(d => ({
+      date: d.date,
       name: fmtDayMonth(d.date),
       value: d.revenue,
-      date: d.date,
     }));
   }, [sales.daily_sales]);
 
@@ -74,13 +75,20 @@ export default function SalesPage() {
   const [orderDist, setOrderDist] = useState<Array<{ bucket: string; orders: number; value: number }>>([]);
 
   useEffect(() => {
-    fetch('/api/analytics/order-distribution')
+    const params = new URLSearchParams();
+    if (activeBounds?.isValid) {
+      params.set('start_date', activeBounds.start);
+      params.set('end_date', activeBounds.end);
+    }
+    const q = params.toString() ? `?${params.toString()}` : '';
+
+    fetch(`/api/analytics/order-distribution${q}`)
       .then(r => r.ok ? r.json() : [])
       .then(data => {
         if (Array.isArray(data)) setOrderDist(data);
       })
       .catch(() => {});
-  }, []);
+  }, [activeBounds]);
 
   const orderValueDistribution = useMemo(() => {
     return orderDist.map(item => ({
@@ -106,14 +114,11 @@ export default function SalesPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
+          <DataFreshnessBadge />
           <div className="px-3.5 py-2 bg-slate-800/60 rounded-xl border border-slate-700/50">
             <div className="text-[10px] text-slate-400 uppercase font-semibold">Total Sales</div>
             <div className="text-base font-extrabold text-sky-400">₹{Number(kpis.total_revenue || 0).toLocaleString('en-IN')}</div>
-          </div>
-          <div className="px-3.5 py-2 bg-slate-800/60 rounded-xl border border-slate-700/50">
-            <div className="text-[10px] text-slate-400 uppercase font-semibold">Top Salesman</div>
-            <div className="text-base font-extrabold text-indigo-600 dark:text-indigo-400">{sales.top_salesman || 'N/A'}</div>
           </div>
         </div>
       </div>

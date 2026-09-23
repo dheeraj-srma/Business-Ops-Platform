@@ -3,6 +3,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { useBi } from '../context/BiDataContext';
 import InteractiveChart from '../components/InteractiveChart';
+import DataFreshnessBadge from '../components/DataFreshnessBadge';
 import { fmtDayMonth } from '../utils/formatters';
 import {
   CircleDollarSign,
@@ -41,12 +42,19 @@ interface FinancialData {
 }
 
 export default function FinancialValuationPage() {
-  const { kpis, sales, inventoryList, loading } = useBi();
+  const { kpis, sales, inventoryList, loading, activeBounds } = useBi();
   const [procTimeline, setProcTimeline] = useState<Array<{ date: string; value: number }>>([]);
   const [finData, setFinData] = useState<FinancialData | null>(null);
 
   useEffect(() => {
-    fetch('/api/analytics/financials')
+    const params = new URLSearchParams();
+    if (activeBounds?.isValid) {
+      params.set('start_date', activeBounds.start);
+      params.set('end_date', activeBounds.end);
+    }
+    const q = params.toString() ? `?${params.toString()}` : '';
+
+    fetch(`/api/analytics/financials${q}`)
       .then(res => res.ok ? res.json() : null)
       .then(data => {
         if (data && typeof data === 'object') {
@@ -55,7 +63,7 @@ export default function FinancialValuationPage() {
       })
       .catch(() => {});
 
-    fetch('/api/analytics/procurement')
+    fetch(`/api/analytics/procurement${q}`)
       .then(res => res.ok ? res.json() : null)
       .then(data => {
         if (data && Array.isArray(data.timeline)) {
@@ -63,13 +71,13 @@ export default function FinancialValuationPage() {
         }
       })
       .catch(() => {});
-  }, []);
+  }, [activeBounds]);
 
   // 1. Authoritative Revenue Realization Timeline (No fabricated COGS)
   const finPerformanceData = useMemo(() => {
     return (sales.daily_sales || []).map((d) => ({
-      name: fmtDayMonth(d.date),
       date: d.date,
+      name: fmtDayMonth(d.date),
       revenue: Number(d.revenue) || 0,
     }));
   }, [sales.daily_sales]);
@@ -232,7 +240,8 @@ export default function FinancialValuationPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-3 self-start md:self-auto">
+        <div className="flex items-center gap-3 self-start md:self-auto flex-wrap">
+          <DataFreshnessBadge />
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-800/40 text-xs text-indigo-300 font-mono">
             <ShieldCheck size={14} className="text-emerald-400" />
             <span>AUTHORITATIVE ACCOUNTING DATA</span>

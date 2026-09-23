@@ -3,6 +3,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { RotateCcw, AlertTriangle, Sparkles, CheckCircle2 } from 'lucide-react';
 import { useBi } from '../context/BiDataContext';
 import InteractiveChart from '../components/InteractiveChart';
+import DataFreshnessBadge from '../components/DataFreshnessBadge';
 import { fmtDayMonth } from '../utils/formatters';
 
 interface ReturnAnalyticsData {
@@ -18,11 +19,18 @@ interface ReturnAnalyticsData {
 }
 
 export default function QualityReturnsPage() {
-  const { ret, sales, kpis, returnsList } = useBi();
+  const { ret, sales, kpis, returnsList, activeBounds } = useBi();
   const [retData, setRetData] = useState<ReturnAnalyticsData | null>(null);
 
   useEffect(() => {
-    fetch('/api/analytics/returns')
+    const params = new URLSearchParams();
+    if (activeBounds?.isValid) {
+      params.set('start_date', activeBounds.start);
+      params.set('end_date', activeBounds.end);
+    }
+    const q = params.toString() ? `?${params.toString()}` : '';
+
+    fetch(`/api/analytics/returns${q}`)
       .then(res => res.ok ? res.json() : null)
       .then(data => {
         if (data && typeof data === 'object') {
@@ -30,7 +38,7 @@ export default function QualityReturnsPage() {
         }
       })
       .catch(() => {});
-  }, []);
+  }, [activeBounds]);
 
   // 1. Authoritative returns timeline from historical return vouchers
   const returnsTimelineData = useMemo(() => {
@@ -126,14 +134,11 @@ export default function QualityReturnsPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
+          <DataFreshnessBadge />
           <div className="px-3.5 py-2 bg-slate-800/60 rounded-xl border border-slate-700/50">
             <div className="text-[10px] text-slate-400 uppercase font-semibold">Return Rate</div>
             <div className="text-base font-extrabold text-rose-400">{returnRateLabel}</div>
-          </div>
-          <div className="px-3.5 py-2 bg-slate-800/60 rounded-xl border border-slate-700/50">
-            <div className="text-[10px] text-slate-400 uppercase font-semibold">Total Returns</div>
-            <div className="text-base font-extrabold text-indigo-600 dark:text-indigo-400">{totalReturnCount} Vouchers</div>
           </div>
           <div className="px-3.5 py-2 bg-slate-800/60 rounded-xl border border-slate-700/50">
             <div className="text-[10px] text-slate-400 uppercase font-semibold">Total Claim Value</div>

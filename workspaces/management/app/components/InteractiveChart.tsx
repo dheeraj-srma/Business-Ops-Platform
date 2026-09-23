@@ -30,7 +30,10 @@ import {
   getDateRangeBounds,
   filterItemsByDateRange,
   aggregateTimeSeriesData,
-  formatCalendarDate
+  formatCalendarDate,
+  getReferenceDate,
+  fillTimeSeriesGaps,
+  formatDayMonth
 } from '../utils/dateRange';
 import { fmtDayMonth } from '../utils/formatters';
 
@@ -229,6 +232,10 @@ export default function InteractiveChart({
     if (item?.date && typeof item.date === 'string') return item.date.slice(0, 10);
     const name = String(item?.name || '');
     if (/^\d{4}-\d{2}-\d{2}$/.test(name)) return name;
+    if (/^\d{2}\/\d{2}$/.test(name)) {
+      const parts = name.split('/');
+      return `2026-${parts[1]}-${parts[0]}`;
+    }
     if (/^\d{2}-\d{2}$/.test(name)) return `2026-${name}`;
     return '';
   };
@@ -247,19 +254,25 @@ export default function InteractiveChart({
     if (!data || data.length === 0) return [];
     if (!isTimeSeries) return data;
 
-    const allDates = data.map(getItemDate).filter(Boolean).sort();
-    const maxDate = allDates.length > 0 ? allDates[allDates.length - 1] : '2026-09-21';
+    const refDate = getReferenceDate();
+    const bounds = getDateRangeBounds(timeRange, refDate, startDate, endDate);
+    if (!bounds.isValid) return data;
 
-    const filtered = filterItemsByDateRange(data, timeRange, getItemDate, maxDate, startDate, endDate);
+    const keysToAggregate = multiSeries && multiSeries.length > 0
+      ? multiSeries.map(s => s.key)
+      : ['value', 'revenue', 'orders', 'qty', 'units', 'stock_in', 'stock_out', 'outward_qty', 'dispatches', 'defective', 'reusable', 'inward', 'outward', 'cost', 'profit', 'Sales', 'sales', 'Orders', 'amount'];
+
+    // Filter items within bounds
+    const inRange = filterItemsByDateRange(data, timeRange, getItemDate, refDate, startDate, endDate);
+
+    // Fill continuous daily calendar sequence [bounds.start, bounds.end]
+    const continuous = fillTimeSeriesGaps(inRange, bounds.start, bounds.end, keysToAggregate, 0, formatDayMonth);
 
     // If time series duration > 31 days, aggregate automatically to avoid dense clutter
-    if (filtered.length > 31) {
-      const keysToAggregate = multiSeries && multiSeries.length > 0
-        ? multiSeries.map(s => s.key)
-        : ['value', 'revenue', 'orders', 'qty', 'units', 'stock_in', 'stock_out', 'defective', 'reusable', 'inward', 'outward', 'cost', 'profit', 'Sales', 'sales', 'Orders', 'amount'];
-      return aggregateTimeSeriesData(filtered, keysToAggregate);
+    if (continuous.length > 31) {
+      return aggregateTimeSeriesData(continuous, keysToAggregate);
     }
-    return filtered;
+    return continuous;
   }, [data, isTimeSeries, timeRange, startDate, endDate, multiSeries]);
 
   // Dynamic Chart Summaries (Phase 8): Calculate latest, average, and peak from real data
@@ -688,6 +701,7 @@ export default function InteractiveChart({
             <option value="this_month">This Month</option>
             <option value="last_month">Last Month</option>
             <option value="30d">Last 30 Days</option>
+            <option value="60d">Last 60 Days</option>
             <option value="90d">Last 90 Days</option>
             <option value="this_quarter">This Quarter</option>
             <option value="ytd">Year-to-Date (YTD)</option>

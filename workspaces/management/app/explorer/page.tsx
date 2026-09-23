@@ -4,6 +4,7 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useBi } from '../context/BiDataContext';
 import InteractiveChart from '../components/InteractiveChart';
 import ExplorerAIInsights from '../analytics/ExplorerAIInsights';
+import DataFreshnessBadge from '../components/DataFreshnessBadge';
 import { fmtDayMonth } from '../utils/formatters';
 import {
   Search,
@@ -365,7 +366,8 @@ export default function BusinessExplorerPage() {
     const sortedDates = Object.keys(byDate).sort();
     if (sortedDates.length === 0) return [{ name: 'No Activity', value: 0 }];
 
-    return sortedDates.slice(-14).map(d => ({
+    return sortedDates.map(d => ({
+      date: d,
       name: fmtDayMonth(d) || d,
       value: byDate[d]
     }));
@@ -435,9 +437,12 @@ export default function BusinessExplorerPage() {
     <div className="space-y-6">
       {/* Header Banner - explicit z-40 and overflow-visible to ensure dropdown menu floats over lower panels */}
       <div className="relative z-40 overflow-visible bg-slate-900/70 border border-slate-800 rounded-xl p-5 shadow-lg backdrop-blur-sm">
-        <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400 font-bold text-lg mb-1">
-          <Search size={22} className="text-indigo-600 dark:text-indigo-400" />
-          <span>360° Business Entity Explorer</span>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-2">
+          <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400 font-bold text-lg">
+            <Search size={22} className="text-indigo-600 dark:text-indigo-400" />
+            <span>360° Business Entity Explorer</span>
+          </div>
+          <DataFreshnessBadge />
         </div>
         <p className="text-xs md:text-sm text-slate-400">
           Cross-examine any Product SKU, Category, Customer Account, Supplier, or Sales Representative with instant contextual metrics, historical velocity, and AI diagnostics.
