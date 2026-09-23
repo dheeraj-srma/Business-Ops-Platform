@@ -84,3 +84,15 @@ def get_salesman_heatmap(
     except Exception as exc:
         logger.error(f"Error generating heatmap for salesman '{salesman_id}': {exc}")
         raise HTTPException(status_code=500, detail="Failed to generate order activity heatmap.")
+
+@router.get("/{salesman_id}/assigned-customers")
+def get_salesman_assigned_customers(
+    salesman_id: str,
+    current_user: dict = Depends(optional_auth)
+):
+    try:
+        customers = salesman_service.get_salesman_assigned_customers(salesman_id=salesman_id)
+        return {"salesman_id": salesman_id, "customers": customers, "count": len(customers)}
+    except Exception as exc:
+        logger.error(f"Error fetching assigned customers for salesman '{salesman_id}': {exc}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve assigned customers directory.")

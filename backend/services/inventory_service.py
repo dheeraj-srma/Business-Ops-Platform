@@ -1,6 +1,6 @@
 import logging
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional
 from repositories.inventory_repo import InventoryRepository
 from schemas.inventory import ProductCreateSchema, StockAdjustmentSchema
@@ -74,6 +74,7 @@ class InventoryService:
         InventoryRepository.invalidate_cache()
         if qty > 0:
             from repositories.transaction_repo import TransactionRepository
+            now_iso = datetime.now(timezone.utc).isoformat()
             TransactionRepository.record_stock_transaction({
                 "transaction_type": "inward",
                 "product_id": prod_id,
@@ -81,13 +82,16 @@ class InventoryService:
                 "quantity": qty,
                 "unit_cost": cost_p,
                 "reference_type": "inward",
+                "reference_id": None,
+                "client_reference": "INITIAL-SETUP",
                 "notes": f"Initial SKU stock setup for {clean_sku}",
-                "created_at": datetime.utcnow().isoformat()
+                "transaction_date": now_iso,
+                "created_at": now_iso
             })
             if client:
                 client.table("inventory").update({
                     "quantity_on_hand": qty,
-                    "updated_at": datetime.utcnow().isoformat()
+                    "updated_at": now_iso
                 }).eq("product_id", prod_id).execute()
 
         prod_resp_obj = {

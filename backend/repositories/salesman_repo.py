@@ -199,6 +199,7 @@ class SalesmanRepository:
                 for r in conn.execute(units_q, params).fetchall()
             }
 
+            assigned_counts = cls.get_all_salesmen_assigned_counts()
             total_team_sales = sum(float(r["sales"] or 0.0) for r in rows)
             res_list = []
             for r in rows:
@@ -208,6 +209,7 @@ class SalesmanRepository:
                 s_orders = int(r["orders"] or 0)
                 aov = round(s_sales / s_orders, 2) if s_orders > 0 else 0.0
                 contrib = round((s_sales / total_team_sales * 100), 1) if total_team_sales > 0 else 0.0
+                assigned_cnt = assigned_counts.get(slm_id, assigned_counts.get(name, assigned_counts.get(name.upper(), 0)))
 
                 res_list.append({
                     "salesman_id": slm_id,
@@ -225,6 +227,7 @@ class SalesmanRepository:
                     "units_sold": units_map.get(name, 0.0),
                     "customers": int(r["customers"] or 0),
                     "dealers": int(r["customers"] or 0),
+                    "assigned_customers": assigned_cnt,
                     "active_days": int(r["active_days"] or 0),
                     "cancelled_orders": 0,
                     "sales_contribution_pct": contrib
@@ -259,6 +262,81 @@ class SalesmanRepository:
             return []
         finally:
             conn.close()
+
+    @classmethod
+    def get_all_salesmen_assigned_counts(cls) -> Dict[str, int]:
+        from config.database import get_db_client
+        client = get_db_client()
+        if not client:
+            return {}
+        try:
+            res = client.table("salesman_customer_catalog").select("salesman_id, salesman_code, salesman_name").execute()
+            counts = {}
+            for r in res.data or []:
+                code = r.get("salesman_code")
+                name = r.get("salesman_name")
+                sid = r.get("salesman_id")
+                if code:
+                    counts[code] = counts.get(code, 0) + 1
+                if name:
+                    counts[name] = counts.get(name, 0) + 1
+                    counts[name.upper()] = counts.get(name.upper(), 0) + 1
+                if sid:
+                    counts[sid] = counts.get(sid, 0) + 1
+            return counts
+        except Exception as err:
+            logger.warning(f"Error fetching catalog assigned counts: {err}")
+            return {}
+
+    @classmethod
+    def get_salesman_assigned_customers(cls, salesman_id: str) -> List[Dict[str, Any]]:
+        import uuid
+        from config.database import get_db_client
+        client = get_db_client()
+        if not client:
+            return []
+        try:
+            canonical_name = CODE_TO_SALESMAN_MAP.get(salesman_id, salesman_id)
+            code = SALESMAN_CODE_MAP.get(canonical_name, salesman_id)
+            is_unresolved = (
+                str(salesman_id).upper() in ("TLY-SLM-UNR", "UNRESOLVED", "DIRECT")
+                or canonical_name.lower() in ("unresolved", "direct", "direct / house account")
+            )
+
+            is_uuid = False
+            try:
+                uuid.UUID(str(salesman_id))
+                is_uuid = True
+            except (ValueError, AttributeError):
+                is_uuid = False
+
+            query = client.table("salesman_customer_catalog").select("*")
+            if is_unresolved:
+                query = query.or_("salesman_code.eq.DIRECT,salesman_name.ilike.%Direct%,salesman_name.ilike.%Unresolved%")
+            elif is_uuid:
+                query = query.or_(f"salesman_id.eq.{salesman_id},salesman_code.eq.{code},salesman_name.ilike.%{canonical_name}%")
+            else:
+                query = query.or_(f"salesman_code.eq.{code},salesman_name.ilike.%{canonical_name}%")
+
+            res = query.order("shop_name").limit(1000).execute()
+            customers = []
+            for r in res.data or []:
+                customers.append({
+                    "customer_id": r.get("customer_id"),
+                    "customer_code": r.get("customer_code") or r.get("Customer Code") or "—",
+                    "shop_name": r.get("shop_name") or r.get("Shop Name") or r.get("location_name") or "Unnamed Customer",
+                    "name": r.get("shop_name") or r.get("Shop Name") or r.get("location_name") or "Unnamed Customer",
+                    "city": r.get("city") or r.get("City") or "Faridabad",
+                    "state": r.get("state") or r.get("State") or "Haryana",
+                    "location_id": r.get("location_id") or r.get("Location ID") or "—",
+                    "location_name": r.get("location_name") or r.get("shop_name"),
+                    "phone": r.get("Phone") or r.get("phone") or "—",
+                    "contact_person": r.get("Contact Person") or r.get("contact_person") or "—"
+                })
+            return customers
+        except Exception as err:
+            logger.error(f"Error fetching assigned customers for salesman '{salesman_id}': {err}")
+            return []
 
     @classmethod
     def get_salesman_detail(cls, salesman_id: str, start_date: Optional[str] = None, end_date: Optional[str] = None) -> Dict[str, Any]:
@@ -344,6 +422,10 @@ class SalesmanRepository:
                 for r in conn.execute(trend_q, params).fetchall()
             ]
 
+            # Fetch authoritative assigned customers from catalog
+            assigned_customers = cls.get_salesman_assigned_customers(salesman_id)
+            assigned_count = len(assigned_customers)
+
             return {
                 "header": header_info,
                 "metrics": {
@@ -359,9 +441,11 @@ class SalesmanRepository:
                     "average_order_value": aov,
                     "total_units_sold": float(u_row["total_units"] or 0.0) if u_row else 0.0,
                     "unique_customers": int(m_row["unique_customers"] or 0) if m_row else 0,
+                    "assigned_customers_count": assigned_count,
                     "active_days": int(m_row["active_days"] or 0) if m_row else 0,
                     "line_items_count": int(u_row["total_line_items"] or 0) if u_row else (tot_orders * 4)
                 },
+                "assigned_customers": assigned_customers,
                 "daily_trends": daily_trends
             }
         except Exception as err:
@@ -369,6 +453,7 @@ class SalesmanRepository:
             return {
                 "header": {"name": salesman_id, "salesman_id": salesman_id},
                 "metrics": {},
+                "assigned_customers": [],
                 "daily_trends": []
             }
         finally:
@@ -417,8 +502,8 @@ class SalesmanRepository:
                 for r in rows
             }
 
-            # Generate full day list back from reference date (2026-09-21)
-            ref_date = datetime.strptime("2026-09-21", "%Y-%m-%d").date()
+            # Generate full day list back from today (dynamic — never hardcoded)
+            ref_date = datetime.utcnow().date()
             days_list = []
             for i in range(days_count - 1, -1, -1):
                 d = ref_date - timedelta(days=i)

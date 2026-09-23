@@ -185,8 +185,7 @@ def rollback_reject_preview(payload: dict):
     if not order_id:
         raise HTTPException(status_code=400, detail="Missing orderId")
     try:
-        res = OrderService.reject_order_preview(order_id, reason)
-        return {"success": True, "affectedProducts": []}
+        return OrderService.rollback_reject_preview(order_id, reason)
     except Exception as exc:
         logger.error(f"Error rolling back order '{order_id}': {exc}")
         raise HTTPException(status_code=500, detail=str(exc))

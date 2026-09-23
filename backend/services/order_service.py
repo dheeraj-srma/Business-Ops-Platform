@@ -1,7 +1,7 @@
 # backend/services/order_service.py
 import uuid
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional
 
 from repositories.order_repo import OrderRepository
@@ -86,12 +86,15 @@ class OrderService:
                 res = (
                     client.table("pending_orders")
                     .select("*")
-                    .neq("status", "Pending")
-                    .order("created_at", desc=True)
+                    .order("updated_at", desc=True)
                     .limit(500)
                     .execute()
                 )
-                raw_orders = res.data or []
+                all_raw_orders = res.data or []
+                raw_orders = [
+                    o for o in all_raw_orders
+                    if str(o.get("status", "")).strip().lower() not in ("pending", "pending_approval", "draft")
+                ]
                 order_ids = [o["order_id"] for o in raw_orders if o.get("order_id")]
                 
                 raw_items = []
@@ -127,11 +130,25 @@ class OrderService:
                         "created_at": it.get("created_at") or "",
                     })
 
+                def to_utc_iso(val: Any) -> str:
+                    if not val:
+                        return datetime.now(timezone.utc).isoformat()
+                    s = str(val).strip().replace(" ", "T")
+                    if s.endswith("+00:00") or s.endswith("Z"):
+                        return s
+                    if "+" in s:
+                        return s
+                    return s + "Z"
+
                 for o in raw_orders:
                     oid = o.get("order_id")
                     st = str(o.get("status", "")).upper()
                     is_confirmed = st in ("APPROVED", "CONFIRMED", "DISPATCHED", "DELIVERED", "COMPLETED", "PROCESSED")
                     o_items = item_map.get(oid, [])
+                    proc_ts = to_utc_iso(o.get("updated_at") or o.get("created_at"))
+                    c_ts = to_utc_iso(o.get("created_at"))
+                    u_ts = to_utc_iso(o.get("updated_at") or o.get("created_at"))
+
                     orders.append({
                         "id": str(o.get("id") or oid),
                         "order_id": oid,
@@ -144,14 +161,15 @@ class OrderService:
                         "total_amount": float(o.get("total_amount") or 0.0),
                         "source": "supabase",
                         "status": "CONFIRMED" if is_confirmed else "REJECTED",
-                        "processed_at": o.get("updated_at") or o.get("created_at") or datetime.now().isoformat(),
+                        "processed_at": proc_ts,
                         "processed_by_name": "Ops Manager",
                         "items_count": int(o.get("item_count") or len(o_items)),
                         "notes": o.get("notes"),
                         "rejection_reason": o.get("notes") if not is_confirmed else None,
-                        "created_at": o.get("created_at") or datetime.now().isoformat(),
-                        "updated_at": o.get("updated_at") or o.get("created_at") or datetime.now().isoformat(),
+                        "created_at": c_ts,
+                        "updated_at": u_ts,
                     })
+                orders.sort(key=lambda x: str(x.get("processed_at") or x.get("updated_at") or x.get("created_at") or ""), reverse=True)
             except Exception as exc:
                 logger.error(f"Error fetching order history from Supabase: {exc}")
 
@@ -251,15 +269,109 @@ class OrderService:
     @staticmethod
     def confirm_order_preview(order_id: str, resolved_items: Optional[List[dict]] = None, metadata: Optional[dict] = None) -> Dict[str, Any]:
         from supabase_client import get_supabase_client
+        from services.snapshot_service import SnapshotService
         client = get_supabase_client()
-        now_str = datetime.now().isoformat()
+        now_str = datetime.now(timezone.utc).isoformat()
+        affected_products = []
+
         if client:
             try:
-                client.table("pending_orders").update({
-                    "status": "Approved",
-                    "notes": "Confirmed by Operations Manager",
-                    "updated_at": now_str
-                }).eq("order_id", order_id).execute()
+                # Deduct physical stock if resolved_items provided
+                if resolved_items:
+                    for it in resolved_items:
+                        prod_id = it.get("productId")
+                        item_name = it.get("itemName")
+                        qty = float(it.get("quantity") or 0.0)
+                        price = float(it.get("price") or 0.0)
+
+                        actual_uuid = None
+                        if is_valid_uuid(prod_id):
+                            actual_uuid = prod_id
+                        elif prod_id:
+                            p_res = client.table("products").select("id").eq("sku", str(prod_id)).limit(1).execute()
+                            if p_res.data:
+                                actual_uuid = p_res.data[0]["id"]
+                        elif item_name:
+                            p_match = client.table("products").select("id, sku").eq("name", str(item_name)).limit(1).execute()
+                            if p_match.data:
+                                actual_uuid = p_match.data[0]["id"]
+
+                        if actual_uuid and qty > 0:
+                            inv_res = client.table("inventory").select("*").eq("product_id", actual_uuid).limit(1).execute()
+                            if inv_res.data:
+                                inv_row = inv_res.data[0]
+                                cur_hand = float(inv_row.get("quantity_on_hand") or 0.0)
+                                cur_res = float(inv_row.get("quantity_reserved") or 0.0)
+                                new_hand = max(0.0, cur_hand - qty)
+                                new_avail = max(0.0, new_hand - cur_res)
+
+                                client.table("inventory").update({
+                                    "quantity_on_hand": new_hand,
+                                    "updated_at": now_str
+                                }).eq("id", inv_row["id"]).execute()
+
+                                from repositories.transaction_repo import TransactionRepository
+                                TransactionRepository.record_stock_transaction({
+                                    "transaction_type": "sale",
+                                    "product_id": actual_uuid,
+                                    "location_id": inv_row.get("location_id") or DEFAULT_LOCATION_ID,
+                                    "quantity": qty,
+                                    "unit_cost": price,
+                                    "reference_type": "order",
+                                    "reference_id": order_id if is_valid_uuid(order_id) else None,
+                                    "transaction_date": now_str,
+                                    "notes": f"Sale order {order_id} confirmed for {(metadata or {}).get('shopName', 'Customer')}",
+                                    "created_at": now_str
+                                })
+
+                                affected_products.append({"id": actual_uuid, "currentStock": new_hand})
+
+                    SnapshotService.invalidate("inventory")
+                    SnapshotService.invalidate("inventory_transactions")
+
+                existing = client.table("pending_orders").select("order_id").eq("order_id", order_id).limit(1).execute()
+                if not existing.data:
+                    client.table("pending_orders").insert({
+                        "order_id": order_id,
+                        "salesman_name": (metadata or {}).get("salesmanName") or "Ops Manager",
+                        "salesman_id": (metadata or {}).get("salesmanId") or "TLY-SLM-001",
+                        "shop_name": (metadata or {}).get("shopName") or "Customer Store",
+                        "city": (metadata or {}).get("city"),
+                        "state": (metadata or {}).get("state"),
+                        "location_id": resolve_location_id((metadata or {}).get("locationId") or (metadata or {}).get("location_id")),
+                        "total_amount": float((metadata or {}).get("totalAmount") or 0.0),
+                        "status": "Approved",
+                        "notes": "Confirmed by Operations Manager",
+                        "created_at": (metadata or {}).get("created_at") or now_str,
+                        "updated_at": now_str,
+                        "item_count": len(resolved_items or [])
+                    }).execute()
+
+                    if resolved_items:
+                        items_to_insert = []
+                        for it in resolved_items:
+                            price_val = float(it.get("price") or 0.0)
+                            qty_val = float(it.get("quantity") or 1.0)
+                            items_to_insert.append({
+                                "order_id": order_id,
+                                "item_name": it.get("itemName") or "Product",
+                                "sku": it.get("productId") or "SKU",
+                                "quantity": qty_val,
+                                "price": price_val,
+                                "total_price": price_val * qty_val,
+                                "category": "General",
+                                "created_at": now_str
+                            })
+                        try:
+                            client.table("pending_order_items").insert(items_to_insert).execute()
+                        except Exception as it_err:
+                            logger.warning(f"Error inserting items for order {order_id}: {it_err}")
+                else:
+                    client.table("pending_orders").update({
+                        "status": "Approved",
+                        "notes": "Confirmed by Operations Manager",
+                        "updated_at": now_str
+                    }).eq("order_id", order_id).execute()
             except Exception as exc:
                 logger.warning(f"Error updating confirmed order in Supabase: {exc}")
 
@@ -272,49 +384,261 @@ class OrderService:
                 "processed_at": now_str,
                 "source": "supabase"
             },
-            "affectedProducts": []
+            "affectedProducts": affected_products
         }
 
     @staticmethod
     def reject_order_preview(order_id: str, reason: Optional[str] = None) -> Dict[str, Any]:
         from supabase_client import get_supabase_client
         client = get_supabase_client()
-        now_str = datetime.now().isoformat()
+        now_str = datetime.now(timezone.utc).isoformat()
         if client:
             try:
-                client.table("pending_orders").update({
-                    "status": "REJECTED",
-                    "notes": f"Rejected: {reason or 'Rejected by operations manager'}",
-                    "updated_at": now_str
-                }).eq("order_id", order_id).execute()
+                existing = client.table("pending_orders").select("order_id").eq("order_id", order_id).limit(1).execute()
+                if not existing.data:
+                    client.table("pending_orders").insert({
+                        "order_id": order_id,
+                        "salesman_name": "Ops Manager",
+                        "salesman_id": "TLY-SLM-001",
+                        "shop_name": "Customer Store",
+                        "total_amount": 0.0,
+                        "status": "REJECTED",
+                        "notes": f"Rejected: {reason or 'Rejected by operations manager'}",
+                        "created_at": now_str,
+                        "updated_at": now_str,
+                        "item_count": 0
+                    }).execute()
+                else:
+                    client.table("pending_orders").update({
+                        "status": "REJECTED",
+                        "notes": f"Rejected: {reason or 'Rejected by operations manager'}",
+                        "updated_at": now_str
+                    }).eq("order_id", order_id).execute()
             except Exception as exc:
                 logger.warning(f"Error updating rejected order in Supabase: {exc}")
 
-        return {"success": True}
+        return {
+            "success": True,
+            "processedOrder": {
+                "id": order_id,
+                "order_id": order_id,
+                "status": "REJECTED",
+                "processed_at": now_str,
+                "rejection_reason": reason or "Rejected by operations manager",
+                "source": "supabase"
+            }
+        }
+
+    @staticmethod
+    def rollback_reject_preview(order_id: str, reason: Optional[str] = None) -> Dict[str, Any]:
+        from supabase_client import get_supabase_client
+        from services.snapshot_service import SnapshotService
+        client = get_supabase_client()
+        now_str = datetime.now(timezone.utc).isoformat()
+        affected_products = []
+
+        if client:
+            try:
+                # Check previous status to see if stock needs restoration
+                order_res = client.table("pending_orders").select("*").eq("order_id", order_id).limit(1).execute()
+                prev_status = str(order_res.data[0].get("status", "")).upper() if order_res.data else ""
+
+                if prev_status in ("APPROVED", "CONFIRMED"):
+                    items_res = client.table("pending_order_items").select("*").eq("order_id", order_id).execute()
+                    for it in (items_res.data or []):
+                        qty = float(it.get("quantity") or 0.0)
+                        sku = it.get("sku")
+                        item_name = it.get("item_name")
+                        prod_id = None
+
+                        if sku:
+                            p_res = client.table("products").select("id").eq("sku", sku).limit(1).execute()
+                            if p_res.data:
+                                prod_id = p_res.data[0]["id"]
+                        if not prod_id and item_name:
+                            p_res = client.table("products").select("id").eq("name", item_name).limit(1).execute()
+                            if p_res.data:
+                                prod_id = p_res.data[0]["id"]
+
+                        if prod_id and qty > 0:
+                            inv_res = client.table("inventory").select("*").eq("product_id", prod_id).limit(1).execute()
+                            if inv_res.data:
+                                inv_row = inv_res.data[0]
+                                cur_hand = float(inv_row.get("quantity_on_hand") or 0.0)
+                                cur_res = float(inv_row.get("quantity_reserved") or 0.0)
+                                new_hand = cur_hand + qty
+                                new_avail = max(0.0, new_hand - cur_res)
+
+                                client.table("inventory").update({
+                                    "quantity_on_hand": new_hand,
+                                    "updated_at": now_str
+                                }).eq("id", inv_row["id"]).execute()
+
+                                from repositories.transaction_repo import TransactionRepository
+                                TransactionRepository.record_stock_transaction({
+                                    "transaction_type": "customer_return",
+                                    "product_id": prod_id,
+                                    "location_id": inv_row.get("location_id") or DEFAULT_LOCATION_ID,
+                                    "quantity": qty,
+                                    "unit_cost": float(it.get("price") or 0.0),
+                                    "reference_type": "order_rollback",
+                                    "reference_id": order_id if is_valid_uuid(order_id) else None,
+                                    "transaction_date": now_str,
+                                    "notes": f"Order {order_id} rollback & reject during grace window - stock restored",
+                                    "created_at": now_str
+                                })
+
+                                affected_products.append({"id": prod_id, "currentStock": new_hand})
+
+                    SnapshotService.invalidate("inventory")
+                    SnapshotService.invalidate("inventory_transactions")
+
+                client.table("pending_orders").update({
+                    "status": "REJECTED",
+                    "notes": f"Rejected (Rollback): {reason or 'Rejected during grace window'}",
+                    "updated_at": now_str
+                }).eq("order_id", order_id).execute()
+            except Exception as exc:
+                logger.warning(f"Error rolling back order in Supabase: {exc}")
+
+        return {
+            "success": True,
+            "processedOrder": {
+                "id": order_id,
+                "order_id": order_id,
+                "status": "REJECTED",
+                "processed_at": now_str,
+                "rejection_reason": reason or "Rejected during grace window",
+                "source": "supabase"
+            },
+            "affectedProducts": affected_products
+        }
 
     @staticmethod
     def reopen_order_preview(order_id: str) -> Dict[str, Any]:
         from supabase_client import get_supabase_client
+        from services.snapshot_service import SnapshotService
         client = get_supabase_client()
-        now_str = datetime.now().isoformat()
+        now_str = datetime.now(timezone.utc).isoformat()
+        affected_products = []
+        reopened_order: Dict[str, Any] = {
+            "order_id": order_id,
+            "status": "PENDING",
+            "source": "supabase",
+            "items": []
+        }
+
         if client:
             try:
+                # Retrieve order header and items
+                order_res = client.table("pending_orders").select("*").eq("order_id", order_id).limit(1).execute()
+                order_row = order_res.data[0] if order_res.data else {}
+                prev_status = str(order_row.get("status", "")).upper()
+
+                items_res = client.table("pending_order_items").select("*").eq("order_id", order_id).execute()
+                raw_items = items_res.data or []
+
+                # If previously approved, restore the deducted stock
+                if prev_status in ("APPROVED", "CONFIRMED"):
+                    for it in raw_items:
+                        qty = float(it.get("quantity") or 0.0)
+                        sku = it.get("sku")
+                        item_name = it.get("item_name")
+                        prod_id = None
+
+                        if sku:
+                            p_res = client.table("products").select("id").eq("sku", sku).limit(1).execute()
+                            if p_res.data:
+                                prod_id = p_res.data[0]["id"]
+                        if not prod_id and item_name:
+                            p_res = client.table("products").select("id").eq("name", item_name).limit(1).execute()
+                            if p_res.data:
+                                prod_id = p_res.data[0]["id"]
+
+                        if prod_id and qty > 0:
+                            inv_res = client.table("inventory").select("*").eq("product_id", prod_id).limit(1).execute()
+                            if inv_res.data:
+                                inv_row = inv_res.data[0]
+                                cur_hand = float(inv_row.get("quantity_on_hand") or 0.0)
+                                cur_res = float(inv_row.get("quantity_reserved") or 0.0)
+                                new_hand = cur_hand + qty
+                                new_avail = max(0.0, new_hand - cur_res)
+
+                                client.table("inventory").update({
+                                    "quantity_on_hand": new_hand,
+                                    "updated_at": now_str
+                                }).eq("id", inv_row["id"]).execute()
+
+                                from repositories.transaction_repo import TransactionRepository
+                                TransactionRepository.record_stock_transaction({
+                                    "transaction_type": "customer_return",
+                                    "product_id": prod_id,
+                                    "location_id": inv_row.get("location_id") or DEFAULT_LOCATION_ID,
+                                    "quantity": qty,
+                                    "unit_cost": float(it.get("price") or 0.0),
+                                    "reference_type": "order_reopen",
+                                    "reference_id": order_id if is_valid_uuid(order_id) else None,
+                                    "transaction_date": now_str,
+                                    "notes": f"Reopened order {order_id} - stock restored",
+                                    "created_at": now_str
+                                })
+
+                                affected_products.append({"id": prod_id, "currentStock": new_hand})
+
+                    SnapshotService.invalidate("inventory")
+                    SnapshotService.invalidate("inventory_transactions")
+
+                # Update status back to Pending
                 client.table("pending_orders").update({
                     "status": "Pending",
                     "notes": "Reopened: Reopened by Operations Manager",
                     "updated_at": now_str
                 }).eq("order_id", order_id).execute()
+
+                # Build full order object with items for the review drawer
+                preview_items = []
+                for it in raw_items:
+                    preview_items.append({
+                        "id": str(it.get("id")),
+                        "item_name": it.get("item_name") or it.get("sku") or "Product",
+                        "category": it.get("category") or "General",
+                        "quantity": float(it.get("quantity") or 0.0),
+                        "price": float(it.get("price") or 0.0),
+                        "total_price": float(it.get("total_price") or 0.0),
+                        "matched": True,
+                        "matchType": "EXACT",
+                        "matchedProductId": it.get("sku"),
+                        "matchedProductSku": it.get("sku"),
+                        "matchedProductName": it.get("item_name"),
+                        "currentStock": 100.0,
+                        "unit": "NOS",
+                        "hasSufficientStock": True,
+                    })
+
+                reopened_order = {
+                    "order_id": order_id,
+                    "salesman_id": order_row.get("salesman_id"),
+                    "salesman_name": order_row.get("salesman_name") or "Sales Representative",
+                    "shop_name": order_row.get("shop_name") or "Customer Store",
+                    "city": order_row.get("city"),
+                    "state": order_row.get("state"),
+                    "location_id": order_row.get("location_id"),
+                    "total_amount": float(order_row.get("total_amount") or 0.0),
+                    "created_at": order_row.get("created_at") or now_str,
+                    "source": "supabase",
+                    "status": "PENDING",
+                    "isDuplicate": False,
+                    "hasUnmatchedItems": False,
+                    "hasStockExceeded": False,
+                    "items": preview_items,
+                }
             except Exception as exc:
                 logger.warning(f"Error reopening order in Supabase: {exc}")
 
         return {
             "success": True,
-            "reopenedOrder": {
-                "order_id": order_id,
-                "status": "PENDING",
-                "source": "supabase"
-            },
-            "affectedProducts": []
+            "reopenedOrder": reopened_order,
+            "affectedProducts": affected_products
         }
 
 
@@ -806,7 +1130,7 @@ class OrderService:
     ) -> Dict[str, Any]:
         from supabase_client import get_supabase_client
         client = get_supabase_client()
-        now_str = datetime.now().isoformat()
+        now_str = datetime.now(timezone.utc).isoformat()
 
         order_dict = OrderRepository.get_order_by_id_with_items(order_id)
         if not order_dict:
@@ -888,7 +1212,7 @@ class OrderService:
     ) -> Dict[str, Any]:
         from supabase_client import get_supabase_client
         client = get_supabase_client()
-        now_str = datetime.now().isoformat()
+        now_str = datetime.now(timezone.utc).isoformat()
 
         order_dict = OrderRepository.get_order_by_id_with_items(order_id)
         if not order_dict:
@@ -943,7 +1267,7 @@ class OrderService:
         from repositories.inventory_repo import InventoryRepository
         from supabase_client import get_supabase_client
         client = get_supabase_client()
-        now_str = datetime.now().isoformat()
+        now_str = datetime.now(timezone.utc).isoformat()
 
         order_dict = OrderRepository.get_order_by_id_with_items(order_id)
         if not order_dict:

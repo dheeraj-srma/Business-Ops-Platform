@@ -34,6 +34,10 @@ class SalesmanService:
         return salesman_repo.get_salesman_detail(salesman_id=salesman_id, start_date=start_date, end_date=end_date)
 
     @staticmethod
+    def get_salesman_assigned_customers(salesman_id: str) -> List[Dict[str, Any]]:
+        return salesman_repo.get_salesman_assigned_customers(salesman_id=salesman_id)
+
+    @staticmethod
     def get_order_heatmap(salesman_id: Optional[str] = None, days_count: int = 365) -> Dict[str, Any]:
         return salesman_repo.get_order_heatmap_data(salesman_id=salesman_id, days_count=days_count)
 

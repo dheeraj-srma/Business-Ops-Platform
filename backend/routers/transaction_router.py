@@ -40,14 +40,26 @@ def list_transactions(
 
             sku = prod.get("sku") or "UNKNOWN"
             name = prod.get("name") or sku
+            notes_str = str(t.get("notes") or "")
             raw_type = str(t.get("transaction_type") or "adjustment").lower()
             t_type = raw_type.upper()
+            if t_type == "ADJUSTMENT":
+                notes_lower = notes_str.lower()
+                if any(kw in notes_lower for kw in ["delta: -", "variance: -", "decrease", "damage", "loss", "shrinkage", "theft", "scrap"]):
+                    t_type = "ADJUSTMENT_DECREASE"
+                elif any(kw in notes_lower for kw in ["delta: +", "variance: +", "opening quantity", "initial", "imported", "increase", "surplus"]):
+                    t_type = "ADJUSTMENT_INCREASE"
+                else:
+                    t_type = "ADJUSTMENT_INCREASE"
+
+            if type and type.upper() in ("ADJUSTMENT_INCREASE", "ADJUSTMENT_DECREASE") and t_type != type.upper():
+                continue
+
             qty = round(float(t.get("quantity") or 0.0), 4)
             cost = round(float(t.get("unit_cost") or 0.0), 2)
             total = round(qty * cost, 2)
             ts = t.get("transaction_date") or t.get("created_at") or ""
 
-            notes_str = str(t.get("notes") or "")
             actor_name = "Staff"
             if "By:" in notes_str:
                 parts = notes_str.split("By:")

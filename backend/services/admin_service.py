@@ -20,6 +20,7 @@ class AdminService:
 
         role_counts = {
             "admin": sum(1 for u in users if str(u.get("role")).lower() == "admin"),
+            "accountant": sum(1 for u in users if str(u.get("role")).lower() == "accountant"),
             "manager": sum(1 for u in users if str(u.get("role")).lower() == "manager"),
             "warehouse_manager": sum(1 for u in users if str(u.get("role")).lower() in ("warehouse_manager", "stock_manager")),
             "salesman": sum(1 for u in users if str(u.get("role")).lower() == "salesman"),
@@ -164,7 +165,6 @@ class AdminService:
 
         client.table("inventory").update({
             "quantity_on_hand": new_quantity,
-            "quantity_available": new_avail,
             "updated_at": datetime.utcnow().isoformat()
         }).eq("product_id", product_id).execute()
 

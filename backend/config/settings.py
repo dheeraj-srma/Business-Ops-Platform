@@ -20,6 +20,7 @@ class Settings:
     JWT_SECRET: str = os.getenv("JWT_SECRET", "nalka-metals-super-secret-jwt-key-2026")
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24 hours
+    PERSISTENT_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 30  # 30 days (Keep Me Logged In)
 
     # Explicit CORS origins for local frontends & production
     ALLOWED_ORIGINS: List[str] = [

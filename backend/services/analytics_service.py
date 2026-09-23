@@ -1,6 +1,6 @@
 # backend/services/analytics_service.py
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, List, Optional
 from repositories.inventory_repo import InventoryRepository
 from repositories.order_repo import OrderRepository
@@ -90,47 +90,93 @@ class AnalyticsService:
                     continue
 
                 t_notes_check = str(tx.get("notes") or "").lower()
-                is_opening_check = "opening quantity" in t_notes_check or "initial stock" in t_notes_check
-
-                if not is_opening_check:
-                    if tx_type in ("INWARD", "STOCK_IN", "CUSTOMER_RETURN", "RETURN_IN", "ADJUSTMENT_INCREASE"):
-                        stock_added_this_month += abs(qty)
-                    elif tx_type in ("SALE", "SALES", "STOCK_OUT", "DISPATCH", "RETURN_OUT", "ADJUSTMENT_DECREASE"):
+                if tx_type in ("INWARD", "STOCK_IN", "CUSTOMER_RETURN", "RETURN_IN", "ADJUSTMENT_INCREASE", "INITIAL_STOCK"):
+                    stock_added_this_month += abs(qty)
+                elif tx_type in ("SALE", "SALES", "STOCK_OUT", "DISPATCH", "RETURN_OUT", "ADJUSTMENT_DECREASE"):
+                    stock_issued_this_month += abs(qty)
+                elif "ADJUSTMENT" in tx_type:
+                    if "delta: -" in t_notes_check or "- " in t_notes_check or "loss" in t_notes_check or "damage" in t_notes_check:
                         stock_issued_this_month += abs(qty)
-                    elif "ADJUSTMENT" in tx_type:
-                        if "delta: -" in t_notes_check or "- " in t_notes_check:
-                            stock_issued_this_month += abs(qty)
-                        else:
-                            stock_added_this_month += abs(qty)
+                    else:
+                        stock_added_this_month += abs(qty)
 
-            if len(recent_movements) < 10:
+            if len(recent_movements) < 15:
                 prod = tx.get("products") or {}
                 if isinstance(prod, list) and prod:
                     prod = prod[0]
                 elif not isinstance(prod, dict):
                     prod = {}
 
+                pid = tx.get("product_id") or tx.get("productId") or ""
+                if (not prod.get("name") or not prod.get("sku")) and pid:
+                    matching_p = next((p for p in active_products if str(p.get("id")) == str(pid) or str(p.get("sku")) == str(pid)), None)
+                    if matching_p:
+                        prod = {
+                            "id": matching_p.get("id"),
+                            "sku": matching_p.get("sku"),
+                            "name": matching_p.get("name"),
+                            "brand": matching_p.get("brand") or matching_p.get("Category") or matching_p.get("categoryName"),
+                            "unit_of_measure": matching_p.get("unit") or matching_p.get("unit_of_measure")
+                        }
+
+                p_sku = prod.get("sku") or tx.get("productSku") or ""
+                p_name = prod.get("name") or tx.get("productName") or p_sku or "Inventory Item"
+                p_brand = prod.get("brand") or tx.get("categoryName") or "General"
+                p_unit = prod.get("unit_of_measure") or tx.get("unit") or "NOS"
+
+                notes_str = str(tx.get("notes") or "")
+                ref_num = tx.get("client_reference") or tx.get("reference_id") or tx.get("reference_number") or tx.get("referenceNumber") or ""
+                if not ref_num or ref_num == "-":
+                    if "Ref:" in notes_str:
+                        ref_num = notes_str.split("Ref:")[1].split("|")[0].strip()
+                    elif "initial" in notes_str.lower():
+                        ref_num = "INITIAL-SETUP"
+                    elif tx.get("reference_type"):
+                        ref_num = str(tx.get("reference_type")).upper()
+                    else:
+                        ref_num = "-"
+
+                supp_rec = tx.get("supplier_or_recipient") or tx.get("supplierOrRecipient") or ""
+                if not supp_rec or supp_rec == "-":
+                    if "Supplier:" in notes_str:
+                        supp_rec = notes_str.split("Supplier:")[1].split("|")[0].strip()
+                    elif "Recipient:" in notes_str:
+                        supp_rec = notes_str.split("Recipient:")[1].split("|")[0].strip()
+                    elif notes_str:
+                        supp_rec = notes_str.split("|")[0].strip()
+                    else:
+                        supp_rec = "-"
+
+                actor = tx.get("created_by_name") or tx.get("createdByName") or tx.get("performed_by") or ""
+                if not actor or actor == "None":
+                    if "By:" in notes_str:
+                        actor = notes_str.split("By:")[1].split("|")[0].strip()
+                    else:
+                        actor = "Admin"
+
+                raw_ts = tx.get("transaction_date") or tx.get("created_at") or datetime.now(timezone.utc).isoformat()
+
                 recent_movements.append({
                     "id": str(tx.get("id")),
-                    "productId": tx.get("product_id") or tx.get("productId") or "",
-                    "product_id": tx.get("product_id") or tx.get("productId") or "",
-                    "productName": prod.get("name") or tx.get("productName") or "Inventory Item",
-                    "productSku": prod.get("sku") or tx.get("productSku") or "",
-                    "categoryName": prod.get("brand") or tx.get("categoryName") or "General",
+                    "productId": str(pid),
+                    "product_id": str(pid),
+                    "productName": p_name,
+                    "productSku": p_sku,
+                    "categoryName": p_brand,
                     "transactionType": tx_type,
                     "transaction_type": tx_type,
                     "quantity": qty,
-                    "unit": tx.get("unit") or prod.get("unit_of_measure") or "NOS",
+                    "unit": p_unit,
                     "newStock": float(tx.get("new_stock") or tx.get("newStock") or qty),
                     "new_stock": float(tx.get("new_stock") or tx.get("newStock") or qty),
-                    "referenceNumber": tx.get("reference_number") or tx.get("referenceNumber") or tx.get("reference_type") or "-",
-                    "reference_number": tx.get("reference_number") or tx.get("referenceNumber") or tx.get("reference_type") or "-",
-                    "supplierOrRecipient": tx.get("supplier_or_recipient") or tx.get("supplierOrRecipient") or tx.get("notes") or "-",
-                    "supplier_or_recipient": tx.get("supplier_or_recipient") or tx.get("supplierOrRecipient") or tx.get("notes") or "-",
-                    "createdByName": tx.get("created_by_name") or tx.get("createdByName") or "Admin",
-                    "created_by_name": tx.get("created_by_name") or tx.get("createdByName") or "Admin",
-                    "createdAt": tx.get("created_at") or tx.get("transaction_date") or datetime.utcnow().isoformat(),
-                    "created_at": tx.get("created_at") or tx.get("transaction_date") or datetime.utcnow().isoformat(),
+                    "referenceNumber": ref_num,
+                    "reference_number": ref_num,
+                    "supplierOrRecipient": supp_rec,
+                    "supplier_or_recipient": supp_rec,
+                    "createdByName": actor,
+                    "created_by_name": actor,
+                    "createdAt": raw_ts,
+                    "created_at": raw_ts,
                 })
 
         # Generate trend for requested date range or last N days
@@ -169,17 +215,12 @@ class AnalyticsService:
                     if t_type in ("RESERVATION", "RESERVATION_RELEASE"):
                         continue
 
-                    is_opening = "opening quantity" in t_notes or "initial stock" in t_notes
-                    if is_opening:
-                        adj += t_qty
-                        continue
-
-                    if t_type in ("INWARD", "STOCK_IN", "CUSTOMER_RETURN", "RETURN_IN", "ADJUSTMENT_INCREASE"):
+                    if t_type in ("INWARD", "STOCK_IN", "CUSTOMER_RETURN", "RETURN_IN", "ADJUSTMENT_INCREASE", "INITIAL_STOCK"):
                         s_in += t_qty
                     elif t_type in ("SALE", "SALES", "STOCK_OUT", "DISPATCH", "RETURN_OUT", "ADJUSTMENT_DECREASE"):
                         s_out += t_qty
                     elif "ADJUSTMENT" in t_type:
-                        if "delta: -" in t_notes or "- " in t_notes:
+                        if "delta: -" in t_notes or "- " in t_notes or "loss" in t_notes or "damage" in t_notes:
                             s_out += t_qty
                         else:
                             s_in += t_qty
@@ -528,7 +569,7 @@ class AnalyticsService:
                     start_date=start_date, end_date=end_date,
                     salesman=salesman, category=category
                 )
-                latest_date_seen = hist_kpis["latest_date"] or "2026-09-21"
+                latest_date_seen = hist_kpis["latest_date"] or datetime.utcnow().strftime("%Y-%m-%d")
                 return_val = hist_kpis["returns_value"]
                 return_count = hist_kpis["returns_count"]
                 return_rate = round((return_val / total_revenue * 100), 2) if total_revenue > 0 else 0.0
@@ -643,7 +684,7 @@ class AnalyticsService:
                     start_date=start_date, end_date=end_date
                 ),
                 "ai_insights": [
-                    { "type": "info", "title": "Authoritative Historical Foundation", "message": f"Verified {total_orders:,} historical sales vouchers (Rs. {total_revenue:,.2f}) spanning 2026-06-01 through 2026-09-21." },
+                    { "type": "info", "title": "Authoritative Historical Foundation", "message": f"Verified {total_orders:,} historical sales vouchers (Rs. {total_revenue:,.2f}) — data through {latest_date_seen}." },
                     { "type": "success" if health_score >= 80 else "warning", "title": "Inventory Integrity Safeguard", "message": f"Historical sales demand ledger operates independently with 0 mutations to current stock ({total_skus:,} SKUs active)." }
                 ]
             }

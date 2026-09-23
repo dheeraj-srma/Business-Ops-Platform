@@ -91,19 +91,6 @@ CITIES_BY_STATE: Dict[str, List[Dict[str, Any]]] = {
     ]
 }
 
-# Load dynamic district centers from JSON
-import os
-import json
-
-DISTRICT_CENTERS_MAP: Dict[str, Dict[str, Any]] = {}
-try:
-    _json_path = os.path.join(os.path.dirname(__file__), '..', '..', 'nextjs_app', 'public', 'district_centers.json')
-    if os.path.exists(_json_path):
-        with open(_json_path, 'r', encoding='utf-8') as _f:
-            DISTRICT_CENTERS_MAP = json.load(_f)
-except Exception as _e:
-    logger.warning(f"Could not load district_centers.json: {_e}")
-
 class GeographyRepository:
 
     @staticmethod
@@ -126,12 +113,20 @@ class GeographyRepository:
         if time_range == 'today':
             cutoff = today.isoformat()
             return [o for o in orders if str(o.get("order_date") or o.get("created_at") or "")[:10] == cutoff]
-        elif time_range == '7d':
+        elif time_range == 'yesterday':
+            cutoff = (today - timedelta(days=1)).isoformat()
+            return [o for o in orders if str(o.get("order_date") or o.get("created_at") or "")[:10] == cutoff]
+        elif time_range in ['7d', 'this_week']:
             cutoff = (today - timedelta(days=6)).isoformat()
             return [o for o in orders if str(o.get("order_date") or o.get("created_at") or "")[:10] >= cutoff]
-        elif time_range == '30d':
+        elif time_range in ['30d', 'this_month']:
             cutoff = (today - timedelta(days=29)).isoformat()
             return [o for o in orders if str(o.get("order_date") or o.get("created_at") or "")[:10] >= cutoff]
+        elif time_range == 'last_month':
+            first_this_month = today.replace(day=1)
+            last_month_end = first_this_month - timedelta(days=1)
+            last_month_start = last_month_end.replace(day=1)
+            return [o for o in orders if last_month_start.isoformat() <= str(o.get("order_date") or o.get("created_at") or "")[:10] <= last_month_end.isoformat()]
         elif time_range == '90d':
             cutoff = (today - timedelta(days=89)).isoformat()
             return [o for o in orders if str(o.get("order_date") or o.get("created_at") or "")[:10] >= cutoff]
@@ -146,82 +141,69 @@ class GeographyRepository:
         all_orders = OrderRepository.get_orders(limit=1000)
         filtered_orders = cls._filter_orders_by_range(all_orders, time_range)
 
-        # Build dealer lookup
+        # Build dealer lookup dynamically without defaulting missing states to Haryana
         dealer_map: Dict[str, Dict[str, Any]] = {}
         state_dealers: Dict[str, List[Dict[str, Any]]] = {}
         for d in dealers:
-            st = d.get("State") or "Haryana"
-            if st not in state_dealers:
-                state_dealers[st] = []
-            state_dealers[st].append(d)
+            st = d.get("State") or d.get("state")
+            if st:
+                if st in ['Delhi', 'NCT of Delhi']:
+                    st = 'Delhi'
+                if st not in state_dealers:
+                    state_dealers[st] = []
+                state_dealers[st].append(d)
+
             name_key = str(d.get("Shop Name") or d.get("Name") or "").strip().lower()
             if name_key:
-                dealer_map[name_key] = {"state": st, "city": d.get("City") or "Faridabad"}
+                dealer_map[name_key] = {"state": st, "city": d.get("City") or d.get("city")}
 
-        # If orders exist, aggregate real state data
+        # Aggregate order sales by state
         state_sales_map: Dict[str, Dict[str, Any]] = {}
         for st_name in STATE_COORDINATES.keys():
             if st_name == 'NCT of Delhi':
                 continue
             state_sales_map[st_name] = {"revenue": 0.0, "orders": 0}
 
-        has_matching_orders = False
+        unresolved_revenue = 0.0
+        unresolved_orders = 0
+
         for o in filtered_orders:
             cust = str(o.get("customer_name") or o.get("customer_id") or o.get("shop_name") or "").strip().lower()
             matched = dealer_map.get(cust) or {}
-            st = o.get("state") or matched.get("state") or "Haryana"
+            st = o.get("state") or matched.get("state")
             if st in ['Delhi', 'NCT of Delhi']:
                 st = 'Delhi'
-            if st in state_sales_map:
-                amt = float(o.get("total_amount") or 0.0)
+
+            amt = float(o.get("total_amount") or 0.0)
+            if st and st in state_sales_map:
                 state_sales_map[st]["revenue"] += amt
                 state_sales_map[st]["orders"] += 1
-                has_matching_orders = True
+            else:
+                unresolved_revenue += amt
+                unresolved_orders += 1
 
-        total_dealers_count = len(dealers) if dealers else 804
+        total_dealers_count = len(dealers)
+        total_state_sales = sum(s["revenue"] for s in state_sales_map.values())
+        total_gross_sales = total_state_sales + unresolved_revenue
+        total_orders_count = sum(s["orders"] for s in state_sales_map.values()) + unresolved_orders
 
-        if has_matching_orders:
-            total_gross_sales = sum(s["revenue"] for s in state_sales_map.values())
-            total_orders_count = sum(s["orders"] for s in state_sales_map.values())
-
-            states_list = []
-            for st_name, s_data in state_sales_map.items():
-                cfg = STATE_COORDINATES.get(st_name, DEFAULT_STATE_CONFIG)
-                st_rev = round(s_data["revenue"], 2)
-                st_share = round((st_rev / total_gross_sales * 100), 1) if total_gross_sales > 0 else 0.0
-                st_dealers_count = len(state_dealers.get(st_name, []))
-                states_list.append({
-                    'name': st_name,
-                    'code': cfg['code'],
-                    'revenue': st_rev,
-                    'orders': s_data["orders"],
-                    'dealers': st_dealers_count,
-                    'share': st_share,
-                    'color': cfg['color'],
-                    'center': cfg['center'],
-                    'zoom': cfg['zoom']
-                })
-        else:
-            # When order collection has no transactions in range, return zero revenue with actual dealer counts
-            total_gross_sales = 0.0
-            total_orders_count = 0
-
-            states_list = []
-            for st_name, cfg in STATE_COORDINATES.items():
-                if st_name == 'NCT of Delhi':
-                    continue
-                st_dealers_count = len(state_dealers.get(st_name, []))
-                states_list.append({
-                    'name': st_name,
-                    'code': cfg['code'],
-                    'revenue': 0.0,
-                    'orders': 0,
-                    'dealers': st_dealers_count,
-                    'share': 0.0,
-                    'color': cfg['color'],
-                    'center': cfg['center'],
-                    'zoom': cfg['zoom']
-                })
+        states_list = []
+        for st_name, s_data in state_sales_map.items():
+            cfg = STATE_COORDINATES.get(st_name, DEFAULT_STATE_CONFIG)
+            st_rev = round(s_data["revenue"], 2)
+            st_share = round((st_rev / total_gross_sales * 100), 1) if total_gross_sales > 0 else 0.0
+            st_dealers_count = len(state_dealers.get(st_name, []))
+            states_list.append({
+                'name': st_name,
+                'code': cfg['code'],
+                'revenue': st_rev,
+                'orders': s_data["orders"],
+                'dealers': st_dealers_count,
+                'share': st_share,
+                'color': cfg['color'],
+                'center': cfg['center'],
+                'zoom': cfg['zoom']
+            })
 
         states_list.sort(key=lambda s: s['revenue'], reverse=True)
 
@@ -231,7 +213,9 @@ class GeographyRepository:
             'gross_sales': round(total_gross_sales, 2),
             'orders': total_orders_count,
             'customers': total_dealers_count,
-            'active_states': len(states_list),
+            'unresolved_sales': round(unresolved_revenue, 2),
+            'unresolved_orders': unresolved_orders,
+            'active_states': len([s for s in states_list if s['revenue'] > 0 or s['dealers'] > 0]),
             'center': [78.9629, 22.5937],
             'zoom': 1.0,
             'states': states_list
@@ -245,11 +229,10 @@ class GeographyRepository:
 
         normalized_state = 'Delhi' if state_name in ['Delhi', 'NCT of Delhi'] else state_name
         st_cfg = STATE_COORDINATES.get(normalized_state, DEFAULT_STATE_CONFIG)
-        st_dealers = [d for d in dealers if (d.get("State") or "Haryana") in [normalized_state, state_name]]
+        st_dealers = [d for d in dealers if (d.get("State") or d.get("state")) in [normalized_state, state_name]]
 
         # Available cities config
         available_cities = CITIES_BY_STATE.get(normalized_state, [{'name': f"{normalized_state} Central", 'center': st_cfg['center'], 'zoom': 9.0}])
-        city_names = [c['name'] for c in available_cities]
 
         # Calculate city breakdown from real orders if available
         city_stats: Dict[str, Dict[str, Any]] = {c['name']: {"revenue": 0.0, "orders": 0, "units_sold": 0.0, "dealers": set()} for c in available_cities}
@@ -261,6 +244,11 @@ class GeographyRepository:
             amt = float(o.get("total_amount") or 0.0)
             qty = float(o.get("total_quantity") or o.get("quantity") or 0.0)
             c_name = o.get("city")
+            o_state = o.get("state") or ('Delhi' if o.get("city") in ['Central Delhi', 'South Delhi', 'North Delhi', 'West Delhi', 'Dwarka'] else None)
+            
+            if o_state and o_state != normalized_state:
+                continue
+
             if c_name and c_name in city_stats:
                 city_stats[c_name]["revenue"] += amt
                 city_stats[c_name]["orders"] += 1
@@ -273,40 +261,22 @@ class GeographyRepository:
                 st_units += qty
 
         cities_list = []
-        if st_rev > 0:
-            for c_cfg in available_cities:
-                c_data = city_stats[c_cfg['name']]
-                c_rev = round(c_data["revenue"], 2)
-                c_share = round((c_rev / st_rev * 100), 1) if st_rev > 0 else 0.0
-                cities_list.append({
-                    'name': c_cfg['name'],
-                    'revenue': c_rev,
-                    'orders': c_data["orders"],
-                    'dealers': len(c_data["dealers"]),
-                    'units_sold': round(c_data["units_sold"], 2),
-                    'share': c_share,
-                    'center': c_cfg['center'],
-                    'zoom': c_cfg['zoom']
-                })
-        else:
-            # When state has no orders in active range, return zero revenue
-            st_rev = 0.0
-            st_orders = 0
-            st_units = 0.0
-
-            cities_list = []
-            for c_cfg in available_cities:
-                c_dealers = [d for d in st_dealers if str(d.get("City") or "").lower() == c_cfg['name'].lower()]
-                cities_list.append({
-                    'name': c_cfg['name'],
-                    'revenue': 0.0,
-                    'orders': 0,
-                    'dealers': len(c_dealers),
-                    'units_sold': 0.0,
-                    'share': 0.0,
-                    'center': c_cfg['center'],
-                    'zoom': c_cfg['zoom']
-                })
+        for c_cfg in available_cities:
+            c_data = city_stats[c_cfg['name']]
+            c_rev = round(c_data["revenue"], 2)
+            c_share = round((c_rev / st_rev * 100), 1) if st_rev > 0 else 0.0
+            c_dealers = [d for d in st_dealers if str(d.get("City") or d.get("city") or "").lower() == c_cfg['name'].lower()]
+            
+            cities_list.append({
+                'name': c_cfg['name'],
+                'revenue': c_rev,
+                'orders': c_data["orders"],
+                'dealers': len(c_data["dealers"]) or len(c_dealers),
+                'units_sold': round(c_data["units_sold"], 2),
+                'share': c_share,
+                'center': c_cfg['center'],
+                'zoom': c_cfg['zoom']
+            })
 
         cities_list.sort(key=lambda c: c['revenue'], reverse=True)
 
@@ -316,7 +286,7 @@ class GeographyRepository:
             'code': st_cfg['code'],
             'gross_sales': round(st_rev, 2),
             'orders': st_orders,
-            'customers': len(st_dealers) or len(dealers),
+            'customers': len(st_dealers),
             'units_sold': round(st_units, 2),
             'center': st_cfg['center'],
             'zoom': st_cfg['zoom'],
@@ -332,12 +302,13 @@ class GeographyRepository:
 
         # Find city config across states
         c_cfg = None
-        found_state = state_name or 'Haryana'
+        found_state = state_name
         for st, c_list in CITIES_BY_STATE.items():
             for c in c_list:
                 if c['name'].lower() == city_name.lower():
                     c_cfg = c
-                    found_state = st
+                    if not found_state:
+                        found_state = st
                     break
             if c_cfg:
                 break
@@ -345,10 +316,10 @@ class GeographyRepository:
         if not c_cfg:
             c_cfg = {'name': city_name, 'center': [77.3178, 28.4089], 'zoom': 9.5}
 
+        found_state = found_state or 'Unassigned'
+
         # Match dealers in this city
-        city_dealers = [d for d in dealers if str(d.get("City") or "").lower() == city_name.lower()]
-        if not city_dealers:
-            city_dealers = [d for d in dealers if (d.get("State") or "Haryana") in [found_state, 'Delhi' if found_state == 'NCT of Delhi' else found_state]][:15]
+        city_dealers = [d for d in dealers if str(d.get("City") or d.get("city") or "").lower() == city_name.lower()]
 
         # Aggregate city orders
         city_orders_list = [o for o in filtered_orders if str(o.get("city") or "").lower() == city_name.lower()]
@@ -358,9 +329,9 @@ class GeographyRepository:
 
         center_lng, center_lat = c_cfg['center']
         customers_list = []
-        for i, d in enumerate(city_dealers[:25]):
+        for i, d in enumerate(city_dealers):
             shop_name = d.get("Shop Name") or d.get("Name") or f"Dealer {i+1}"
-            salesman_name = d.get("Salesman Name") or "ANKIT"
+            salesman_name = d.get("Salesman Name") or "Unassigned"
             phone = d.get("Phone") or "—"
             cust_id = str(d.get("Location ID") or d.get("id") or f"CUST-10{24 + i}")
 
@@ -369,9 +340,6 @@ class GeographyRepository:
             c_rev = round(sum(float(o.get("total_amount") or 0.0) for o in c_orders_list), 2)
             c_orders = len(c_orders_list)
             c_units = round(sum(float(o.get("total_quantity") or o.get("quantity") or 0.0) for o in c_orders_list), 2)
-
-            offset_lat = ((i * 7 + 3) % 17 - 8) * 0.008
-            offset_lng = ((i * 11 + 5) % 19 - 9) * 0.008
 
             customers_list.append({
                 'id': cust_id,
@@ -384,7 +352,7 @@ class GeographyRepository:
                 'orders': c_orders,
                 'avg_order': round(c_rev / c_orders, 2) if c_orders > 0 else 0.0,
                 'units_sold': c_units,
-                'coords': [round(center_lng + offset_lng, 4), round(center_lat + offset_lat, 4)]
+                'coords': [center_lng, center_lat]
             })
 
         customers_list.sort(key=lambda x: x['revenue'], reverse=True)
@@ -414,13 +382,11 @@ class GeographyRepository:
             if str(d.get("Shop Name") or d.get("Name")) == customer_id or str(d.get("Location ID") or d.get("id")) == customer_id:
                 matched_dealer = d
                 break
-        if not matched_dealer and dealers:
-            matched_dealer = dealers[0]
 
         shop_name = matched_dealer.get("Shop Name") or matched_dealer.get("Name") if matched_dealer else customer_id
-        salesman_name = matched_dealer.get("Salesman Name") if matched_dealer else "Rahul"
-        st_name = matched_dealer.get("State") if matched_dealer else "Haryana"
-        ct_name = matched_dealer.get("City") if matched_dealer else "Faridabad"
+        salesman_name = matched_dealer.get("Salesman Name") if matched_dealer else "Unassigned"
+        st_name = matched_dealer.get("State") if matched_dealer else "Unresolved"
+        ct_name = matched_dealer.get("City") if matched_dealer else "Unresolved"
 
         cust_orders = [o for o in filtered_orders if str(o.get("customer_name") or o.get("shop_name") or "").lower() == str(shop_name).lower()]
         cust_sales = round(sum(float(o.get("total_amount") or 0.0) for o in cust_orders), 2)
@@ -441,3 +407,4 @@ class GeographyRepository:
             'units_sold': units_sold,
             'top_products': []
         }
+

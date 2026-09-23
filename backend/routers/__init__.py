@@ -19,6 +19,8 @@ from . import salesman_router
 from . import geography_router
 from . import settings_router
 
+from . import coupon_router
+
 __all__ = [
     "auth_router",
     "product_router",
@@ -37,4 +39,5 @@ __all__ = [
     "salesman_router",
     "geography_router",
     "settings_router",
+    "coupon_router",
 ]

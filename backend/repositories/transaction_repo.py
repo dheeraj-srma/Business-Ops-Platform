@@ -48,7 +48,7 @@ class TransactionRepository:
                         query = query.in_("transaction_type", ["inward", "return_in"])
                     elif tt_clean in ("sale", "stock_out"):
                         query = query.in_("transaction_type", ["sale", "return_out"])
-                    elif tt_clean == "adjustment":
+                    elif tt_clean in ("adjustment", "adjustment_increase", "adjustment_decrease"):
                         query = query.eq("transaction_type", "adjustment")
                     elif tt_clean in ("return", "customer_return", "return_in"):
                         query = query.eq("transaction_type", "return_in")
@@ -99,6 +99,41 @@ class TransactionRepository:
         Enforces unsigned magnitude quantity (quantity >= 0), DB enum alignment,
         atomic snapshot invalidation on success, and failure propagation.
         """
+        from datetime import datetime, timezone
+        now_iso = datetime.now(timezone.utc).isoformat()
+        if not transaction_data.get("transaction_date"):
+            transaction_data["transaction_date"] = now_iso
+        if not transaction_data.get("created_at"):
+            transaction_data["created_at"] = now_iso
+
+        # Map input transaction types to valid PostgreSQL enum values
+        raw_tt = str(transaction_data.get("transaction_type") or "adjustment").lower().strip()
+        if raw_tt in ("inward", "stock_in", "initial_stock"):
+            transaction_data["transaction_type"] = "inward"
+        elif raw_tt in ("sale", "sales", "stock_out", "dispatch"):
+            transaction_data["transaction_type"] = "sale"
+        elif raw_tt in ("customer_return", "return_in", "return"):
+            transaction_data["transaction_type"] = "return_in"
+        elif raw_tt in ("supplier_return", "return_out"):
+            transaction_data["transaction_type"] = "return_out"
+        elif "adjustment" in raw_tt:
+            transaction_data["transaction_type"] = "adjustment"
+        else:
+            transaction_data["transaction_type"] = raw_tt
+
+        # Map input reference types to valid database check constraints
+        raw_ref = str(transaction_data.get("reference_type") or "order").lower().strip()
+        if raw_ref in ("order_rollback", "order_reopen", "customer_return", "return_in", "return_out", "return"):
+            transaction_data["reference_type"] = "return"
+        elif raw_ref in ("order", "sale", "sales", "dispatch"):
+            transaction_data["reference_type"] = "order"
+        elif raw_ref in ("inward", "purchase_order", "po", "initial"):
+            transaction_data["reference_type"] = "inward"
+        elif "adjustment" in raw_ref:
+            transaction_data["reference_type"] = "adjustment"
+        else:
+            transaction_data["reference_type"] = raw_ref
+
         # Enforce non-negative quantity magnitude
         raw_qty = float(transaction_data.get("quantity") or 0.0)
         transaction_data["quantity"] = abs(raw_qty)
@@ -150,14 +185,16 @@ class TransactionRepository:
         notes: str = None
     ) -> Dict[str, Any]:
         import uuid
-        from datetime import datetime
+        from datetime import datetime, timezone
+        now_iso = datetime.now(timezone.utc).isoformat()
         tx_data = {
             "id": str(uuid.uuid4()),
             "product_id": product_id,
             "transaction_type": transaction_type,
             "quantity": abs(quantity),
             "notes": f"{reason} | {supplier_or_recipient} | Ref: {reference_number} | {notes or ''}",
-            "created_at": datetime.utcnow().isoformat()
+            "transaction_date": now_iso,
+            "created_at": now_iso
         }
         return TransactionRepository.record_stock_transaction(tx_data)
 
