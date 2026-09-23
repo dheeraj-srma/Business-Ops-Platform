@@ -634,21 +634,6 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               </div>
             )}
 
-            {/* Dedicated Data Exchange Button (JSON, XML, Excel, CSV) */}
-            <button
-              type="button"
-              id="btn-inventory-data-exchange"
-              onClick={() => setIsDataExchangeModalOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 transition-all cursor-pointer shadow-2xs group"
-              title="Open Data Exchange: Import and Export catalog in JSON, XML, Excel, and CSV formats"
-            >
-              <ArrowUpDown className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 group-hover:scale-110 transition-transform" />
-              <span>Data Exchange</span>
-              <span className="text-[10px] py-0.2 px-1 bg-white dark:bg-slate-800 rounded text-indigo-600 dark:text-indigo-400 font-mono text-[9px] ml-0.5 font-bold border border-indigo-100 dark:border-indigo-900/60">
-                JSON • XML • XLS
-              </span>
-            </button>
-
             {/* Full Screen Toggle Button */}
             <button
               type="button"
