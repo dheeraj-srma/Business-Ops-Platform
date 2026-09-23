@@ -192,6 +192,17 @@ export default function ProcurementPage() {
           title="Purchase Spend Trend Over Time"
           subtitle="Authoritative procurement spend timeline tracking historical purchase vouchers"
           data={spendTrendData}
+          fetchData={async (bounds) => {
+            const res = await fetch(`/api/analytics/procurement?start_date=${bounds.start}&end_date=${bounds.end}`);
+            if (!res.ok) return [];
+            const d = await res.json();
+            return (d?.timeline || []).map((t: any) => ({
+              name: fmtDayMonth(t.date),
+              date: t.date,
+              value: t.value,
+              purchases: t.purchases,
+            }));
+          }}
           defaultChartType="area"
           unit="₹"
           isHero={true}
@@ -205,6 +216,15 @@ export default function ProcurementPage() {
           title="Supplier Spend Contribution"
           subtitle="Total procurement purchase capital allocation split by primary manufacturing partner"
           data={supplierSpendData}
+          fetchData={async (bounds) => {
+            const res = await fetch(`/api/analytics/procurement?start_date=${bounds.start}&end_date=${bounds.end}`);
+            if (!res.ok) return [];
+            const d = await res.json();
+            return (d?.top_suppliers || []).map((s: any) => ({
+              name: s.supplier.length > 22 ? s.supplier.slice(0, 22) + '…' : s.supplier,
+              value: s.value,
+            }));
+          }}
           defaultChartType="horizontal_bar"
           unit="₹"
           statusBadge="LIVE"
@@ -214,6 +234,15 @@ export default function ProcurementPage() {
           title="Purchase Value by Category"
           subtitle="Procurement spend split across primary product lines"
           data={categoryPurchData}
+          fetchData={async (bounds) => {
+            const res = await fetch(`/api/analytics/procurement?start_date=${bounds.start}&end_date=${bounds.end}`);
+            if (!res.ok) return [];
+            const d = await res.json();
+            return (d?.by_category || []).map((c: any) => ({
+              name: c.category.length > 20 ? c.category.slice(0, 20) + '…' : c.category,
+              value: c.value,
+            }));
+          }}
           defaultChartType="donut"
           unit="₹"
           statusBadge="LIVE"
@@ -223,6 +252,16 @@ export default function ProcurementPage() {
           title="Monthly Sourcing Capital Outflow"
           subtitle="Monthly procurement expenditure and inward voucher volume trajectory"
           data={monthlyOutflowData}
+          fetchData={async (bounds) => {
+            const res = await fetch(`/api/analytics/procurement?start_date=${bounds.start}&end_date=${bounds.end}`);
+            if (!res.ok) return [];
+            const d = await res.json();
+            return (d?.monthly_outflow || []).map((m: any) => ({
+              name: m.month,
+              value: m.value,
+              vouchers: m.vouchers,
+            }));
+          }}
           defaultChartType="bar"
           unit="₹"
           statusBadge="LIVE"
@@ -232,6 +271,16 @@ export default function ProcurementPage() {
           title="Consignment Value Distribution"
           subtitle="Authoritative purchase voucher ticket size tier allocation"
           data={consignmentBracketData}
+          fetchData={async (bounds) => {
+            const res = await fetch(`/api/analytics/procurement?start_date=${bounds.start}&end_date=${bounds.end}`);
+            if (!res.ok) return [];
+            const d = await res.json();
+            return (d?.consignment_brackets || []).map((b: any) => ({
+              name: b.name,
+              value: b.value,
+              count: b.count,
+            }));
+          }}
           defaultChartType="donut"
           unit="₹"
           statusBadge="LIVE"
@@ -241,6 +290,18 @@ export default function ProcurementPage() {
           title="Top Procured Items by Volume"
           subtitle="Authoritative purchase line items ranking by inward units ordered"
           data={topItemsByVolumeData}
+          fetchData={async (bounds) => {
+            const res = await fetch(`/api/analytics/procurement?start_date=${bounds.start}&end_date=${bounds.end}`);
+            if (!res.ok) return [];
+            const d = await res.json();
+            return [...(d?.by_category || [])]
+              .sort((a: any, b: any) => b.quantity - a.quantity)
+              .slice(0, 20)
+              .map((i: any) => ({
+                name: i.category.length > 22 ? i.category.slice(0, 22) + '…' : i.category,
+                value: Math.round(i.quantity),
+              }));
+          }}
           defaultChartType="horizontal_bar"
           unit="units"
           statusBadge="LIVE"

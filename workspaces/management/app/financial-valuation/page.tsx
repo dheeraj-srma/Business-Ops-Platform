@@ -345,6 +345,18 @@ export default function FinancialValuationPage() {
           title="Gross Margin % by Product Line"
           subtitle="Realized gross trade margin percentages across core product brand categories"
           data={grossMarginData}
+          fetchData={async (bounds) => {
+            const res = await fetch(`/api/analytics/financials?start_date=${bounds.start}&end_date=${bounds.end}`);
+            if (!res.ok) return [];
+            const d = await res.json();
+            return (d?.gross_margin_by_brand || []).map((b: any) => ({
+              name: b.name,
+              value: b.value,
+              sales: b.sales,
+              purchases: b.purchases,
+              surplus: b.surplus,
+            }));
+          }}
           defaultChartType="bar"
           unit="%"
           statusBadge="LIVE"
@@ -354,6 +366,15 @@ export default function FinancialValuationPage() {
           title="Working Capital & Asset Allocation"
           subtitle="Distribution between active inventory assets, dead stock capital lockup, and realized surplus"
           data={workingCapitalData}
+          fetchData={async (bounds) => {
+            const res = await fetch(`/api/analytics/financials?start_date=${bounds.start}&end_date=${bounds.end}`);
+            if (!res.ok) return [];
+            const d = await res.json();
+            return (d?.working_capital_allocation || []).map((w: any) => ({
+              name: w.name,
+              value: Math.round(w.value),
+            }));
+          }}
           defaultChartType="donut"
           unit="₹"
           statusBadge="LIVE"
@@ -363,6 +384,16 @@ export default function FinancialValuationPage() {
           title="Net Margin Contribution"
           subtitle="Absolute commercial profit surplus generated per product brand"
           data={netMarginContribData}
+          fetchData={async (bounds) => {
+            const res = await fetch(`/api/analytics/financials?start_date=${bounds.start}&end_date=${bounds.end}`);
+            if (!res.ok) return [];
+            const d = await res.json();
+            return (d?.net_margin_contribution || []).map((m: any) => ({
+              name: m.name,
+              value: Math.round(m.value),
+              sales: m.sales,
+            }));
+          }}
           defaultChartType="horizontal_bar"
           unit="₹"
           statusBadge="LIVE"
@@ -372,6 +403,15 @@ export default function FinancialValuationPage() {
           title="Inventory Carrying Cost Overhead"
           subtitle="Annualized storage, facility rent, capital holding, and shrinkage overhead (20% standard rate)"
           data={carryingCostData}
+          fetchData={async (bounds) => {
+            const res = await fetch(`/api/analytics/financials?start_date=${bounds.start}&end_date=${bounds.end}`);
+            if (!res.ok) return [];
+            const d = await res.json();
+            return (d?.carrying_cost_breakdown || []).map((c: any) => ({
+              name: c.name,
+              value: Math.round(c.value),
+            }));
+          }}
           defaultChartType="donut"
           unit="₹"
           statusBadge="LIVE"
@@ -381,6 +421,18 @@ export default function FinancialValuationPage() {
           title="Monthly Capital Cashflow & Trade Surplus"
           subtitle="Chronological trajectory of monthly revenue, procurement outflow, and net cash margin"
           data={monthlyCashflowData}
+          fetchData={async (bounds) => {
+            const res = await fetch(`/api/analytics/financials?start_date=${bounds.start}&end_date=${bounds.end}`);
+            if (!res.ok) return [];
+            const d = await res.json();
+            return (d?.monthly_cashflow || []).map((m: any) => ({
+              name: m.name,
+              sales: Math.round(m.sales),
+              purchases: Math.round(m.purchases),
+              net_surplus: Math.round(m.net_surplus),
+              value: Math.round(m.net_surplus),
+            }));
+          }}
           defaultChartType="bar"
           unit="₹"
           multiSeries={cashflowSeries}
@@ -391,6 +443,16 @@ export default function FinancialValuationPage() {
           title="Revenue Realization by Order Ticket Size"
           subtitle="Sales revenue split across transaction ticket size brackets"
           data={orderTicketData}
+          fetchData={async (bounds) => {
+            const res = await fetch(`/api/analytics/financials?start_date=${bounds.start}&end_date=${bounds.end}`);
+            if (!res.ok) return [];
+            const d = await res.json();
+            return (d?.order_ticket_distribution || []).map((t: any) => ({
+              name: t.name,
+              value: Math.round(t.value),
+              orders: t.orders,
+            }));
+          }}
           defaultChartType="horizontal_bar"
           unit="₹"
           statusBadge="LIVE"

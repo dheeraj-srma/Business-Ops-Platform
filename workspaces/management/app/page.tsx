@@ -510,6 +510,15 @@ export default function DashboardPage() {
           title="Revenue by Core Brand & Category"
           subtitle="Sales revenue distribution across primary product lines (HAHN, FINOLEX, FLOTO, UNIK, etc.)"
           data={brandRevenueData}
+          fetchData={async (bounds) => {
+            const res = await fetch(`/api/analytics/categories?start_date=${bounds.start}&end_date=${bounds.end}`);
+            if (!res.ok) return [];
+            const data = await res.json();
+            return (Array.isArray(data) ? data : []).map((c: any) => ({
+              name: c.category,
+              value: c.revenue,
+            }));
+          }}
           defaultChartType="donut"
           unit="₹"
         />

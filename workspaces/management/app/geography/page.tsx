@@ -83,6 +83,12 @@ export default function GeographyPage() {
           title="Revenue by State Territory"
           subtitle="Authoritative sales realization per state territory"
           data={stateRevenueData}
+          fetchData={async (bounds) => {
+            const res = await fetch(`/api/analytics/geography?start_date=${bounds.start}&end_date=${bounds.end}`);
+            if (!res.ok) return [];
+            const d = await res.json();
+            return (d.by_state || []).map((s: any) => ({ name: s.state, value: s.revenue }));
+          }}
           defaultChartType="horizontal_bar"
           unit="₹"
           statusBadge="LIVE"
@@ -92,6 +98,12 @@ export default function GeographyPage() {
           title="Revenue by City Hub"
           subtitle="Top contributing metro and city commercial centers"
           data={cityRevenueData}
+          fetchData={async (bounds) => {
+            const res = await fetch(`/api/analytics/geography?start_date=${bounds.start}&end_date=${bounds.end}`);
+            if (!res.ok) return [];
+            const d = await res.json();
+            return (d.by_city || []).map((c: any) => ({ name: `${c.city} (${c.state || ''})`, value: c.revenue }));
+          }}
           defaultChartType="horizontal_bar"
           unit="₹"
           statusBadge="LIVE"

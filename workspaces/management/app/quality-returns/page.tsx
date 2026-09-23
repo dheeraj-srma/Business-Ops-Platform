@@ -153,6 +153,17 @@ export default function QualityReturnsPage() {
           title="Customer Returns Value Timeline"
           subtitle="Chronological return claims aggregated from historical return vouchers"
           data={returnsTimelineData}
+          fetchData={async (bounds) => {
+            const res = await fetch(`/api/analytics/returns?start_date=${bounds.start}&end_date=${bounds.end}`);
+            if (!res.ok) return [];
+            const d = await res.json();
+            return (d?.timeline || []).map((t: any) => ({
+              name: fmtDayMonth(t.date),
+              date: t.date,
+              value: t.value,
+              returns: t.returns,
+            }));
+          }}
           defaultChartType="area"
           unit="₹"
           isHero={true}
@@ -166,6 +177,15 @@ export default function QualityReturnsPage() {
           title="Returns by Product Category"
           subtitle="Financial return claim value distributed across product lines"
           data={returnCategoryData}
+          fetchData={async (bounds) => {
+            const res = await fetch(`/api/analytics/returns?start_date=${bounds.start}&end_date=${bounds.end}`);
+            if (!res.ok) return [];
+            const d = await res.json();
+            return (d?.by_category || []).map((c: any) => ({
+              name: c.category,
+              value: c.value,
+            }));
+          }}
           defaultChartType="donut"
           unit="₹"
           statusBadge="LIVE"
@@ -175,6 +195,15 @@ export default function QualityReturnsPage() {
           title="Top Returned Products"
           subtitle="Products with highest cumulative return claim values"
           data={topReturnedProducts}
+          fetchData={async (bounds) => {
+            const res = await fetch(`/api/analytics/returns?start_date=${bounds.start}&end_date=${bounds.end}`);
+            if (!res.ok) return [];
+            const d = await res.json();
+            return (d?.top_returned_products || []).map((p: any) => ({
+              name: p.product.length > 22 ? p.product.slice(0, 22) + '…' : p.product,
+              value: p.value,
+            }));
+          }}
           defaultChartType="horizontal_bar"
           unit="₹"
           statusBadge="LIVE"
@@ -184,6 +213,15 @@ export default function QualityReturnsPage() {
           title="Returns by Customer"
           subtitle="Customer accounts with highest logged return values"
           data={returnsByCustomerData}
+          fetchData={async (bounds) => {
+            const res = await fetch(`/api/analytics/returns?start_date=${bounds.start}&end_date=${bounds.end}`);
+            if (!res.ok) return [];
+            const d = await res.json();
+            return (d?.by_customer || []).slice(0, 10).map((c: any) => ({
+              name: c.customer.length > 20 ? c.customer.slice(0, 20) + '…' : c.customer,
+              value: c.value,
+            }));
+          }}
           defaultChartType="horizontal_bar"
           unit="₹"
           statusBadge="LIVE"

@@ -176,16 +176,41 @@ export default function InventoryVelocityPage() {
           title="Fast Moving SKUs"
           subtitle="Highest turnover catalog items by units dispatched in current period"
           data={fastMoversData}
+          fetchData={async (bounds) => {
+            const res = await fetch(`/api/analytics/bi?start_date=${bounds.start}&end_date=${bounds.end}`);
+            if (!res.ok) return [];
+            const d = await res.json();
+            return (d.inventory_intelligence?.top_movers || d.sales_intelligence?.top_products || []).map((m: any) => ({
+              name: m.name.length > 20 ? m.name.slice(0, 20) + '…' : m.name,
+              value: m.units_sold || m.qty,
+            }));
+          }}
           defaultChartType="horizontal_bar"
           unit="units"
+          statusBadge="LIVE"
         />
 
         <InteractiveChart
           title="Slow Moving SKUs"
           subtitle="Low sales velocity items requiring promotional liquidation"
           data={slowMoversData}
+          fetchData={async (bounds) => {
+            const res = await fetch(`/api/analytics/bi?start_date=${bounds.start}&end_date=${bounds.end}`);
+            if (!res.ok) return [];
+            const d = await res.json();
+            const prods = d.sales_intelligence?.top_products || [];
+            const pos = prods.filter((p: any) => Number(p.qty || 0) > 0);
+            return [...pos]
+              .sort((a: any, b: any) => a.qty - b.qty)
+              .slice(0, 10)
+              .map((p: any) => ({
+                name: p.name.length > 20 ? p.name.slice(0, 20) + '…' : p.name,
+                value: p.qty,
+              }));
+          }}
           defaultChartType="horizontal_bar"
           unit="units"
+          statusBadge="LIVE"
         />
 
         <InteractiveChart
@@ -194,6 +219,7 @@ export default function InventoryVelocityPage() {
           data={deadStockData}
           defaultChartType="donut"
           unit="₹"
+          statusBadge="LIVE"
         />
 
         <InteractiveChart
@@ -202,6 +228,7 @@ export default function InventoryVelocityPage() {
           data={agingData}
           defaultChartType="pie"
           unit="SKUs"
+          statusBadge="LIVE"
         />
 
         <InteractiveChart
@@ -210,6 +237,7 @@ export default function InventoryVelocityPage() {
           data={categoryValueData}
           defaultChartType="horizontal_bar"
           unit="₹"
+          statusBadge="LIVE"
         />
 
         <InteractiveChart
@@ -218,6 +246,7 @@ export default function InventoryVelocityPage() {
           data={abcAnalysisData}
           defaultChartType="donut"
           unit="₹"
+          statusBadge="LIVE"
         />
       </div>
     </div>

@@ -286,6 +286,16 @@ export default function CustomersPage() {
               defaultChartType="bar"
               unit="₹"
               isHero={true}
+              fetchData={async (bounds) => {
+                const res = await fetch(`/api/analytics/customers?start_date=${bounds.start}&end_date=${bounds.end}`);
+                if (!res.ok) return [];
+                const data = await res.json();
+                const list = data.customers || (Array.isArray(data) ? data : []);
+                return list.slice(0, 10).map((c: any) => ({
+                  name: c.customer_name || c.name,
+                  value: Number(c.revenue || c.total_amount || 0),
+                }));
+              }}
             />
           </div>
 
@@ -297,6 +307,19 @@ export default function CustomersPage() {
               data={customerOrderFreqData}
               defaultChartType="donut"
               unit="orders"
+              fetchData={async (bounds) => {
+                const res = await fetch(`/api/analytics/customers?start_date=${bounds.start}&end_date=${bounds.end}`);
+                if (!res.ok) return [];
+                const data = await res.json();
+                const list = data.customers || (Array.isArray(data) ? data : []);
+                return [...list]
+                  .sort((a: any, b: any) => Number(b.voucher_count || 0) - Number(a.voucher_count || 0))
+                  .slice(0, 7)
+                  .map((c: any) => ({
+                    name: (c.customer_name || c.name || '').length > 18 ? (c.customer_name || c.name).slice(0, 18) + '…' : (c.customer_name || c.name),
+                    value: Number(c.voucher_count || 0),
+                  }));
+              }}
             />
 
             <InteractiveChart
@@ -305,6 +328,17 @@ export default function CustomersPage() {
               data={customerGrowthData}
               defaultChartType="bar"
               unit="%"
+              fetchData={async (bounds) => {
+                const res = await fetch(`/api/analytics/customers?start_date=${bounds.start}&end_date=${bounds.end}`);
+                if (!res.ok) return [];
+                const data = await res.json();
+                const list = data.customers || (Array.isArray(data) ? data : []);
+                const totalRev = list.reduce((acc: number, c: any) => acc + Number(c.revenue || 0), 0) || 1;
+                return list.slice(0, 6).map((c: any) => ({
+                  name: (c.customer_name || c.name || '').length > 18 ? (c.customer_name || c.name).slice(0, 18) + '…' : (c.customer_name || c.name),
+                  value: Number(c.contribution_percent || ((Number(c.revenue || 0) / totalRev) * 100).toFixed(1)),
+                }));
+              }}
             />
 
             <InteractiveChart
@@ -313,6 +347,16 @@ export default function CustomersPage() {
               data={customerGeoData}
               defaultChartType="pie"
               unit="customers"
+              fetchData={async (bounds) => {
+                const res = await fetch(`/api/analytics/geography?start_date=${bounds.start}&end_date=${bounds.end}`);
+                if (!res.ok) return [];
+                const data = await res.json();
+                const states = data.by_state || [];
+                return states.slice(0, 5).map((s: any) => ({
+                  name: s.state,
+                  value: Number(s.customer_count || s.orders_count || s.revenue || 0),
+                }));
+              }}
             />
 
             <InteractiveChart
@@ -321,6 +365,7 @@ export default function CustomersPage() {
               data={customerRetentionData}
               defaultChartType="donut"
               unit="accounts"
+              statusBadge="LIVE"
             />
 
             <InteractiveChart
@@ -329,6 +374,26 @@ export default function CustomersPage() {
               data={customerSegmentationData}
               defaultChartType="bar"
               unit="accounts"
+              fetchData={async (bounds) => {
+                const res = await fetch(`/api/analytics/customers?start_date=${bounds.start}&end_date=${bounds.end}`);
+                if (!res.ok) return [];
+                const data = await res.json();
+                const list = data.customers || (Array.isArray(data) ? data : []);
+                let plat = 0, gold = 0, silver = 0, bronze = 0;
+                list.forEach((c: any) => {
+                  const rev = Number(c.revenue || 0);
+                  if (rev > 500000) plat++;
+                  else if (rev > 150000) gold++;
+                  else if (rev > 30000) silver++;
+                  else bronze++;
+                });
+                return [
+                  { name: 'Platinum (>₹5L)', value: plat },
+                  { name: 'Gold (₹1.5L-₹5L)', value: gold },
+                  { name: 'Silver (₹30k-₹1.5L)', value: silver },
+                  { name: 'Bronze (<₹30k)', value: bronze },
+                ];
+              }}
             />
 
             {/* ── Strategic Partner Spotlight Card (Natural Height, Matches Grid Row Height) ── */}

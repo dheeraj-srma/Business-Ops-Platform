@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import {
   DateRangeType,
+  DateRangeBounds,
   getDateRangeBounds,
   filterItemsByDateRange,
   aggregateTimeSeriesData,
@@ -47,10 +48,10 @@ interface SeriesOption {
 
 export type ChartTypeOption = 'area' | 'bar' | 'horizontal_bar' | 'pie' | 'donut' | 'line' | 'table' | 'kpi';
 
-interface InteractiveChartProps {
+export interface InteractiveChartProps {
   title: string;
   subtitle?: string;
-  data: any[];
+  data?: any[];
   defaultChartType?: ChartTypeOption;
   defaultTimeRange?: DateRangeType;
   unit?: string;
@@ -62,7 +63,11 @@ interface InteractiveChartProps {
   showLegend?: boolean;
   unavailable?: boolean;
   unavailableReason?: string;
-  statusBadge?: 'LIVE' | 'SNAPSHOT' | 'MODELLED' | 'UNAVAILABLE' | 'HEURISTIC';
+  statusBadge?: 'LIVE' | 'SNAPSHOT' | 'MODELLED' | 'UNAVAILABLE' | 'HEURISTIC' | string;
+  fetchData?: (bounds: DateRangeBounds, timeRange: DateRangeType) => Promise<any[]>;
+  onTimeRangeChange?: (range: DateRangeType, bounds: DateRangeBounds) => void;
+  groupBy?: string;
+  valueKey?: string;
 }
 
 const COLORS = [
@@ -193,6 +198,10 @@ export default function InteractiveChart({
   unavailable = false,
   unavailableReason,
   statusBadge,
+  fetchData,
+  onTimeRangeChange,
+  groupBy,
+  valueKey,
 }: InteractiveChartProps) {
   const [chartType, setChartType] = useState<ChartTypeOption>(defaultChartType);
   const [timeRange, setTimeRange] = useState<DateRangeType>(defaultTimeRange || '30d');
@@ -202,6 +211,10 @@ export default function InteractiveChart({
   const [containerWidth, setContainerWidth] = useState<number>(0);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [activeHoverIndex, setActiveHoverIndex] = useState<number | null>(null);
+
+  // Independent per-graph dynamic fetched data state
+  const [fetchedData, setFetchedData] = useState<any[] | null>(null);
+  const [isFetching, setIsFetching] = useState<boolean>(false);
 
   const [isMounted, setIsMounted] = useState<boolean>(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -218,6 +231,33 @@ export default function InteractiveChart({
     setContainerWidth(containerRef.current.clientWidth);
     return () => observer.disconnect();
   }, []);
+
+  // When timeRange or custom date changes and fetchData is provided, fetch dynamically for this graph
+  useEffect(() => {
+    if (!fetchData) return;
+    const refDate = getReferenceDate();
+    const bounds = getDateRangeBounds(timeRange, refDate, startDate, endDate);
+    if (!bounds.isValid) return;
+
+    let active = true;
+    setIsFetching(true);
+    fetchData(bounds, timeRange)
+      .then(res => {
+        if (active) {
+          setFetchedData(Array.isArray(res) ? res : []);
+          setIsFetching(false);
+          setCurrentPage(1);
+        }
+      })
+      .catch(err => {
+        console.error(`Error fetching data for "${title}":`, err);
+        if (active) setIsFetching(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [fetchData, timeRange, startDate, endDate]);
 
   const isWide = useMemo(() => {
     if (isHero !== undefined) return isHero;
@@ -245,40 +285,69 @@ export default function InteractiveChart({
     return '';
   };
 
+  const activeRawData = useMemo(() => {
+    if (fetchedData !== null) return fetchedData;
+    return data || [];
+  }, [fetchedData, data]);
+
   // Determine whether data represents a chronological time-series
   const isTimeSeries = useMemo(() => {
-    if (!data || data.length === 0) return false;
-    return data.some(d => Boolean(getItemDate(d)));
-  }, [data]);
+    if (!activeRawData || activeRawData.length === 0) return false;
+    return activeRawData.some(d => Boolean(getItemDate(d))) && (chartType === 'area' || chartType === 'line' || isHero === true || (!groupBy && !activeRawData.some(d => d.category || d.product || d.dealer || d.salesman)));
+  }, [activeRawData, chartType, isHero, groupBy]);
 
   // Automatically suppress horizontal axis data labels when color legends and hover tooltips identify items
   const shouldHideXAxisLabels = hideXAxisLabels !== undefined ? hideXAxisLabels : !isTimeSeries;
 
   // Filter data based on timeRange using shared dateRange engine
   const filteredData = useMemo(() => {
-    if (!data || data.length === 0) return [];
-    if (!isTimeSeries) return data;
+    if (!activeRawData || activeRawData.length === 0) return [];
 
     const refDate = getReferenceDate();
     const bounds = getDateRangeBounds(timeRange, refDate, startDate, endDate);
-    if (!bounds.isValid) return data;
+    if (!bounds.isValid) return activeRawData;
 
-    const keysToAggregate = multiSeries && multiSeries.length > 0
-      ? multiSeries.map(s => s.key)
-      : ['value', 'revenue', 'orders', 'qty', 'units', 'stock_in', 'stock_out', 'outward_qty', 'dispatches', 'defective', 'reusable', 'inward', 'outward', 'cost', 'profit', 'Sales', 'sales', 'Orders', 'amount'];
+    // Case 1: Time Series
+    if (isTimeSeries) {
+      const keysToAggregate = multiSeries && multiSeries.length > 0
+        ? multiSeries.map(s => s.key)
+        : ['value', 'revenue', 'orders', 'qty', 'units', 'stock_in', 'stock_out', 'outward_qty', 'dispatches', 'defective', 'reusable', 'inward', 'outward', 'cost', 'profit', 'Sales', 'sales', 'Orders', 'amount'];
 
-    // Filter items within bounds
-    const inRange = filterItemsByDateRange(data, timeRange, getItemDate, refDate, startDate, endDate);
+      // Filter items within bounds
+      const inRange = filterItemsByDateRange(activeRawData, timeRange, getItemDate, refDate, startDate, endDate);
 
-    // Fill continuous daily calendar sequence [bounds.start, bounds.end]
-    const continuous = fillTimeSeriesGaps(inRange, bounds.start, bounds.end, keysToAggregate, 0, formatDayMonth);
+      // Fill continuous daily calendar sequence [bounds.start, bounds.end]
+      const continuous = fillTimeSeriesGaps(inRange, bounds.start, bounds.end, keysToAggregate, 0, formatDayMonth);
 
-    // If time series duration > 31 days, aggregate automatically to avoid dense clutter
-    if (continuous.length > 31) {
-      return aggregateTimeSeriesData(continuous, keysToAggregate);
+      // If time series duration > 31 days, aggregate automatically to avoid dense clutter
+      if (continuous.length > 31) {
+        return aggregateTimeSeriesData(continuous, keysToAggregate);
+      }
+      return continuous;
     }
-    return continuous;
-  }, [data, isTimeSeries, timeRange, startDate, endDate, multiSeries]);
+
+    // Case 2: Categorical dataset with dates (e.g. raw vouchers or dated entity points)
+    const hasDates = activeRawData.some(d => Boolean(getItemDate(d)));
+    if (hasDates && fetchedData === null) {
+      const inRange = filterItemsByDateRange(activeRawData, timeRange, getItemDate, refDate, startDate, endDate);
+      const groupKey = groupBy || 'name';
+      const valKey = valueKey || 'value';
+      const map: Record<string, any> = {};
+      inRange.forEach(item => {
+        const k = String(item[groupKey] || item.name || item.category || item.product || item.dealer || item.salesman || 'Item');
+        let numVal = Number(item[valKey] ?? item.value ?? item.revenue ?? item.qty ?? item.amount ?? 0);
+        if (isNaN(numVal)) numVal = 0;
+        if (!map[k]) {
+          map[k] = { ...item, name: k, value: 0 };
+        }
+        map[k].value += numVal;
+      });
+      return Object.values(map).sort((a: any, b: any) => (Number(b.value) || 0) - (Number(a.value) || 0));
+    }
+
+    // Case 3: Already filtered / aggregated (e.g. by backend fetchData or static)
+    return activeRawData;
+  }, [activeRawData, isTimeSeries, timeRange, startDate, endDate, multiSeries, groupBy, valueKey, fetchedData]);
 
   // Dynamic Chart Summaries (Phase 8): Calculate latest, average, and peak from real data
   const timeSeriesSummary = useMemo(() => {
@@ -337,17 +406,14 @@ export default function InteractiveChart({
     return { latest, avg, peak, peakDate };
   }, [isTimeSeries, filteredData, multiSeries]);
 
-  // Compute readable active time range label badge dynamically
+  // Compute readable active time range label badge dynamically from canonical bounds
   const timeRangeLabel = useMemo(() => {
     if (timeRange === 'custom') {
       return `${startDate} to ${endDate}`;
     }
-    if (filteredData.length === 0) return 'No records in range';
-
-    const firstItem = filteredData[0];
-    const lastItem = filteredData[filteredData.length - 1];
-    const dStart = getItemDate(firstItem);
-    const dEnd = getItemDate(lastItem);
+    const refDate = getReferenceDate();
+    const bounds = getDateRangeBounds(timeRange, refDate, startDate, endDate);
+    if (!bounds.isValid) return 'Invalid Range';
 
     const formatDate = (iso: string) => {
       if (!iso || iso.length < 10) return iso;
@@ -359,12 +425,11 @@ export default function InteractiveChart({
       return `${months[m] || parts[1]} ${day}, ${year}`;
     };
 
-    if (dStart && dEnd) {
-      if (dStart === dEnd) return formatDate(dStart);
-      return `${formatDate(dStart)} – ${formatDate(dEnd)}`;
+    if (bounds.start === bounds.end) {
+      return formatDate(bounds.start);
     }
-    return `${String(firstItem?.name || '')} – ${String(lastItem?.name || '')}`;
-  }, [timeRange, filteredData, startDate, endDate]);
+    return `${formatDate(bounds.start)} – ${formatDate(bounds.end)}`;
+  }, [timeRange, startDate, endDate]);
 
   // ── Pagination Calculation & State Management ──────────────────────────────
   // For time series, aggregation is preferred over pagination.
@@ -691,37 +756,59 @@ export default function InteractiveChart({
           </select>
 
           {/* Time Range Dropdown */}
-          <select
-            className="bg-slate-800 border border-slate-700 hover:border-slate-600 focus:border-indigo-600 dark:border-indigo-500 rounded-lg px-2 py-1 text-xs text-slate-200 outline-none transition-colors cursor-pointer"
-            value={timeRange}
-            onChange={e => {
-              setTimeRange(e.target.value as any);
-              setCurrentPage(1);
-            }}
-          >
-            <option value="today">Today</option>
-            <option value="yesterday">Yesterday</option>
-            <option value="7d">Last 7 Days</option>
-            <option value="this_week">This Week</option>
-            <option value="this_month">This Month</option>
-            <option value="last_month">Last Month</option>
-            <option value="30d">Last 30 Days</option>
-            <option value="60d">Last 60 Days</option>
-            <option value="90d">Last 90 Days</option>
-            <option value="this_quarter">This Quarter</option>
-            <option value="ytd">Year-to-Date (YTD)</option>
-            <option value="12m">Trailing 12 Months</option>
-            <option value="all">Full History</option>
-            <option value="custom">Custom Range...</option>
-          </select>
+          <div className="flex items-center gap-1">
+            {isFetching && (
+              <div className="w-3 h-3 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin shrink-0" />
+            )}
+            <select
+              className="bg-slate-800 border border-slate-700 hover:border-slate-600 focus:border-indigo-600 dark:border-indigo-500 rounded-lg px-2 py-1 text-xs text-slate-200 outline-none transition-colors cursor-pointer"
+              value={timeRange}
+              onChange={e => {
+                const newRange = e.target.value as DateRangeType;
+                setTimeRange(newRange);
+                setCurrentPage(1);
+                const refDate = getReferenceDate();
+                const b = getDateRangeBounds(newRange, refDate, startDate, endDate);
+                if (newRange !== 'custom') {
+                  setStartDate(b.start);
+                  setEndDate(b.end);
+                }
+                if (onTimeRangeChange) {
+                  onTimeRangeChange(newRange, b);
+                }
+              }}
+            >
+              <option value="today">Today</option>
+              <option value="yesterday">Yesterday</option>
+              <option value="7d">Last 7 Days</option>
+              <option value="this_week">This Week</option>
+              <option value="this_month">This Month</option>
+              <option value="last_month">Last Month</option>
+              <option value="30d">Last 30 Days</option>
+              <option value="60d">Last 60 Days</option>
+              <option value="90d">Last 90 Days</option>
+              <option value="this_quarter">This Quarter</option>
+              <option value="ytd">Year-to-Date (YTD)</option>
+              <option value="12m">Trailing 12 Months</option>
+              <option value="all">Full History</option>
+              <option value="custom">Custom Range...</option>
+            </select>
+          </div>
 
           {/* Reset Button */}
           <button
             className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
             onClick={() => {
               setChartType(defaultChartType);
-              setTimeRange(defaultTimeRange || '30d');
+              const defaultRange = defaultTimeRange || '30d';
+              setTimeRange(defaultRange);
+              const b = getDateRangeBounds(defaultRange);
+              setStartDate(b.start);
+              setEndDate(b.end);
               setCurrentPage(1);
+              if (onTimeRangeChange) {
+                onTimeRangeChange(defaultRange, b);
+              }
             }}
             title="Reset Chart View"
           >

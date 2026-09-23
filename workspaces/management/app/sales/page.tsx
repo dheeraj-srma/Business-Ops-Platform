@@ -173,6 +173,12 @@ export default function SalesPage() {
               title="Sales by Category"
               subtitle="Sales split by brand and category"
               data={catRevenueData}
+              fetchData={async (bounds) => {
+                const res = await fetch(`/api/analytics/categories?start_date=${bounds.start}&end_date=${bounds.end}`);
+                if (!res.ok) return [];
+                const d = await res.json();
+                return (Array.isArray(d) ? d : []).map((c: any) => ({ name: c.category, value: c.revenue }));
+              }}
               defaultChartType="donut"
               unit="₹"
             />
@@ -181,6 +187,15 @@ export default function SalesPage() {
               title="Top Products"
               subtitle="Products with highest quantity sold"
               data={topProductsData}
+              fetchData={async (bounds) => {
+                const res = await fetch(`/api/analytics/bi?start_date=${bounds.start}&end_date=${bounds.end}`);
+                if (!res.ok) return [];
+                const d = await res.json();
+                return (d.sales_intelligence?.top_products || []).map((p: any) => ({
+                  name: p.name.length > 20 ? p.name.slice(0, 20) + '…' : p.name,
+                  value: p.qty,
+                }));
+              }}
               defaultChartType="bar"
               unit="units"
             />
@@ -189,6 +204,15 @@ export default function SalesPage() {
               title="Top Customers"
               subtitle="Highest buying customer accounts by realized sales"
               data={topCustomersData}
+              fetchData={async (bounds) => {
+                const res = await fetch(`/api/analytics/customers?limit=25&start_date=${bounds.start}&end_date=${bounds.end}`);
+                if (!res.ok) return [];
+                const d = await res.json();
+                return (Array.isArray(d) ? d : []).map((c: any) => ({
+                  name: (c.customer_name || c.name || '').length > 20 ? (c.customer_name || c.name).slice(0, 20) + '…' : (c.customer_name || c.name),
+                  value: c.revenue,
+                }));
+              }}
               defaultChartType="horizontal_bar"
               unit="₹"
               showLegend={false}
@@ -199,6 +223,12 @@ export default function SalesPage() {
               title="Salesmen Ranking"
               subtitle="Total sales contribution per attributed salesman"
               data={salesmanRankData}
+              fetchData={async (bounds) => {
+                const res = await fetch(`/api/analytics/salesmen?start_date=${bounds.start}&end_date=${bounds.end}`);
+                if (!res.ok) return [];
+                const d = await res.json();
+                return (Array.isArray(d) ? d : []).map((s: any) => ({ name: s.salesman, value: s.revenue }));
+              }}
               defaultChartType="horizontal_bar"
               unit="₹"
               statusBadge="LIVE"
@@ -208,6 +238,12 @@ export default function SalesPage() {
               title="Sales by Region"
               subtitle="Authoritative sales realization per territory"
               data={regionData}
+              fetchData={async (bounds) => {
+                const res = await fetch(`/api/analytics/geography?start_date=${bounds.start}&end_date=${bounds.end}`);
+                if (!res.ok) return [];
+                const d = await res.json();
+                return (d.by_state || d.by_region || []).map((s: any) => ({ name: s.state || s.region, value: s.revenue }));
+              }}
               defaultChartType="horizontal_bar"
               unit="₹"
               statusBadge="LIVE"
@@ -217,6 +253,12 @@ export default function SalesPage() {
               title="Order Size Distribution"
               subtitle="Historical sales vouchers grouped by invoice value"
               data={orderValueDistribution}
+              fetchData={async (bounds) => {
+                const res = await fetch(`/api/analytics/order-distribution?start_date=${bounds.start}&end_date=${bounds.end}`);
+                if (!res.ok) return [];
+                const d = await res.json();
+                return (Array.isArray(d) ? d : []).map((item: any) => ({ name: item.bucket, value: item.orders }));
+              }}
               defaultChartType="donut"
               unit="vouchers"
               statusBadge="LIVE"
