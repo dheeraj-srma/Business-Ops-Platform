@@ -24,6 +24,7 @@ import {
   Settings,
   Lock,
   Eye,
+  EyeOff,
   Edit,
   Power,
   Trash2,
@@ -97,7 +98,7 @@ export default function CentralAdminPage() {
     customer_name: '',
     shop_name: '',
     location: '',
-    role: 'customer',
+    role: 'salesman',
     salesman_id: '',
     password: '',
     phone: ''
@@ -108,11 +109,13 @@ export default function CentralAdminPage() {
     customer_name: '',
     shop_name: '',
     location: '',
-    role: 'customer',
+    role: 'salesman',
     phone: '',
     is_active: true
   });
   const [tempPassword, setTempPassword] = useState('NalkaTemp2026!');
+  const [showNewUserPassword, setShowNewUserPassword] = useState(false);
+  const [showResetPassword, setShowResetPassword] = useState(false);
   const [stockAdjustForm, setStockAdjustForm] = useState({
     product_id: '',
     new_quantity: 0,
@@ -433,7 +436,7 @@ export default function CentralAdminPage() {
       if (res.ok) {
         setMessage({ type: 'success', text: `User account '${newUserForm.email}' created successfully.` });
         setShowAddUserModal(false);
-        setNewUserForm({ email: '', full_name: '', customer_name: '', shop_name: '', location: '', role: 'customer', salesman_id: '', password: '', phone: '' });
+        setNewUserForm({ email: '', full_name: '', customer_name: '', shop_name: '', location: '', role: 'salesman', salesman_id: '', password: '', phone: '' });
         fetchUsers();
         fetchAdminOverview();
       } else {
@@ -870,7 +873,7 @@ export default function CentralAdminPage() {
               >
                 <option value="">All Roles</option>
                 <option value="admin">Admin</option>
-                <option value="manager">Manager</option>
+                <option value="accountant">Accountant</option>
                 <option value="warehouse_manager">Warehouse Manager</option>
                 <option value="salesman">Salesman</option>
                 <option value="customer">Customer</option>
@@ -955,9 +958,9 @@ export default function CentralAdminPage() {
                           fontSize: '0.72rem',
                           fontWeight: 700,
                           textTransform: 'uppercase',
-                          background: u.role === 'admin' ? 'rgba(168, 85, 247, 0.15)' : (u.role === 'warehouse_manager' || u.role === 'stock_manager') ? 'rgba(52, 211, 153, 0.15)' : u.role === 'manager' ? 'rgba(59, 130, 246, 0.15)' : u.role === 'salesman' ? 'rgba(245, 158, 11, 0.15)' : u.role === 'customer' ? 'rgba(236, 72, 153, 0.15)' : 'rgba(148, 163, 184, 0.15)',
-                          color: u.role === 'admin' ? '#c084fc' : (u.role === 'warehouse_manager' || u.role === 'stock_manager') ? '#34d399' : u.role === 'manager' ? '#60a5fa' : u.role === 'salesman' ? '#fbbf24' : u.role === 'customer' ? '#f472b6' : '#94a3b8',
-                          border: `1px solid ${u.role === 'admin' ? 'rgba(168, 85, 247, 0.3)' : (u.role === 'warehouse_manager' || u.role === 'stock_manager') ? 'rgba(52, 211, 153, 0.3)' : u.role === 'manager' ? 'rgba(59, 130, 246, 0.3)' : u.role === 'salesman' ? 'rgba(245, 158, 11, 0.3)' : u.role === 'customer' ? 'rgba(236, 72, 153, 0.3)' : 'rgba(148, 163, 184, 0.3)'}`
+                          background: (u.role === 'admin' || u.role === 'accountant') ? 'rgba(99, 102, 241, 0.15)' : (u.role === 'warehouse_manager' || u.role === 'stock_manager') ? 'rgba(52, 211, 153, 0.15)' : u.role === 'salesman' ? 'rgba(245, 158, 11, 0.15)' : u.role === 'customer' ? 'rgba(148, 163, 184, 0.15)' : 'rgba(148, 163, 184, 0.15)',
+                          color: (u.role === 'admin' || u.role === 'accountant') ? '#818cf8' : (u.role === 'warehouse_manager' || u.role === 'stock_manager') ? '#34d399' : u.role === 'salesman' ? '#fbbf24' : u.role === 'customer' ? '#94a3b8' : '#94a3b8',
+                          border: `1px solid ${(u.role === 'admin' || u.role === 'accountant') ? 'rgba(99, 102, 241, 0.3)' : (u.role === 'warehouse_manager' || u.role === 'stock_manager') ? 'rgba(52, 211, 153, 0.3)' : u.role === 'salesman' ? 'rgba(245, 158, 11, 0.3)' : 'rgba(148, 163, 184, 0.3)'}`
                         }}>
                           {(u.role || 'viewer').replace(/_/g, ' ')}
                         </span>
@@ -1371,11 +1374,11 @@ export default function CentralAdminPage() {
                   onChange={(e) => setNewUserForm({ ...newUserForm, role: e.target.value })}
                   style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', background: '#0f172a', border: '1px solid #334155', color: '#f8fafc', fontSize: '0.85rem' }}
                 >
-                  <option value="customer">Customer</option>
                   <option value="salesman">Salesman</option>
-                  <option value="manager">Manager</option>
-                  <option value="warehouse_manager">Warehouse Manager</option>
+                  <option value="accountant">Accountant</option>
                   <option value="admin">Admin</option>
+                  <option value="warehouse_manager">Warehouse Manager</option>
+                  <option value="customer">Customer</option>
                   <option value="viewer">Viewer</option>
                 </select>
               </div>
@@ -1387,14 +1390,14 @@ export default function CentralAdminPage() {
                   required
                   value={newUserForm.email}
                   onChange={(e) => setNewUserForm({ ...newUserForm, email: e.target.value })}
-                  placeholder="customer@example.com"
+                  placeholder="user@example.com"
                   style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', background: '#0f172a', border: '1px solid #334155', color: '#f8fafc', fontSize: '0.85rem' }}
                 />
               </div>
 
               {newUserForm.role === 'customer' ? (
-                <div style={{ background: 'rgba(168, 85, 247, 0.08)', border: '1px solid rgba(168, 85, 247, 0.25)', borderRadius: '10px', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                  <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#c084fc', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                <div style={{ background: '#0f172a', border: '1px solid #334155', borderRadius: '10px', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                     Customer Details
                   </div>
                   <div>
@@ -1467,13 +1470,24 @@ export default function CentralAdminPage() {
 
               <div>
                 <label style={{ fontSize: '0.78rem', color: '#94a3b8', display: 'block', marginBottom: '4px' }}>Initial Password</label>
-                <input
-                  type="password"
-                  required
-                  value={newUserForm.password}
-                  onChange={(e) => setNewUserForm({ ...newUserForm, password: e.target.value })}
-                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', background: '#0f172a', border: '1px solid #334155', color: '#f8fafc', fontSize: '0.85rem' }}
-                />
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                  <input
+                    type={showNewUserPassword ? 'text' : 'password'}
+                    required
+                    value={newUserForm.password}
+                    onChange={(e) => setNewUserForm({ ...newUserForm, password: e.target.value })}
+                    placeholder="Enter initial password"
+                    style={{ width: '100%', padding: '8px 38px 8px 12px', borderRadius: '6px', background: '#0f172a', border: '1px solid #334155', color: '#f8fafc', fontSize: '0.85rem' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewUserPassword(!showNewUserPassword)}
+                    style={{ position: 'absolute', right: '8px', background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '4px' }}
+                    title={showNewUserPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showNewUserPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
               </div>
 
               <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '1rem' }}>
@@ -1493,13 +1507,24 @@ export default function CentralAdminPage() {
             <form onSubmit={handleResetPasswordSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div>
                 <label style={{ fontSize: '0.78rem', color: '#94a3b8', display: 'block', marginBottom: '4px' }}>New / Temporary Password</label>
-                <input
-                  type="text"
-                  required
-                  value={tempPassword}
-                  onChange={(e) => setTempPassword(e.target.value)}
-                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', background: '#0f172a', border: '1px solid #334155', color: '#f8fafc', fontSize: '0.85rem' }}
-                />
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                  <input
+                    type={showResetPassword ? 'text' : 'password'}
+                    required
+                    value={tempPassword}
+                    onChange={(e) => setTempPassword(e.target.value)}
+                    placeholder="Enter new password"
+                    style={{ width: '100%', padding: '8px 38px 8px 12px', borderRadius: '6px', background: '#0f172a', border: '1px solid #334155', color: '#f8fafc', fontSize: '0.85rem' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowResetPassword(!showResetPassword)}
+                    style={{ position: 'absolute', right: '8px', background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '4px' }}
+                    title={showResetPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showResetPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
               </div>
 
               <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
@@ -1524,11 +1549,11 @@ export default function CentralAdminPage() {
                   onChange={(e) => setEditUserForm({ ...editUserForm, role: e.target.value })}
                   style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', background: '#0f172a', border: '1px solid #334155', color: '#f8fafc', fontSize: '0.85rem' }}
                 >
-                  <option value="customer">Customer</option>
                   <option value="salesman">Salesman</option>
-                  <option value="manager">Manager</option>
-                  <option value="warehouse_manager">Warehouse Manager</option>
+                  <option value="accountant">Accountant</option>
                   <option value="admin">Admin</option>
+                  <option value="warehouse_manager">Warehouse Manager</option>
+                  <option value="customer">Customer</option>
                   <option value="viewer">Viewer</option>
                 </select>
               </div>
@@ -1545,8 +1570,8 @@ export default function CentralAdminPage() {
               </div>
 
               {editUserForm.role === 'customer' ? (
-                <div style={{ background: 'rgba(168, 85, 247, 0.08)', border: '1px solid rgba(168, 85, 247, 0.25)', borderRadius: '10px', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                  <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#c084fc', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                <div style={{ background: '#0f172a', border: '1px solid #334155', borderRadius: '10px', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                     Customer Details
                   </div>
                   <div>

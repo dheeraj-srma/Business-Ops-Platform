@@ -19,7 +19,9 @@ import {
   X,
   BadgeCheck,
   User,
-  Tag
+  Tag,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import { cn } from '../../lib/utils';
@@ -28,7 +30,7 @@ import { useDialog } from '../../context/DialogContext';
 export interface UserProfileRow {
   id: string;
   email: string;
-  role: 'salesman' | 'customer' | 'admin' | 'manager' | 'staff';
+  role: 'salesman' | 'customer' | 'admin' | 'accountant' | 'warehouse_manager' | 'stock_manager' | 'staff' | string;
   salesman_id?: string;
   salesman_name?: string;
   customer_name?: string;
@@ -50,7 +52,7 @@ interface UserManagementPanelProps {
 
 export const UserManagementPanel: React.FC<UserManagementPanelProps> = ({ currentRole }) => {
   const { showSuccess, showError, showConfirm } = useDialog();
-  const isManager = currentRole === 'manager' || currentRole === 'admin';
+  const isManager = currentRole === 'manager' || currentRole === 'admin' || currentRole === 'accountant';
 
   const [users, setUsers] = useState<UserProfileRow[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -64,7 +66,8 @@ export const UserManagementPanel: React.FC<UserManagementPanelProps> = ({ curren
   // Form Fields
   const [formEmail, setFormEmail] = useState<string>('');
   const [formPassword, setFormPassword] = useState<string>('password123');
-  const [formRole, setFormRole] = useState<'salesman' | 'customer' | 'admin' | 'manager' | 'staff'>('customer');
+  const [showFormPassword, setShowFormPassword] = useState<boolean>(false);
+  const [formRole, setFormRole] = useState<string>('salesman');
   
   // Customer Specific Fields
   const [formCustomerName, setFormCustomerName] = useState<string>('');
@@ -148,7 +151,7 @@ export const UserManagementPanel: React.FC<UserManagementPanelProps> = ({ curren
     setEditingUser(null);
     setFormEmail('');
     setFormPassword('password123');
-    setFormRole('customer');
+    setFormRole('salesman');
     setFormCustomerName('');
     setFormShopName('');
     setFormCity('');
@@ -379,17 +382,6 @@ export const UserManagementPanel: React.FC<UserManagementPanelProps> = ({ curren
               All Roles ({users.length})
             </button>
             <button
-              onClick={() => setRoleFilter('customer')}
-              className={cn(
-                'px-2.5 py-1 rounded-md font-semibold transition-all cursor-pointer whitespace-nowrap',
-                roleFilter === 'customer'
-                  ? 'bg-purple-600 text-white shadow-2xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-purple-600'
-              )}
-            >
-              Customers ({users.filter((u) => u.role === 'customer').length})
-            </button>
-            <button
               onClick={() => setRoleFilter('salesman')}
               className={cn(
                 'px-2.5 py-1 rounded-md font-semibold transition-all cursor-pointer whitespace-nowrap',
@@ -401,15 +393,26 @@ export const UserManagementPanel: React.FC<UserManagementPanelProps> = ({ curren
               Salesmen ({users.filter((u) => u.role === 'salesman').length})
             </button>
             <button
-              onClick={() => setRoleFilter('manager')}
+              onClick={() => setRoleFilter('customer')}
               className={cn(
                 'px-2.5 py-1 rounded-md font-semibold transition-all cursor-pointer whitespace-nowrap',
-                roleFilter === 'manager'
+                roleFilter === 'customer'
+                  ? 'bg-slate-700 text-white shadow-2xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              )}
+            >
+              Customers ({users.filter((u) => u.role === 'customer').length})
+            </button>
+            <button
+              onClick={() => setRoleFilter('accountant')}
+              className={cn(
+                'px-2.5 py-1 rounded-md font-semibold transition-all cursor-pointer whitespace-nowrap',
+                roleFilter === 'accountant'
                   ? 'bg-indigo-600 text-white shadow-2xs'
                   : 'text-slate-600 dark:text-slate-400 hover:text-indigo-600'
               )}
             >
-              Managers ({users.filter((u) => u.role === 'manager' || u.role === 'admin').length})
+              Admins & Accountants ({users.filter((u) => u.role === 'accountant' || u.role === 'admin').length})
             </button>
           </div>
         </div>
@@ -443,7 +446,8 @@ export const UserManagementPanel: React.FC<UserManagementPanelProps> = ({ curren
                 filteredUsers.map((u) => {
                   const isCustomer = u.role === 'customer';
                   const isSalesman = u.role === 'salesman';
-                  const isManagerRole = u.role === 'manager' || u.role === 'admin';
+                  const isAdminOrAccountant = u.role === 'admin' || u.role === 'accountant';
+                  const isWarehouseManager = u.role === 'warehouse_manager' || u.role === 'stock_manager';
 
                   return (
                     <tr key={u.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-700/40 transition-colors">
@@ -454,7 +458,7 @@ export const UserManagementPanel: React.FC<UserManagementPanelProps> = ({ curren
                         </div>
                         <div className="mt-1">
                           {isCustomer && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 dark:bg-purple-950/80 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
                               <User className="w-3 h-3" />
                               <span>Customer Account</span>
                             </span>
@@ -465,10 +469,16 @@ export const UserManagementPanel: React.FC<UserManagementPanelProps> = ({ curren
                               <span>Sales Representative</span>
                             </span>
                           )}
-                          {isManagerRole && (
+                          {isAdminOrAccountant && (
                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
                               <ShieldCheck className="w-3 h-3" />
-                              <span>Manager / Admin</span>
+                              <span>{u.role === 'accountant' ? 'Accountant' : 'Admin'}</span>
+                            </span>
+                          )}
+                          {isWarehouseManager && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-teal-100 dark:bg-teal-950/80 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-800">
+                              <ShieldCheck className="w-3 h-3" />
+                              <span>Warehouse Manager</span>
                             </span>
                           )}
                         </div>
@@ -604,9 +614,11 @@ export const UserManagementPanel: React.FC<UserManagementPanelProps> = ({ curren
                   onChange={(e) => setFormRole(e.target.value as any)}
                   className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-slate-100 font-bold focus:outline-none focus:border-indigo-500"
                 >
-                  <option value="customer">Customer (Order Portal & Inventory View Only)</option>
                   <option value="salesman">Salesman / Field Representative</option>
-                  <option value="manager">Manager / Administrator</option>
+                  <option value="accountant">Accountant (Full Authority & Admin Privileges)</option>
+                  <option value="admin">Administrator</option>
+                  <option value="warehouse_manager">Warehouse Manager</option>
+                  <option value="customer">Customer (Order Portal & Inventory View Only)</option>
                   <option value="staff">Internal Staff Employee</option>
                 </select>
                 <p className="text-[10px] text-slate-400 mt-1">
@@ -614,7 +626,9 @@ export const UserManagementPanel: React.FC<UserManagementPanelProps> = ({ curren
                     ? 'Customers can log into Order App, view live stock balances, and place orders directly under their own shop details.'
                     : formRole === 'salesman'
                     ? 'Salesmen can log into Order App and place orders on behalf of assigned dealers.'
-                    : 'Managers get full administrative access across inventory, settings, and reports.'}
+                    : formRole === 'accountant' || formRole === 'admin'
+                    ? 'Accountants and Administrators get full administrative authority across transactions, settings, and reports.'
+                    : 'Warehouse Managers get inventory processing and order fulfillment access.'}
                 </p>
               </div>
 
@@ -639,21 +653,31 @@ export const UserManagementPanel: React.FC<UserManagementPanelProps> = ({ curren
                     <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1">
                       Initial Password
                     </label>
-                    <input
-                      type="text"
-                      value={formPassword}
-                      onChange={(e) => setFormPassword(e.target.value)}
-                      placeholder="password123"
-                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-slate-100 font-mono focus:outline-none focus:border-indigo-500"
-                    />
+                    <div className="relative flex items-center">
+                      <input
+                        type={showFormPassword ? 'text' : 'password'}
+                        value={formPassword}
+                        onChange={(e) => setFormPassword(e.target.value)}
+                        placeholder="password123"
+                        className="w-full pl-3 pr-9 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-slate-100 font-mono focus:outline-none focus:border-indigo-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowFormPassword(!showFormPassword)}
+                        className="absolute right-2.5 text-slate-400 hover:text-slate-200 p-1 cursor-pointer"
+                        title={showFormPassword ? 'Hide password' : 'Show password'}
+                      >
+                        {showFormPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
 
               {/* CONDITIONAL SECTION: CUSTOMER DETAILS */}
               {formRole === 'customer' && (
-                <div className="p-4 bg-purple-50/50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-900/50 rounded-2xl space-y-3">
-                  <div className="flex items-center gap-1.5 text-purple-700 dark:text-purple-300 font-bold text-xs uppercase tracking-wider">
+                <div className="p-4 bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 rounded-2xl space-y-3">
+                  <div className="flex items-center gap-1.5 text-slate-700 dark:text-slate-300 font-bold text-xs uppercase tracking-wider">
                     <User className="w-4 h-4" />
                     <span>Customer Profile Information</span>
                   </div>
@@ -669,7 +693,7 @@ export const UserManagementPanel: React.FC<UserManagementPanelProps> = ({ curren
                         value={formCustomerName}
                         onChange={(e) => setFormCustomerName(e.target.value)}
                         placeholder="e.g. BRIJRAJ CREATIVE"
-                        className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-slate-100 font-semibold focus:outline-none focus:border-purple-500"
+                        className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-slate-100 font-semibold focus:outline-none focus:border-slate-400"
                       />
                     </div>
 
@@ -682,7 +706,7 @@ export const UserManagementPanel: React.FC<UserManagementPanelProps> = ({ curren
                         value={formShopName}
                         onChange={(e) => setFormShopName(e.target.value)}
                         placeholder="e.g. Brijraj Hardware & Sanitary"
-                        className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-purple-500"
+                        className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-slate-400"
                       />
                     </div>
                   </div>
@@ -697,7 +721,7 @@ export const UserManagementPanel: React.FC<UserManagementPanelProps> = ({ curren
                         value={formState}
                         onChange={(e) => setFormState(e.target.value)}
                         placeholder="Haryana"
-                        className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-purple-500"
+                        className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-slate-400"
                       />
                     </div>
 
@@ -710,7 +734,7 @@ export const UserManagementPanel: React.FC<UserManagementPanelProps> = ({ curren
                         value={formCity}
                         onChange={(e) => setFormCity(e.target.value)}
                         placeholder="Faridabad"
-                        className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-purple-500"
+                        className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-slate-400"
                       />
                     </div>
 
@@ -723,7 +747,7 @@ export const UserManagementPanel: React.FC<UserManagementPanelProps> = ({ curren
                         value={formPhone}
                         onChange={(e) => setFormPhone(e.target.value)}
                         placeholder="+91 98765 43210"
-                        className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-slate-100 font-mono focus:outline-none focus:border-purple-500"
+                        className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-slate-100 font-mono focus:outline-none focus:border-slate-400"
                       />
                     </div>
                   </div>
