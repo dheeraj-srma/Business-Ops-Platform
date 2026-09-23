@@ -41,3 +41,5 @@ backend/.env
 backend/data/snapshots/*.json
 backend/data/snapshots/*.tmp
 scratch/
+tests/
+backend/tests/
