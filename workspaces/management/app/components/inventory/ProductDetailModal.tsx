@@ -275,42 +275,47 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 dark:divide-slate-700/60 font-normal">
-                        {transactions.map((tx) => (
-                          <tr key={tx.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-700/40 transition-colors">
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400 whitespace-nowrap">
-                              {formatDate(tx.createdAt || (tx as any).created_at)}
-                            </td>
-                            <td className="py-2.5 px-4 whitespace-nowrap">
-                              <span
+                        {transactions.map((tx) => {
+                          const rawType = String(tx.transactionType || (tx as any).transaction_type || '').toUpperCase();
+                          const isStockIn = ['STOCK_IN', 'INWARD', 'INITIAL_STOCK', 'ADJUSTMENT_INCREASE'].includes(rawType);
+                          const isReturn = ['CUSTOMER_RETURN', 'RETURN_IN'].includes(rawType);
+                          const isStockOut = ['STOCK_OUT', 'SALE', 'SALES', 'DISPATCH', 'RETURN_OUT', 'SUPPLIER_RETURN', 'ADJUSTMENT_DECREASE'].includes(rawType);
+                          const isPositive = isStockIn || isReturn;
+
+                          return (
+                            <tr key={tx.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-700/40 transition-colors">
+                              <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400 whitespace-nowrap">
+                                {formatDate(tx.createdAt || (tx as any).created_at)}
+                              </td>
+                              <td className="py-2.5 px-4 whitespace-nowrap">
+                                <span
+                                  className={cn(
+                                    'px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider',
+                                    isReturn
+                                      ? 'bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800'
+                                      : isStockIn
+                                      ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
+                                      : isStockOut
+                                      ? 'bg-red-50 dark:bg-red-950/60 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800'
+                                      : 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
+                                  )}
+                                >
+                                  {rawType === 'INWARD' ? 'STOCK IN' : rawType === 'SALE' ? 'STOCK OUT' : rawType.replace(/_/g, ' ')}
+                                </span>
+                              </td>
+                              <td
                                 className={cn(
-                                  'px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider',
-                                  tx.transactionType === 'STOCK_IN' || (tx as any).transaction_type === 'STOCK_IN'
-                                    ? 'bg-cyan-50 dark:bg-cyan-950/60 text-cyan-700 dark:text-indigo-700 dark:text-indigo-300 border border-cyan-200 dark:border-cyan-800'
-                                    : tx.transactionType === 'STOCK_OUT' || (tx as any).transaction_type === 'STOCK_OUT'
-                                    ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
-                                    : tx.transactionType === 'CUSTOMER_RETURN' || (tx as any).transaction_type === 'CUSTOMER_RETURN'
-                                    ? 'bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800'
-                                    : tx.transactionType === 'INITIAL_STOCK' || (tx as any).transaction_type === 'INITIAL_STOCK'
-                                    ? 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-600'
-                                    : 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800'
+                                  'py-2.5 px-4 text-right font-mono font-bold whitespace-nowrap',
+                                  isReturn
+                                    ? 'text-purple-700 dark:text-purple-400'
+                                    : isPositive
+                                    ? 'text-emerald-700 dark:text-emerald-400'
+                                    : 'text-red-700 dark:text-red-400'
                                 )}
                               >
-                                {(tx.transactionType || (tx as any).transaction_type)?.replace('_', ' ')}
-                              </span>
-                            </td>
-                            <td
-                              className={cn(
-                                'py-2.5 px-4 text-right font-mono font-bold whitespace-nowrap',
-                                (tx.transactionType === 'CUSTOMER_RETURN' || (tx as any).transaction_type === 'CUSTOMER_RETURN')
-                                  ? 'text-purple-700 dark:text-purple-400'
-                                  : (tx.transactionType === 'STOCK_IN' || (tx as any).transaction_type === 'STOCK_IN' || tx.transactionType === 'INITIAL_STOCK' || (tx as any).transaction_type === 'INITIAL_STOCK' || tx.transactionType === 'ADJUSTMENT_INCREASE' || (tx as any).transaction_type === 'ADJUSTMENT_INCREASE')
-                                  ? 'text-cyan-700 dark:text-indigo-600 dark:text-indigo-400'
-                                  : 'text-amber-700 dark:text-amber-400'
-                              )}
-                            >
-                              {(tx.transactionType === 'CUSTOMER_RETURN' || (tx as any).transaction_type === 'CUSTOMER_RETURN' || tx.transactionType === 'STOCK_IN' || (tx as any).transaction_type === 'STOCK_IN' || tx.transactionType === 'INITIAL_STOCK' || (tx as any).transaction_type === 'INITIAL_STOCK' || tx.transactionType === 'ADJUSTMENT_INCREASE' || (tx as any).transaction_type === 'ADJUSTMENT_INCREASE') ? '+' : '-'}
-                              {tx.quantity} {product.unit}
-                            </td>
+                                {isPositive ? '+' : '-'}
+                                {tx.quantity} {product.unit}
+                              </td>
                             <td className="py-2.5 px-4 text-right font-mono text-slate-600 dark:text-slate-400 whitespace-nowrap">
                               {tx.previousStock ?? (tx as any).previous_stock} →{' '}
                               <span className="font-bold text-slate-900 dark:text-slate-100">{tx.newStock ?? (tx as any).new_stock}</span>
@@ -327,7 +332,8 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                               {tx.createdByName || (tx as any).created_by_name}
                             </td>
                           </tr>
-                        ))}
+                        );
+                      })}
                       </tbody>
                     </table>
                   </div>

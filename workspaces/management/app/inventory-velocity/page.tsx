@@ -4,13 +4,14 @@ import { Activity, Zap, Clock, AlertTriangle } from 'lucide-react';
 import { useBi } from '../context/BiDataContext';
 import InteractiveChart from '../components/InteractiveChart';
 import { calculateABC } from '../utils/metricCalculations';
+import { fmtDayMonth } from '../utils/formatters';
 
 export default function InventoryVelocityPage() {
   const { inv, sales, kpis, inventoryList } = useBi();
 
   const movementTimelineData = useMemo(() => {
     return (sales.daily_sales || []).map(d => ({
-      name: d.date.slice(5),
+      name: fmtDayMonth(d.date),
       date: d.date,
       inward: Number(d.stock_in || 0),
       outward: Number(d.stock_out || 0),

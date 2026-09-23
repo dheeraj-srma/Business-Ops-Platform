@@ -3,6 +3,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { Truck, ShieldCheck, Award, AlertCircle } from 'lucide-react';
 import { useBi } from '../context/BiDataContext';
 import InteractiveChart from '../components/InteractiveChart';
+import { fmtDayMonth } from '../utils/formatters';
 
 interface ProcurementData {
   total_purchases: number;
@@ -36,7 +37,7 @@ export default function ProcurementPage() {
   const spendTrendData = useMemo(() => {
     if (procData && procData.timeline && procData.timeline.length > 0) {
       return procData.timeline.map(t => ({
-        name: t.date.slice(5),
+        name: fmtDayMonth(t.date),
         date: t.date,
         value: t.value,
         purchases: t.purchases,
@@ -51,7 +52,7 @@ export default function ProcurementPage() {
         dateMap[d] = (dateMap[d] || 0) + cost;
       });
       return Object.keys(dateMap).sort().map(d => ({
-        name: d.slice(5),
+        name: fmtDayMonth(d),
         value: Math.round(dateMap[d]),
       }));
     }

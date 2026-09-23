@@ -25,6 +25,7 @@ import {
   ChevronsRight
 } from 'lucide-react';
 import InteractiveChart from '../components/InteractiveChart';
+import { fmtDayMonth } from '../utils/formatters';
 
 interface AIDecisionIntelligenceProps {
   inventoryList: any[];
@@ -339,19 +340,19 @@ export default function AIDecisionIntelligence({
     ordersList.forEach(o => {
       const rawDate = o.Timestamp || o.date || '';
       if (rawDate) {
-        const dateKey = String(rawDate).split(' ')[0].slice(5); // MM-DD
+        const rawKey = String(rawDate).split(' ')[0].split('T')[0];
         const qty = Number(o.Quantity || 0);
         const skuKey = String(o.SKU || '').trim().toLowerCase();
         const price = productMetrics.find((p: any) => p.sku.toLowerCase() === skuKey)?.price || 450;
-        if (dateKey.match(/^\d{2}-\d{2}$/)) {
-          dailyRev[dateKey] = (dailyRev[dateKey] || 0) + (qty * price);
+        if (rawKey) {
+          dailyRev[rawKey] = (dailyRev[rawKey] || 0) + (qty * price);
         }
       }
     });
 
     const sortedDates = Object.keys(dailyRev).sort();
     const timeline: any[] = sortedDates.map(d => ({
-      name: d,
+      name: fmtDayMonth(d) || d,
       actual: dailyRev[d],
       forecast: undefined,
       upperBound: undefined,

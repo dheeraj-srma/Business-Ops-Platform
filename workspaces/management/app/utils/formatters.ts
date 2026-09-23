@@ -13,6 +13,30 @@ export function cn(...inputs: (string | boolean | undefined | null | Record<stri
   return classes.join(' ');
 }
 
+/**
+ * Convert a YYYY-MM-DD ISO date string to DD/MM chart axis label.
+ * e.g. "2026-09-21" -> "21/09"
+ */
+export function fmtDayMonth(isoDate: string | null | undefined): string {
+  if (!isoDate) return '';
+  const s = String(isoDate).slice(0, 10);
+  const parts = s.split('-');
+  if (parts.length >= 3) return `${parts[2]}/${parts[1]}`;
+  return s.slice(5); // fallback to MM-DD
+}
+
+/**
+ * Convert a YYYY-MM-DD ISO date string to DD/MM/YYYY full date label.
+ * e.g. "2026-09-21" -> "21/09/2026"
+ */
+export function fmtDayMonthYear(isoDate: string | null | undefined): string {
+  if (!isoDate) return '';
+  const s = String(isoDate).slice(0, 10);
+  const parts = s.split('-');
+  if (parts.length >= 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  return s;
+}
+
 export function formatDate(dateString: string | number | Date | null | undefined): string {
   if (!dateString) return '-';
   const d = new Date(dateString);

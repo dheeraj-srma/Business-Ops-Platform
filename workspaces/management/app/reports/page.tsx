@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { useDialog } from '../context/DialogContext';
 import {
   Download,
   FileSpreadsheet,
@@ -35,6 +36,7 @@ const API = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
 
 export default function ReportsPage() {
   const [downloading, setDownloading] = useState<string | null>(null);
+  const { showError } = useDialog();
 
   async function handleDownload(endpoint: string, title: string) {
     setDownloading(endpoint);
@@ -50,7 +52,7 @@ export default function ReportsPage() {
       a.click();
       URL.revokeObjectURL(url);
     } catch {
-      alert('Failed to generate export file.');
+      showError('Failed to generate export file.');
     } finally {
       setDownloading(null);
     }

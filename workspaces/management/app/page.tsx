@@ -20,6 +20,7 @@ import { useBi } from './context/BiDataContext';
 import InteractiveChart from './components/InteractiveChart';
 import DataFreshnessBadge from './components/DataFreshnessBadge';
 import { KpiDetailModal, KpiModalData, KpiType } from './components/dashboard/KpiDetailModal';
+import { fmtDayMonth } from './utils/formatters';
 
 export default function DashboardPage() {
   const { kpis, sales, inv, proc, ordersList, dealersList, aiFeed } = useBi();
@@ -35,7 +36,7 @@ export default function DashboardPage() {
       const sIn = Number(d.stock_in) || 0;
       const sOut = Number(d.stock_out) || 0;
       return {
-        name: d.date.slice(5),
+        name: fmtDayMonth(d.date),
         revenue: rev,
         orders: ords,
         stock_in: sIn,

@@ -4,6 +4,7 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useBi } from '../context/BiDataContext';
 import InteractiveChart from '../components/InteractiveChart';
 import ExplorerAIInsights from '../analytics/ExplorerAIInsights';
+import { fmtDayMonth } from '../utils/formatters';
 import {
   Search,
   X,
@@ -365,7 +366,7 @@ export default function BusinessExplorerPage() {
     if (sortedDates.length === 0) return [{ name: 'No Activity', value: 0 }];
 
     return sortedDates.slice(-14).map(d => ({
-      name: d.length > 5 ? d.slice(5) : d,
+      name: fmtDayMonth(d) || d,
       value: byDate[d]
     }));
   }, [explorerMetrics]);

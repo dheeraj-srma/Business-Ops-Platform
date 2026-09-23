@@ -283,7 +283,7 @@ export function aggregateTimeSeriesData(
       const diff = dow === 0 ? 6 : dow - 1;
       const monStr = addCalendarDays(dStr, -diff);
       bucketKey = monStr;
-      label = `Wk ${monStr.slice(5)}`;
+      label = `Wk ${monStr.slice(8)}/${monStr.slice(5, 7)}`;
     }
 
     if (!buckets[bucketKey]) {

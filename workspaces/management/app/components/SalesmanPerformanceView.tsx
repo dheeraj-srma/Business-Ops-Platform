@@ -18,11 +18,15 @@ import {
   BarChart3,
   Award,
   AlertCircle,
-  FileText
+  FileText,
+  Building,
+  Phone,
+  Store
 } from 'lucide-react';
 import GithubHeatmap, { HeatmapDay } from './GithubHeatmap';
 import InteractiveChart from './InteractiveChart';
 import { resolveDateRange, getDateRangeBounds, DateRangeType } from '../utils/dateRange';
+import { fmtDayMonth } from '../utils/formatters';
 
 interface TeamSummary {
   total_team_sales: number;
@@ -31,6 +35,19 @@ interface TeamSummary {
   total_active_salesmen: number;
   total_customers_served: number;
   average_order_value: number;
+}
+
+export interface AssignedCustomerItem {
+  customer_id?: string;
+  customer_code: string;
+  shop_name: string;
+  name: string;
+  city: string;
+  state: string;
+  location_id?: string;
+  location_name?: string;
+  phone?: string;
+  contact_person?: string;
 }
 
 interface SalesmanListItem {
@@ -43,6 +60,7 @@ interface SalesmanListItem {
   orders: number;
   average_order_value: number;
   customers: number;
+  assigned_customers?: number;
   units_sold: number;
   active_days: number;
 }
@@ -62,6 +80,7 @@ interface SalesmanDetail {
     average_order_value: number;
     total_units_sold: number;
     unique_customers: number;
+    assigned_customers_count?: number;
     cancelled_returned_orders: number;
     cancelled_returned_value: number;
     net_sales: number;
@@ -69,6 +88,7 @@ interface SalesmanDetail {
     active_days: number;
   };
   daily_trends: { date: string; sales: number; orders: number }[];
+  assigned_customers?: AssignedCustomerItem[];
 }
 
 export default function SalesmanPerformanceView() {
@@ -98,6 +118,9 @@ export default function SalesmanPerformanceView() {
   const [loadingList, setLoadingList] = useState<boolean>(true);
   const [loadingDetail, setLoadingDetail] = useState<boolean>(false);
   const [loadingHeatmap, setLoadingHeatmap] = useState<boolean>(false);
+  const [loadingAssignedCustomers, setLoadingAssignedCustomers] = useState<boolean>(false);
+  const [assignedCustomers, setAssignedCustomers] = useState<AssignedCustomerItem[]>([]);
+  const [customerSearch, setCustomerSearch] = useState<string>('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // Authoritative calendar date strings derived from dateRange.ts with safe custom range handling
@@ -128,11 +151,18 @@ export default function SalesmanPerformanceView() {
     }
   };
 
-  // Get Auth Token from localStorage if needed
+  // Get Auth Token from canonical cookie session — NEVER from localStorage
   const getAuthHeaders = (): HeadersInit => {
     if (typeof window === 'undefined') return {};
-    const token = localStorage.getItem('nalka_access_token');
-    return token ? { Authorization: `Bearer ${token}` } : {};
+    try {
+      const { getAuthSession } = require('@/shared/auth');
+      const session = getAuthSession();
+      return session?.token && session.token !== 'httponly-session-token'
+        ? { Authorization: `Bearer ${session.token}` }
+        : {};
+    } catch {
+      return {};
+    }
   };
 
   // Fetch Team Summary
@@ -198,7 +228,7 @@ export default function SalesmanPerformanceView() {
     }
   };
 
-  // Fetch Heatmap for selected salesman
+  // Fetch Heatmap for selected salesman (or all team)
   const fetchHeatmap = async (salesmanId: string, range: string) => {
     setLoadingHeatmap(true);
     try {
@@ -230,27 +260,73 @@ export default function SalesmanPerformanceView() {
         case 'all':
           daysCount = 365;
           break;
+        case 'custom': {
+          if (customStart && customEnd && customStart <= customEnd) {
+            try {
+              const resDates = resolveDateRange('custom', customStart, customEnd);
+              daysCount = Math.max(7, Math.min(730, resDates.daysCount || 30));
+            } catch {
+              daysCount = 30;
+            }
+          } else {
+            daysCount = 30;
+          }
+          break;
+        }
         default: {
           try {
             const rangeType = (range === 'this_year' ? 'ytd' : range) as DateRangeType;
-            const resDates = resolveDateRange(rangeType, customStart, customEnd);
-            daysCount = Math.max(7, Math.min(730, resDates.daysCount || 30));
+            if (rangeType === 'custom') {
+              if (customStart && customEnd && customStart <= customEnd) {
+                const resDates = resolveDateRange('custom', customStart, customEnd);
+                daysCount = Math.max(7, Math.min(730, resDates.daysCount || 30));
+              } else {
+                daysCount = 30;
+              }
+            } else {
+              const resDates = resolveDateRange(rangeType);
+              daysCount = Math.max(7, Math.min(730, resDates.daysCount || 30));
+            }
           } catch {
             daysCount = 30;
           }
         }
       }
 
-      const url = `/api/sales/salesmen/${salesmanId}/heatmap?days=${daysCount}`;
+      const sid = salesmanId && salesmanId !== 'all' ? encodeURIComponent(salesmanId) : 'all';
+      const url = `/api/sales/salesmen/${sid}/heatmap?days=${daysCount}`;
       const res = await fetch(url, { headers: getAuthHeaders() });
       if (res.ok) {
         const data = await res.json();
         setHeatmapDays(data.days || []);
+      } else {
+        setHeatmapDays([]);
       }
     } catch (err) {
       console.error(err);
+      setHeatmapDays([]);
     } finally {
       setLoadingHeatmap(false);
+    }
+  };
+
+  // Fetch Assigned Customers for selected salesman
+  const fetchAssignedCustomers = async (salesmanId: string) => {
+    setLoadingAssignedCustomers(true);
+    try {
+      const url = `/api/sales/salesmen/${salesmanId}/assigned-customers`;
+      const res = await fetch(url, { headers: getAuthHeaders() });
+      if (res.ok) {
+        const data = await res.json();
+        setAssignedCustomers(data?.customers || []);
+      } else {
+        setAssignedCustomers([]);
+      }
+    } catch (err) {
+      console.error(err);
+      setAssignedCustomers([]);
+    } finally {
+      setLoadingAssignedCustomers(false);
     }
   };
 
@@ -266,9 +342,14 @@ export default function SalesmanPerformanceView() {
   }, [startDateStr, endDateStr, sortBy, sortOrder, statusFilter, searchQuery]);
 
   useEffect(() => {
-    if (selectedSalesmanId) {
+    fetchHeatmap(selectedSalesmanId || 'all', heatmapRange);
+    if (selectedSalesmanId && selectedSalesmanId !== 'all') {
       fetchSalesmanDetail(selectedSalesmanId);
-      fetchHeatmap(selectedSalesmanId, heatmapRange);
+      fetchAssignedCustomers(selectedSalesmanId);
+    } else {
+      setSalesmanDetail(null);
+      setAssignedCustomers([]);
+      setCustomerSearch('');
     }
   }, [selectedSalesmanId, heatmapRange, customStart, customEnd]);
 
@@ -289,7 +370,7 @@ export default function SalesmanPerformanceView() {
 
     if (chartGranularity === 'daily') {
       return raw.map(d => ({
-        name: d.date.slice(5),
+        name: fmtDayMonth(d.date) || d.date,
         date: d.date,
         Sales: Math.round(d.sales),
         Orders: d.orders,
@@ -337,6 +418,20 @@ export default function SalesmanPerformanceView() {
       value: Math.round(val.sales)
     }));
   }, [salesmanDetail, chartGranularity]);
+
+  // Filter assigned customers by search query
+  const filteredAssignedCustomers = useMemo(() => {
+    if (!customerSearch.trim()) return assignedCustomers;
+    const q = customerSearch.toLowerCase();
+    return assignedCustomers.filter(c =>
+      c.shop_name?.toLowerCase().includes(q) ||
+      c.name?.toLowerCase().includes(q) ||
+      c.customer_code?.toLowerCase().includes(q) ||
+      c.city?.toLowerCase().includes(q) ||
+      c.state?.toLowerCase().includes(q) ||
+      c.contact_person?.toLowerCase().includes(q)
+    );
+  }, [assignedCustomers, customerSearch]);
 
   return (
     <div className="space-y-6">
@@ -590,6 +685,75 @@ export default function SalesmanPerformanceView() {
               defaultChartType="area"
               unit="₹"
             />
+          </div>
+
+          {/* Assigned Customers Directory */}
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                <Store size={14} className="text-emerald-400" />
+                Assigned Customers
+                <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
+                  {assignedCustomers.length}
+                </span>
+              </h4>
+              <div className="relative">
+                <Search size={12} className="absolute left-2.5 top-1/2 transform -translate-y-1/2 text-slate-500" />
+                <input
+                  type="text"
+                  placeholder="Search customers..."
+                  value={customerSearch}
+                  onChange={(e) => setCustomerSearch(e.target.value)}
+                  className="pl-7 pr-3 py-1.5 bg-slate-950/80 border border-slate-800 rounded-xl text-[11px] text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 w-40 sm:w-52"
+                />
+              </div>
+            </div>
+
+            {loadingAssignedCustomers ? (
+              <div className="py-8 text-center text-slate-400 text-xs animate-pulse">Loading assigned customers...</div>
+            ) : filteredAssignedCustomers.length === 0 ? (
+              <div className="py-6 text-center text-slate-500 text-xs">
+                {customerSearch ? 'No customers match your search.' : 'No assigned customers found.'}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2.5 max-h-[420px] overflow-y-auto pr-1">
+                {filteredAssignedCustomers.map((c, idx) => (
+                  <div
+                    key={c.customer_id || c.customer_code || idx}
+                    className="bg-slate-950/50 border border-slate-800/70 rounded-xl p-3 hover:border-emerald-500/30 transition-all group"
+                  >
+                    <div className="flex items-start gap-2.5">
+                      <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 text-[11px] font-bold shrink-0 mt-0.5">
+                        {(c.shop_name || c.name || '?').charAt(0).toUpperCase()}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-xs font-bold text-white truncate group-hover:text-emerald-300 transition-colors">
+                          {c.shop_name || c.name}
+                        </div>
+                        <div className="text-[10px] text-slate-400 font-mono mt-0.5">{c.customer_code}</div>
+                        {c.contact_person && c.contact_person !== c.name && (
+                          <div className="text-[10px] text-slate-400 mt-0.5 truncate">Contact: {c.contact_person}</div>
+                        )}
+                        <div className="flex items-center gap-3 mt-1.5 text-[10px] text-slate-500">
+                          {(c.city || c.state) && (
+                            <span className="flex items-center gap-1">
+                              <MapPin size={10} className="text-sky-400" />
+                              {[c.city, c.state].filter(Boolean).join(', ')}
+                            </span>
+                          )}
+                          {c.phone && (
+                            <span className="flex items-center gap-1">
+                              <Phone size={10} className="text-indigo-400" />
+                              {c.phone}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}

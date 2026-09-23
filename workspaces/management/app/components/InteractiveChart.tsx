@@ -32,6 +32,7 @@ import {
   aggregateTimeSeriesData,
   formatCalendarDate
 } from '../utils/dateRange';
+import { fmtDayMonth } from '../utils/formatters';
 
 interface SeriesOption {
   key: string;
@@ -314,7 +315,7 @@ export default function InteractiveChart({
       }
     }
     const peakItem = filteredData[peakIdx];
-    const peakDate = peakItem?.name || (peakItem?.date ? peakItem.date.slice(5) : '');
+    const peakDate = peakItem?.name || (peakItem?.date ? fmtDayMonth(peakItem.date) : '');
     return { latest, avg, peak, peakDate };
   }, [isTimeSeries, filteredData, multiSeries]);
 

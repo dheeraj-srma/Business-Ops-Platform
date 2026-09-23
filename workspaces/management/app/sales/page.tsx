@@ -4,14 +4,25 @@ import { TrendingUp, Users, DollarSign, Award, BarChart3, UserCheck } from 'luci
 import { useBi } from '../context/BiDataContext';
 import InteractiveChart from '../components/InteractiveChart';
 import SalesmanPerformanceView from '../components/SalesmanPerformanceView';
+import { fmtDayMonth } from '../utils/formatters';
 
 export default function SalesPage() {
   const { sales, kpis, ordersList, dealersList } = useBi();
-  const [activeTab, setActiveTab] = useState<'overview' | 'salesman'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'salesman'>('salesman');
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const tab = params.get('tab');
+      if (tab === 'overview' || tab === 'salesman') {
+        setActiveTab(tab);
+      }
+    }
+  }, []);
 
   const dailySalesData = useMemo(() => {
     return (sales.daily_sales || []).map(d => ({
-      name: d.date.slice(5),
+      name: fmtDayMonth(d.date),
       value: d.revenue,
       date: d.date,
     }));

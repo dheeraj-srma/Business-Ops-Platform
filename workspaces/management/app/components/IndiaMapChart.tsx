@@ -557,13 +557,15 @@ export default function IndiaMapChart() {
                           onMouseEnter={() => {
                             // Only update summary for operating states!
                             if (isOperatingState) {
+                              const matchedState = indiaData?.states?.find((s: any) => s.name === stName || (stName === 'NCT of Delhi' && s.name === 'Delhi'));
+                              const totalGross = indiaData?.gross_sales || 1;
                               const stObj: StateSalesData = {
                                 name: stName,
                                 code: stCfg.code,
-                                revenue: stName === 'Haryana' ? 9850000 : stName === 'Uttar Pradesh' ? 3450000 : 3840000,
-                                dealers: stName === 'Haryana' ? 586 : stName === 'Uttar Pradesh' ? 102 : 105,
-                                orders: 420,
-                                share: stName === 'Haryana' ? 72.8 : stName === 'Uttar Pradesh' ? 12.7 : 13.1,
+                                revenue: matchedState ? matchedState.revenue : 0,
+                                dealers: matchedState ? matchedState.dealers : 0,
+                                orders: matchedState ? matchedState.orders : 0,
+                                share: matchedState ? calculateShare(matchedState.revenue, totalGross) : 0,
                                 color: stCfg.color,
                                 center: stCfg.center,
                                 zoom: stCfg.zoom
@@ -658,8 +660,8 @@ export default function IndiaMapChart() {
                                 revenue: opInfo.city.revenue,
                                 orders: opInfo.city.orders,
                                 dealers: opInfo.city.dealers,
-                                units_sold: opInfo.city.units_sold || 2550,
-                                share: opInfo.city.share || 42.0,
+                                units_sold: opInfo.city.units_sold || 0,
+                                share: opInfo.city.share || 0.0,
                                 center: dtInfo ? dtInfo.center : selectedState.center,
                                 zoom: dtInfo ? dtInfo.zoom : selectedState.zoom
                               };

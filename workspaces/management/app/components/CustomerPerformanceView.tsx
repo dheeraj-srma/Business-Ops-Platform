@@ -33,6 +33,7 @@ import GithubHeatmap, { HeatmapDay } from './GithubHeatmap';
 import InteractiveChart from './InteractiveChart';
 import { resolveDateRange, getDateRangeBounds, DateRangeType } from '../utils/dateRange';
 import { calculateAOV } from '../utils/metricCalculations';
+import { fmtDayMonth } from '../utils/formatters';
 
 interface CustomerRecord {
   id: string;
@@ -439,7 +440,7 @@ export default function CustomerPerformanceView() {
     const raw = heatmapDays.filter(d => d.orders > 0 || d.sales > 0);
     if (chartGranularity === 'daily') {
       return raw.map(d => ({
-        name: d.date.slice(5),
+        name: fmtDayMonth(d.date) || d.date,
         date: d.date,
         Sales: Math.round(d.sales),
         Orders: d.orders,

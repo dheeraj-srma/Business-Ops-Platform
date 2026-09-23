@@ -3,6 +3,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { RotateCcw, AlertTriangle, Sparkles, CheckCircle2 } from 'lucide-react';
 import { useBi } from '../context/BiDataContext';
 import InteractiveChart from '../components/InteractiveChart';
+import { fmtDayMonth } from '../utils/formatters';
 
 interface ReturnAnalyticsData {
   total_returns: number;
@@ -35,7 +36,7 @@ export default function QualityReturnsPage() {
   const returnsTimelineData = useMemo(() => {
     if (retData && retData.timeline && retData.timeline.length > 0) {
       return retData.timeline.map(t => ({
-        name: t.date.slice(5),
+        name: fmtDayMonth(t.date),
         date: t.date,
         value: t.value,
         returns: t.returns,
@@ -47,7 +48,7 @@ export default function QualityReturnsPage() {
         const ts = String(r.Timestamp || r.created_at || '').slice(0, 10);
         if (!ts) return;
         if (!dateMap[ts]) {
-          dateMap[ts] = { name: ts.slice(5), value: 0, returns: 0 };
+          dateMap[ts] = { name: fmtDayMonth(ts), value: 0, returns: 0 };
         }
         dateMap[ts].returns += 1;
         dateMap[ts].value += Number(r.Price || r.price || 0) * Number(r.Quantity || r.quantity || 1);

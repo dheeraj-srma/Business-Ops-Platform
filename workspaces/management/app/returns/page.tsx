@@ -23,6 +23,8 @@ import {
   BarChart3
 } from 'lucide-react';
 
+import { useDialog } from '../context/DialogContext';
+
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
 
 interface ReturnRecord {
@@ -130,6 +132,7 @@ function getItemPrice(item: InventoryItem): number {
 
 function ReturnsContent() {
   const searchParams = useSearchParams();
+  const { showWarning, showError } = useDialog();
   const { registerLoadingKey, resolveLoadingKey } = useLoading();
   const [mounted, setMounted]           = useState(false);
   const [returns, setReturns]           = useState<ReturnRecord[]>([]);
@@ -399,7 +402,7 @@ function ReturnsContent() {
   const handleCreateReturn = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!customerName.trim() || !itemName.trim() || !sku.trim() || !quantity || quantity <= 0) {
-      alert('Please fill out all required fields (Customer Name, Item Name, SKU, and Quantity > 0).');
+      showWarning('Please fill out all required fields (Customer Name, Item Name, SKU, and Quantity > 0).');
       return;
     }
 
@@ -437,7 +440,7 @@ function ReturnsContent() {
       fetchReturns();
       fetchInventory();
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'Error processing return');
+      showError(err instanceof Error ? err.message : 'Error processing return');
     } finally {
       setSubmitting(false);
     }

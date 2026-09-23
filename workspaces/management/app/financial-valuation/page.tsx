@@ -3,6 +3,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { useBi } from '../context/BiDataContext';
 import InteractiveChart from '../components/InteractiveChart';
+import { fmtDayMonth } from '../utils/formatters';
 import {
   CircleDollarSign,
   TrendingUp,
@@ -67,7 +68,7 @@ export default function FinancialValuationPage() {
   // 1. Authoritative Revenue Realization Timeline (No fabricated COGS)
   const finPerformanceData = useMemo(() => {
     return (sales.daily_sales || []).map((d) => ({
-      name: d.date.slice(5),
+      name: fmtDayMonth(d.date),
       date: d.date,
       revenue: Number(d.revenue) || 0,
     }));
@@ -108,7 +109,7 @@ export default function FinancialValuationPage() {
     });
 
     return sortedDates.map(date => ({
-      name: date.slice(5),
+      name: fmtDayMonth(date),
       date: date,
       sales: salesMap.get(date) || 0,
       purchase: purMap.get(date) || 0,

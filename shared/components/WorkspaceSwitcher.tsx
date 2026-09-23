@@ -4,9 +4,9 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
-  ShoppingCart,
-  Boxes,
-  BarChart3,
+  Megaphone,
+  Factory,
+  Gem,
   Shield,
   Check,
   User
@@ -31,19 +31,19 @@ const WORKSPACES: WorkspaceItem[] = [
     id: 'sales',
     label: 'Sales',
     route: '/sales',
-    icon: ShoppingCart,
+    icon: Megaphone,
   },
   {
     id: 'operations',
     label: 'Operations',
     route: '/operations',
-    icon: Boxes,
+    icon: Factory,
   },
   {
     id: 'management',
     label: 'Management',
     route: '/management',
-    icon: BarChart3,
+    icon: Gem,
   },
 ];
 
@@ -182,11 +182,11 @@ export default function WorkspaceSwitcher({ currentWorkspace: propWorkspace }: W
   const getActiveIcon = () => {
     switch (activeWorkspace) {
       case 'sales':
-        return ShoppingCart;
+        return Megaphone;
       case 'operations':
-        return Boxes;
+        return Factory;
       case 'management':
-        return BarChart3;
+        return Gem;
       default:
         return Shield;
     }

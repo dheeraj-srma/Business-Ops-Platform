@@ -224,8 +224,9 @@ export default function GithubHeatmap({
 
   const formatTooltipDate = (dateStr: string) => {
     try {
-      const d = new Date(dateStr);
-      return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+      const [y, m, d] = dateStr.split('-').map(Number);
+      const dt = new Date(y, m - 1, d);
+      return dt.toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
     } catch {
       return dateStr;
     }
