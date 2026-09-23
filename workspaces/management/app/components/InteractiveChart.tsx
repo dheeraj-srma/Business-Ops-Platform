@@ -677,18 +677,20 @@ export default function InteractiveChart({
 
   const chartId = useMemo(() => title.replace(/[^a-z0-9]/gi, '_'), [title]);
 
+  // For time-series with a single metric, do NOT render individual date points as legend entries
+  const shouldShowBottomLegend = useMemo(() => {
+    if (showLegend === false) return false;
+    if (multiSeries && multiSeries.length > 0) return true;
+    if (isTimeSeries) return false;
+    return true;
+  }, [showLegend, multiSeries, isTimeSeries]);
+
   const lineGradientStops = useMemo(() => {
-    if (normalizedVisibleData.length === 0) {
+    if (isTimeSeries || normalizedVisibleData.length <= 1) {
+      const primaryColor = '#6366f1';
       return [
-        { offset: '0%', color: COLORS[0] },
-        { offset: '100%', color: COLORS[0] },
-      ];
-    }
-    if (normalizedVisibleData.length === 1) {
-      const col = normalizedVisibleData[0]?.color || COLORS[startIndex % COLORS.length];
-      return [
-        { offset: '0%', color: col },
-        { offset: '100%', color: col },
+        { offset: '0%', color: primaryColor },
+        { offset: '100%', color: primaryColor },
       ];
     }
     const count = normalizedVisibleData.length;
@@ -696,13 +698,43 @@ export default function InteractiveChart({
       offset: `${Math.round((i / (count - 1)) * 100)}%`,
       color: d.color || COLORS[(startIndex + i) % COLORS.length],
     }));
-  }, [normalizedVisibleData, startIndex]);
+  }, [isTimeSeries, normalizedVisibleData, startIndex]);
 
   const renderCustomLineDot = (props: any) => {
     const { cx, cy, index, payload } = props;
     if (cx === undefined || cy === undefined) return null;
-    const color = payload?.color || COLORS[(startIndex + index) % COLORS.length];
     const isHovered = activeHoverIndex === index;
+
+    // Clean, subtle markers for temporal time-series
+    if (isTimeSeries) {
+      return (
+        <g key={`dot-${index}`}>
+          <circle
+            cx={cx}
+            cy={cy}
+            r={isHovered ? 5 : (normalizedVisibleData.length > 20 ? 1.5 : 2.5)}
+            fill="#6366f1"
+            stroke="#0f172a"
+            strokeWidth={isHovered ? 2 : 1}
+            style={{ transition: 'all 0.15s ease', cursor: 'pointer' }}
+          />
+          {isHovered && (
+            <circle
+              cx={cx}
+              cy={cy}
+              r={8}
+              fill="none"
+              stroke="#6366f1"
+              strokeWidth={1.5}
+              opacity={0.6}
+            />
+          )}
+        </g>
+      );
+    }
+
+    // Categorical multi-series point markers matching legend colors
+    const color = payload?.color || COLORS[(startIndex + index) % COLORS.length];
     return (
       <g key={`dot-${index}`}>
         <circle
@@ -751,10 +783,12 @@ export default function InteractiveChart({
               : val;
             const entryColor = multiSeries
               ? (p.color || COLORS[(startIndex + idx) % COLORS.length])
+              : isTimeSeries
+              ? '#6366f1'
               : (itemIndex >= 0 ? (normalizedVisibleData[itemIndex]?.color || COLORS[(startIndex + itemIndex) % COLORS.length]) : (p.color || COLORS[0]));
             return (
               <div key={idx} style={{ color: entryColor, fontWeight: 700, fontSize: '0.88rem' }}>
-                {p.name && multiSeries ? `${p.name}: ` : ''}{formattedVal}
+                {p.name && (multiSeries || isTimeSeries) ? `${p.name}: ` : ''}{formattedVal}
               </div>
             );
           })}
@@ -1001,7 +1035,7 @@ export default function InteractiveChart({
               )}
             </div>
             {/* Bottom Legend */}
-            {showLegend && (
+            {shouldShowBottomLegend && (
               <div className="shrink-0 flex flex-wrap gap-x-3 gap-y-1 justify-center items-center pt-2 pb-0.5 border-t border-slate-800/60 mt-auto select-none">
                 {multiSeries ? (
                   multiSeries.map((s, idx) => (
@@ -1248,7 +1282,7 @@ export default function InteractiveChart({
               )}
             </div>
             {/* Bottom Legend */}
-            {showLegend && (
+            {shouldShowBottomLegend && (
               <div className="shrink-0 flex flex-wrap gap-x-3 gap-y-1 justify-center items-center pt-2 pb-0.5 border-t border-slate-800/60 mt-auto select-none">
                 {multiSeries ? (
                   multiSeries.map((s, idx) => (
@@ -1321,7 +1355,7 @@ export default function InteractiveChart({
               )}
             </div>
             {/* Bottom Legend */}
-            {showLegend && (
+            {shouldShowBottomLegend && (
               <div className="shrink-0 flex flex-wrap gap-x-3 gap-y-1 justify-center items-center pt-2 pb-0.5 border-t border-slate-800/60 mt-auto select-none">
                 {multiSeries ? (
                   multiSeries.map((s, idx) => (
@@ -1406,7 +1440,7 @@ export default function InteractiveChart({
               )}
             </div>
             {/* Bottom Legend */}
-            {showLegend && (
+            {shouldShowBottomLegend && (
               <div className="shrink-0 flex flex-wrap gap-x-3 gap-y-1 justify-center items-center pt-2 pb-0.5 border-t border-slate-800/60 mt-auto select-none">
                 {multiSeries ? (
                   multiSeries.map((s, idx) => (
