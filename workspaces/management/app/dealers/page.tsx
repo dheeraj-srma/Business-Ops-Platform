@@ -7,7 +7,7 @@ import CustomerPerformanceView from '../components/CustomerPerformanceView';
 import { InScreenLoader } from '../components/common/InScreenLoader';
 
 export default function CustomersPage() {
-  const { sales, kpis, dealersList, customersAnalyticsList, loading, selectedRange } = useBi();
+  const { sales, kpis, dealersList, customersAnalyticsList, loading, hasData, selectedRange } = useBi();
   const [activeTab, setActiveTab] = useState<'performance' | 'overview'>('overview');
   const [topProfile, setTopProfile] = useState<{
     top_lines?: Array<{ line_name: string; skus: number; quantity: number; amount: number; share_pct: number }>;
@@ -217,47 +217,47 @@ export default function CustomersPage() {
     ];
   }, [customersAnalyticsList]);
 
-  if (loading) {
+  if (loading && !hasData) {
     return <InScreenLoader message="Loading Customer Partner Network & Collections..." />;
   }
 
   return (
     <div className="space-y-6 pb-12">
       {/* ── Page Header ─────────────────────────────────────────────────── */}
-      <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-5 shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="bg-white dark:bg-slate-900/70 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-xs dark:shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 text-purple-400 font-bold text-xs uppercase tracking-wider mb-1">
+          <div className="flex items-center gap-2 text-purple-600 dark:text-purple-400 font-bold text-xs uppercase tracking-wider mb-1">
             <Users size={16} />
             <span>Customers</span>
           </div>
-          <h1 className="text-xl sm:text-2xl font-extrabold text-white tracking-tight">
+          <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">
             Customers
           </h1>
-          <p className="text-xs text-slate-400 mt-0.5">
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
             Customer rankings, order frequency, growth, and performance analytics.
           </p>
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="px-3.5 py-2 bg-slate-800/60 rounded-xl border border-slate-700/50">
-            <div className="text-[10px] text-slate-400 uppercase font-semibold">Total Customers</div>
-            <div className="text-base font-extrabold text-purple-400">{kpis.active_dealers || dealersList.length || 804} Active</div>
+          <div className="px-3.5 py-2 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700/50">
+            <div className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-semibold">Total Customers</div>
+            <div className="text-base font-extrabold text-purple-600 dark:text-purple-400">{kpis.active_dealers || dealersList.length || 804} Active</div>
           </div>
-          <div className="px-3.5 py-2 bg-slate-800/60 rounded-xl border border-slate-700/50">
-            <div className="text-[10px] text-slate-400 uppercase font-semibold">Top Customer</div>
+          <div className="px-3.5 py-2 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700/50">
+            <div className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-semibold">Top Customer</div>
             <div className="text-base font-extrabold text-indigo-600 dark:text-indigo-400">{topAccount.name}</div>
           </div>
         </div>
       </div>
 
       {/* ── Section Navigation Tabs ──────────────────────────────────────── */}
-      <div className="flex items-center gap-2 bg-slate-900/80 p-1.5 rounded-2xl border border-slate-800 w-fit backdrop-blur-md">
+      <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-900/80 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-800 w-fit backdrop-blur-md">
         <button
           onClick={() => setActiveTab('performance')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
             activeTab === 'performance'
-              ? 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800/60 shadow-md'
-              : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+              ? 'bg-white dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-slate-200 dark:border-indigo-800/60 shadow-xs'
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-slate-800/50'
           }`}
         >
           <Users size={16} />
@@ -266,10 +266,10 @@ export default function CustomersPage() {
 
         <button
           onClick={() => setActiveTab('overview')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
             activeTab === 'overview'
-              ? 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800/60 shadow-md'
-              : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+              ? 'bg-white dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-slate-200 dark:border-indigo-800/60 shadow-xs'
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-slate-800/50'
           }`}
         >
           <BarChart3 size={16} />
@@ -424,72 +424,72 @@ export default function CustomersPage() {
             />
 
             {/* ── Strategic Partner Spotlight Card (Natural Height, Matches Grid Row Height) ── */}
-            <div className="bg-slate-900/70 border border-slate-800 rounded-xl p-4 shadow-lg backdrop-blur-sm flex flex-col justify-between h-full min-h-[420px]">
+            <div className="bg-white dark:bg-slate-900/70 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xs dark:shadow-lg backdrop-blur-sm flex flex-col justify-between h-full min-h-[420px]">
               <div className="space-y-2.5">
                 {/* Header */}
                 <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 text-purple-400 font-bold text-sm">
-                    <Award size={17} className="shrink-0 text-purple-400" />
+                  <div className="flex items-center gap-2 text-purple-600 dark:text-purple-400 font-bold text-sm">
+                    <Award size={17} className="shrink-0 text-purple-600 dark:text-purple-400" />
                     <span>Key Account Spotlight</span>
                   </div>
-                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-900/60 text-indigo-300 border border-indigo-700/60 uppercase">
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-50 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-700/60 uppercase">
                     {topAccount.tier}
                   </span>
                 </div>
-                <p className="text-[11px] text-slate-400 -mt-1 leading-tight">
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 -mt-1 leading-tight">
                   Performance metrics for the highest volume regional distribution customer account.
                 </p>
 
                 {/* Primary Entity Box */}
-                <div className="p-3 bg-slate-800/70 rounded-xl border border-slate-700/50 space-y-1.5">
+                <div className="p-3 bg-slate-50 dark:bg-slate-800/70 rounded-xl border border-slate-200 dark:border-slate-700/50 space-y-1.5">
                   <div className="flex items-start justify-between gap-2">
                     <div>
-                      <div className="text-sm font-black text-slate-100">{topAccount.name} ({topAccount.city})</div>
-                      <div className="text-[11px] text-slate-400 mt-0.5">
+                      <div className="text-sm font-black text-slate-900 dark:text-slate-100">{topAccount.name} ({topAccount.city})</div>
+                      <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
                         Primary territory: {topAccount.state} Hub • Rep: {topAccount.salesman}
                       </div>
                     </div>
-                    <span className="px-1.5 py-0.5 rounded bg-emerald-950/60 text-emerald-400 border border-emerald-800/50 text-[10px] font-bold shrink-0">
+                    <span className="px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/50 text-[10px] font-bold shrink-0">
                       {topAccount.share}% Share
                     </span>
                   </div>
 
                   {/* 4 Compact Metric Points */}
-                  <div className="grid grid-cols-2 gap-x-2 gap-y-1.5 pt-2 border-t border-slate-700/40 text-xs">
+                  <div className="grid grid-cols-2 gap-x-2 gap-y-1.5 pt-2 border-t border-slate-200/80 dark:border-slate-700/40 text-xs">
                     <div>
-                      <span className="text-slate-400 text-[11px]">Gross Sales: </span>
-                      <span className="font-bold text-indigo-400">₹{topAccount.revenue.toLocaleString('en-IN')}</span>
+                      <span className="text-slate-500 dark:text-slate-400 text-[11px]">Gross Sales: </span>
+                      <span className="font-bold text-indigo-600 dark:text-indigo-400">₹{topAccount.revenue.toLocaleString('en-IN')}</span>
                     </div>
                     <div>
-                      <span className="text-slate-400 text-[11px]">Orders: </span>
-                      <span className="font-bold text-sky-400">{topAccount.orders} dispatches</span>
+                      <span className="text-slate-500 dark:text-slate-400 text-[11px]">Orders: </span>
+                      <span className="font-bold text-sky-600 dark:text-sky-400">{topAccount.orders} dispatches</span>
                     </div>
                     <div>
-                      <span className="text-slate-400 text-[11px]">Avg Order: </span>
-                      <span className="font-bold text-purple-400">₹{topAccount.aov.toLocaleString('en-IN')}</span>
+                      <span className="text-slate-500 dark:text-slate-400 text-[11px]">Avg Order: </span>
+                      <span className="font-bold text-purple-600 dark:text-purple-400">₹{topAccount.aov.toLocaleString('en-IN')}</span>
                     </div>
                     <div>
-                      <span className="text-slate-400 text-[11px]">Units Sold: </span>
-                      <span className="font-bold text-amber-400">{topAccount.units.toLocaleString('en-IN')}</span>
+                      <span className="text-slate-500 dark:text-slate-400 text-[11px]">Units Sold: </span>
+                      <span className="font-bold text-amber-600 dark:text-amber-400">{topAccount.units.toLocaleString('en-IN')}</span>
                     </div>
                   </div>
 
                   {/* Secondary Details */}
-                  <div className="grid grid-cols-2 gap-x-2 pt-1.5 border-t border-slate-700/40 text-[11px] text-slate-400">
+                  <div className="grid grid-cols-2 gap-x-2 pt-1.5 border-t border-slate-200/80 dark:border-slate-700/40 text-[11px] text-slate-500 dark:text-slate-400">
                     <div>
                       <span className="text-slate-500">Catalog: </span>
-                      <span className="font-semibold text-slate-300">{topAccount.skus} SKUs ({topAccount.activeDays} days)</span>
+                      <span className="font-semibold text-slate-800 dark:text-slate-300">{topAccount.skus} SKUs ({topAccount.activeDays} days)</span>
                     </div>
                     <div>
                       <span className="text-slate-500">GSTIN: </span>
-                      <span className="font-mono text-slate-300 text-[10px]">{topAccount.gstin}</span>
+                      <span className="font-mono text-slate-700 dark:text-slate-300 text-[10px]">{topAccount.gstin}</span>
                     </div>
                   </div>
                 </div>
 
                 {/* Key Procured Lines Mini-Pill Bar (Filling Available Space without extra height) */}
-                <div className="p-2.5 bg-slate-800/40 rounded-xl border border-slate-700/30 text-[11px] space-y-1">
-                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between">
+                <div className="p-2.5 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200 dark:border-slate-700/30 text-[11px] space-y-1">
+                  <div className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center justify-between">
                     <span>Top Procured Lines</span>
                     <span className="text-slate-500">
                       {topProfile?.days_since_last_order !== undefined
@@ -499,9 +499,9 @@ export default function CustomersPage() {
                   </div>
                   {topProfile?.top_lines && topProfile.top_lines.length > 0 ? (
                     topProfile.top_lines.slice(0, 3).map((line, idx) => {
-                      const colors = ['text-indigo-400', 'text-sky-400', 'text-amber-400'];
+                      const colors = ['text-indigo-600 dark:text-indigo-400', 'text-sky-600 dark:text-sky-400', 'text-amber-600 dark:text-amber-400'];
                       return (
-                        <div key={line.line_name} className="flex items-center justify-between text-slate-300 text-[11px]">
+                        <div key={line.line_name} className="flex items-center justify-between text-slate-800 dark:text-slate-300 text-[11px]">
                           <span className="truncate pr-2">{line.line_name}</span>
                           <span className={`font-semibold shrink-0 ${colors[idx % colors.length]}`}>
                             ₹{(line.amount / 100000).toFixed(2)}L ({line.share_pct}%)
@@ -511,17 +511,17 @@ export default function CustomersPage() {
                     })
                   ) : (
                     <>
-                      <div className="flex items-center justify-between text-slate-300 text-[11px]">
+                      <div className="flex items-center justify-between text-slate-800 dark:text-slate-300 text-[11px]">
                         <span>NALKA CP Fittings</span>
-                        <span className="font-semibold text-indigo-400">₹3.80L (38%)</span>
+                        <span className="font-semibold text-indigo-600 dark:text-indigo-400">₹3.80L (38%)</span>
                       </div>
-                      <div className="flex items-center justify-between text-slate-300 text-[11px]">
+                      <div className="flex items-center justify-between text-slate-800 dark:text-slate-300 text-[11px]">
                         <span>HAHN Bathroom Fixtures</span>
-                        <span className="font-semibold text-sky-400">₹1.99L (20%)</span>
+                        <span className="font-semibold text-sky-600 dark:text-sky-400">₹1.99L (20%)</span>
                       </div>
-                      <div className="flex items-center justify-between text-slate-300 text-[11px]">
+                      <div className="flex items-center justify-between text-slate-800 dark:text-slate-300 text-[11px]">
                         <span>Nalka PTMT Polymers</span>
-                        <span className="font-semibold text-amber-400">₹1.94L (19%)</span>
+                        <span className="font-semibold text-amber-600 dark:text-amber-400">₹1.94L (19%)</span>
                       </div>
                     </>
                   )}

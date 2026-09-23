@@ -6,30 +6,11 @@ import { Header } from './Header';
 import { useApp } from '../../context/AppContext';
 import { ScrollToTopButton } from '../common/ScrollToTopButton';
 import { ProductDetailModal } from '../inventory/ProductDetailModal';
-import { InScreenLoader } from '../common/InScreenLoader';
-
-const TAB_MODULE_TITLES: Record<string, string> = {
-  dashboard: 'Executive Business Insights Dashboard',
-  sales: 'Sales & Revenue Intelligence',
-  dealers: 'Customer Partner Network & Collections',
-  'inventory-velocity': 'Inventory Movement & Velocity Analytics',
-  procurement: 'Procurement & Vendor Intelligence',
-  'quality-returns': 'Returns & Quality Diagnostics',
-  geography: 'Geographic Intelligence & GIS Mapping',
-  'demand-forecast': 'AI Demand Forecast & Predictive Modeling',
-  financial: 'Financial Valuation & Capital Allocation',
-  explorer: '360° Business Entity Explorer',
-  inventory: 'Master Catalog Reference (4,315 SKUs)',
-  admin: 'Central Admin & System Control Center',
-};
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const mainScrollRef = useRef<HTMLElement | null>(null);
-
-  const [isModuleLoading, setIsModuleLoading] = useState(false);
-  const [loadingModuleName, setLoadingModuleName] = useState<string>('');
 
   const {
     fetchData,
@@ -71,49 +52,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     return 'dashboard';
   }, [pathname]);
 
-  // Smooth dismiss when route changes and DOM mounts
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsModuleLoading(false);
-    }, 280);
-    return () => clearTimeout(timer);
-  }, [pathname]);
-
-  // Intercept all route link clicks to trigger glassmorphic loading animation immediately
-  useEffect(() => {
-    const handleGlobalLinkClick = (e: MouseEvent) => {
-      const link = (e.target as HTMLElement)?.closest('a');
-      if (!link) return;
-      const href = link.getAttribute('href');
-      if (href && href.startsWith('/management') && href !== pathname) {
-        let title = 'Business Module';
-        if (href === '/management') title = TAB_MODULE_TITLES.dashboard;
-        else if (href.includes('/sales')) title = TAB_MODULE_TITLES.sales;
-        else if (href.includes('/dealers')) title = TAB_MODULE_TITLES.dealers;
-        else if (href.includes('/inventory-velocity')) title = TAB_MODULE_TITLES['inventory-velocity'];
-        else if (href.includes('/procurement')) title = TAB_MODULE_TITLES.procurement;
-        else if (href.includes('/quality-returns')) title = TAB_MODULE_TITLES['quality-returns'];
-        else if (href.includes('/geography')) title = TAB_MODULE_TITLES.geography;
-        else if (href.includes('/demand-forecast')) title = TAB_MODULE_TITLES['demand-forecast'];
-        else if (href.includes('/financial-valuation')) title = TAB_MODULE_TITLES.financial;
-        else if (href.includes('/explorer')) title = TAB_MODULE_TITLES.explorer;
-        else if (href.includes('/inventory')) title = TAB_MODULE_TITLES.inventory;
-        else if (href.includes('/admin')) title = TAB_MODULE_TITLES.admin;
-
-        setLoadingModuleName(title);
-        setIsModuleLoading(true);
-      }
-    };
-
-    document.addEventListener('click', handleGlobalLinkClick, { capture: true });
-    return () => document.removeEventListener('click', handleGlobalLinkClick, { capture: true });
-  }, [pathname]);
-
   const handleSelectTab = (tab: string) => {
-    if (tab !== currentTab) {
-      setLoadingModuleName(TAB_MODULE_TITLES[tab] || 'Business Module');
-      setIsModuleLoading(true);
-    }
     if (tab === 'dashboard') router.push('/management');
     else if (tab === 'sales') router.push('/management/sales');
     else if (tab === 'dealers') router.push('/management/dealers');
@@ -218,7 +157,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-slate-950 text-slate-100 font-sans antialiased">
+    <div className="flex h-screen w-screen overflow-hidden bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans antialiased">
       {/* Refactored Business Intelligence Sidebar */}
       <Sidebar
         currentTab={currentTab}
@@ -230,7 +169,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       />
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden bg-slate-950">
+      <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden bg-slate-50 dark:bg-slate-950">
         {/* Streamlined Header */}
         <Header
           currentTabTitle={headerMeta.title}
@@ -242,14 +181,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         {/* Dynamic Route Page Body */}
         <main
           ref={mainScrollRef}
-          className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 bg-slate-950 text-slate-100 custom-scrollbar relative"
+          className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 custom-scrollbar relative"
         >
           <div className="w-full max-w-[1760px] 2xl:max-w-[1880px] mx-auto">
-            {isModuleLoading ? (
-              <InScreenLoader message={`Loading ${loadingModuleName || 'Module'}...`} />
-            ) : (
-              children
-            )}
+            {children}
           </div>
 
           <ScrollToTopButton containerRef={mainScrollRef} />

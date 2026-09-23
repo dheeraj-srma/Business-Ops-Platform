@@ -274,4 +274,41 @@ def explorer_entity_analytics(
         logger.error(f"Error generating 360 explorer analytics for '{entity_type}' ('{query}'): {exc}")
         raise HTTPException(status_code=500, detail="Failed to calculate 360 explorer analytics.")
 
+@router.get("/forecast")
+def demand_forecast(
+    metric: str = Query("sales_and_purchases", description="Forecasting target metric: sales_and_purchases, demand, profit, procurement_refill"),
+    horizon: int = Query(7, ge=7, le=90, description="Forecast horizon in days (7, 30, 90)"),
+    demand_shift: float = Query(0.0, ge=-50.0, le=100.0, description="What-if demand volume shift percentage (-20 to +50)"),
+    safety_stock_factor: float = Query(1.0, ge=0.5, le=3.0, description="What-if safety stock buffer multiplier (0.5 to 3.0)")
+):
+    """Statistical business planning forecast powered by Nixtla StatsForecast with 80% prediction intervals."""
+    try:
+        return analytics_service.get_demand_forecast(
+            metric=metric,
+            horizon=horizon,
+            demand_shift=demand_shift,
+            safety_stock_factor=safety_stock_factor
+        )
+    except Exception as exc:
+        logger.error(f"Error generating demand forecast for {metric}: {exc}")
+        raise HTTPException(status_code=500, detail=f"Failed to generate statistical forecast for {metric}.")
+
+@router.get("/ai-insights")
+def ai_insights_summary(
+    demand_shift: float = Query(0.0, description="What-if demand shift percentage"),
+    lead_time_shift: int = Query(0, description="What-if lead time delay in days"),
+    safety_stock_factor: float = Query(1.0, description="What-if safety stock buffer factor")
+):
+    """Authoritative AI intelligence summary: product velocity, growth rates, observed seasonality, and risk distributions."""
+    try:
+        return analytics_service.get_ai_insights(
+            demand_shift=demand_shift,
+            lead_time_shift=lead_time_shift,
+            safety_stock_factor=safety_stock_factor
+        )
+    except Exception as exc:
+        logger.error(f"Error generating AI insights summary: {exc}")
+        raise HTTPException(status_code=500, detail="Failed to generate AI insights summary.")
+
+
 

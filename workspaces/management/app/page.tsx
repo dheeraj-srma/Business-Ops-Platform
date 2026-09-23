@@ -24,7 +24,7 @@ import { fmtDayMonth } from './utils/formatters';
 import { InScreenLoader } from './components/common/InScreenLoader';
 
 export default function DashboardPage() {
-  const { kpis, sales, inv, proc, ordersList, dealersList, aiFeed, loading, selectedRange } = useBi();
+  const { kpis, sales, inv, proc, ordersList, dealersList, aiFeed, loading, hasData, selectedRange } = useBi();
   const [selectedKpi, setSelectedKpi] = useState<KpiModalData | null>(null);
 
   // Authoritative Multi-series timeline for Business Performance (Phase 16)
@@ -303,7 +303,7 @@ export default function DashboardPage() {
     };
   }, [kpis, sales, inv, proc, ordersList]);
 
-  if (loading) {
+  if (loading && !hasData) {
     return <InScreenLoader message="Loading Executive Business Insights Dashboard..." />;
   }
 
@@ -350,42 +350,42 @@ export default function DashboardPage() {
         {/* Gross Revenue */}
         <div
           onClick={() => setSelectedKpi(kpiDataMap.revenue)}
-          className="bg-slate-900/40 hover:bg-slate-800/50 border border-slate-700/40 hover:border-slate-500/50 rounded-2xl p-5 shadow-xs backdrop-blur-sm relative overflow-hidden group cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-indigo-950/20 active:scale-[0.99]"
+          className="bg-white dark:bg-slate-900/40 hover:bg-slate-50 dark:hover:bg-slate-800/50 border border-slate-200 dark:border-slate-700/40 hover:border-slate-300 dark:hover:border-slate-500/50 rounded-2xl p-5 shadow-xs dark:shadow-none relative overflow-hidden group cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-indigo-950/20 active:scale-[0.99]"
         >
-          <div className="flex items-center justify-between text-xs font-semibold text-slate-400 mb-2.5">
-            <span className="tracking-wider text-[11px] font-semibold text-slate-400 group-hover:text-slate-200 transition-colors">
+          <div className="flex items-center justify-between text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2.5">
+            <span className="tracking-wider text-[11px] font-bold text-slate-500 dark:text-slate-400 group-hover:text-slate-900 dark:group-hover:text-slate-200 transition-colors">
               TOTAL SALES
             </span>
-            <div className="w-8 h-8 rounded-lg bg-slate-800/60 border border-slate-700/50 flex items-center justify-center text-slate-300 group-hover:text-sky-400 group-hover:border-sky-500/30 group-hover:bg-sky-500/10 transition-all duration-200">
+            <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/50 flex items-center justify-center text-slate-600 dark:text-slate-300 group-hover:text-sky-600 dark:group-hover:text-sky-400 group-hover:border-sky-300 dark:group-hover:border-sky-500/30 group-hover:bg-sky-50 dark:group-hover:bg-sky-500/10 transition-all duration-200">
               <TrendingUp size={15} />
             </div>
           </div>
-          <div className="text-2xl sm:text-[28px] font-extrabold text-white tracking-tight group-hover:text-sky-300 transition-colors">
+          <div className="text-2xl sm:text-[28px] font-extrabold text-slate-900 dark:text-white tracking-tight group-hover:text-sky-600 dark:group-hover:text-sky-300 transition-colors">
             {kpiDataMap.revenue.value}
           </div>
-          <div className="flex items-center gap-1.5 mt-2.5 text-xs font-medium text-slate-400">
-            <span className="text-emerald-400 font-semibold font-mono">100% Reconciled</span>
-            <span className="text-slate-400">historical sales ledger</span>
+          <div className="flex items-center gap-1.5 mt-2.5 text-xs font-medium text-slate-500 dark:text-slate-400">
+            <span className="text-emerald-600 dark:text-emerald-400 font-bold font-mono">100% Reconciled</span>
+            <span className="text-slate-500 dark:text-slate-400">historical sales ledger</span>
           </div>
         </div>
 
         {/* Inventory Asset Value */}
         <div
           onClick={() => setSelectedKpi(kpiDataMap.inventory)}
-          className="bg-slate-900/40 hover:bg-slate-800/50 border border-slate-700/40 hover:border-slate-500/50 rounded-2xl p-5 shadow-xs backdrop-blur-sm relative overflow-hidden group cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-indigo-950/20 active:scale-[0.99]"
+          className="bg-white dark:bg-slate-900/40 hover:bg-slate-50 dark:hover:bg-slate-800/50 border border-slate-200 dark:border-slate-700/40 hover:border-slate-300 dark:hover:border-slate-500/50 rounded-2xl p-5 shadow-xs dark:shadow-none relative overflow-hidden group cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-indigo-950/20 active:scale-[0.99]"
         >
-          <div className="flex items-center justify-between text-xs font-semibold text-slate-400 mb-2.5">
-            <span className="tracking-wider text-[11px] font-semibold text-slate-400 group-hover:text-slate-200 transition-colors">
+          <div className="flex items-center justify-between text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2.5">
+            <span className="tracking-wider text-[11px] font-bold text-slate-500 dark:text-slate-400 group-hover:text-slate-900 dark:group-hover:text-slate-200 transition-colors">
               INVENTORY VALUE
             </span>
-            <div className="w-8 h-8 rounded-lg bg-slate-800/60 border border-slate-700/50 flex items-center justify-center text-slate-300 group-hover:text-indigo-600 dark:text-indigo-400 group-hover:border-indigo-200 dark:border-indigo-800/60 group-hover:bg-indigo-50 dark:bg-indigo-950/40 transition-all duration-200">
+            <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/50 flex items-center justify-center text-slate-600 dark:text-slate-300 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 group-hover:border-indigo-300 dark:group-hover:border-indigo-800/60 group-hover:bg-indigo-50 dark:group-hover:bg-indigo-950/40 transition-all duration-200">
               <CircleDollarSign size={15} />
             </div>
           </div>
-          <div className="text-2xl sm:text-[28px] font-extrabold text-white tracking-tight group-hover:text-indigo-700 dark:text-indigo-300 transition-colors">
+          <div className="text-2xl sm:text-[28px] font-extrabold text-slate-900 dark:text-white tracking-tight group-hover:text-indigo-600 dark:group-hover:text-indigo-300 transition-colors">
             {kpiDataMap.inventory.value}
           </div>
-          <div className="flex items-center gap-1.5 mt-2.5 text-xs font-medium text-slate-400">
+          <div className="flex items-center gap-1.5 mt-2.5 text-xs font-medium text-slate-500 dark:text-slate-400">
             <span>{inv.total_skus || 4024} SKUs in physical stock</span>
           </div>
         </div>
@@ -393,20 +393,20 @@ export default function DashboardPage() {
         {/* Procurement Spend */}
         <div
           onClick={() => setSelectedKpi(kpiDataMap.purchase)}
-          className="bg-slate-900/40 hover:bg-slate-800/50 border border-slate-700/40 hover:border-slate-500/50 rounded-2xl p-5 shadow-xs backdrop-blur-sm relative overflow-hidden group cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-indigo-950/20 active:scale-[0.99]"
+          className="bg-white dark:bg-slate-900/40 hover:bg-slate-50 dark:hover:bg-slate-800/50 border border-slate-200 dark:border-slate-700/40 hover:border-slate-300 dark:hover:border-slate-500/50 rounded-2xl p-5 shadow-xs dark:shadow-none relative overflow-hidden group cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-indigo-950/20 active:scale-[0.99]"
         >
-          <div className="flex items-center justify-between text-xs font-semibold text-slate-400 mb-2.5">
-            <span className="tracking-wider text-[11px] font-semibold text-slate-400 group-hover:text-slate-200 transition-colors">
+          <div className="flex items-center justify-between text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2.5">
+            <span className="tracking-wider text-[11px] font-bold text-slate-500 dark:text-slate-400 group-hover:text-slate-900 dark:group-hover:text-slate-200 transition-colors">
               PURCHASES
             </span>
-            <div className="w-8 h-8 rounded-lg bg-slate-800/60 border border-slate-700/50 flex items-center justify-center text-slate-300 group-hover:text-amber-400 group-hover:border-amber-500/30 group-hover:bg-amber-500/10 transition-all duration-200">
+            <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/50 flex items-center justify-center text-slate-600 dark:text-slate-300 group-hover:text-amber-600 dark:group-hover:text-amber-400 group-hover:border-amber-300 dark:group-hover:border-amber-500/30 group-hover:bg-amber-50 dark:group-hover:bg-amber-500/10 transition-all duration-200">
               <Truck size={15} />
             </div>
           </div>
-          <div className="text-2xl sm:text-[28px] font-extrabold text-white tracking-tight group-hover:text-amber-300 transition-colors">
+          <div className="text-2xl sm:text-[28px] font-extrabold text-slate-900 dark:text-white tracking-tight group-hover:text-amber-600 dark:group-hover:text-amber-300 transition-colors">
             {kpiDataMap.purchase.value}
           </div>
-          <div className="flex items-center gap-1.5 mt-2.5 text-xs font-medium text-amber-400/90">
+          <div className="flex items-center gap-1.5 mt-2.5 text-xs font-medium text-amber-700 dark:text-amber-400/90">
             <span>{kpis.active_suppliers || proc.total_suppliers || 0} active suppliers</span>
           </div>
         </div>
@@ -414,20 +414,20 @@ export default function DashboardPage() {
         {/* Customer Network */}
         <div
           onClick={() => setSelectedKpi(kpiDataMap.customers)}
-          className="bg-slate-900/40 hover:bg-slate-800/50 border border-slate-700/40 hover:border-slate-500/50 rounded-2xl p-5 shadow-xs backdrop-blur-sm relative overflow-hidden group cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-indigo-950/20 active:scale-[0.99]"
+          className="bg-white dark:bg-slate-900/40 hover:bg-slate-50 dark:hover:bg-slate-800/50 border border-slate-200 dark:border-slate-700/40 hover:border-slate-300 dark:hover:border-slate-500/50 rounded-2xl p-5 shadow-xs dark:shadow-none relative overflow-hidden group cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-indigo-950/20 active:scale-[0.99]"
         >
-          <div className="flex items-center justify-between text-xs font-semibold text-slate-400 mb-2.5">
-            <span className="tracking-wider text-[11px] font-semibold text-slate-400 group-hover:text-slate-200 transition-colors">
+          <div className="flex items-center justify-between text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2.5">
+            <span className="tracking-wider text-[11px] font-bold text-slate-500 dark:text-slate-400 group-hover:text-slate-900 dark:group-hover:text-slate-200 transition-colors">
               CUSTOMERS
             </span>
-            <div className="w-8 h-8 rounded-lg bg-slate-800/60 border border-slate-700/50 flex items-center justify-center text-slate-300 group-hover:text-purple-400 group-hover:border-purple-500/30 group-hover:bg-purple-500/10 transition-all duration-200">
+            <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/50 flex items-center justify-center text-slate-600 dark:text-slate-300 group-hover:text-purple-600 dark:group-hover:text-purple-400 group-hover:border-purple-300 dark:group-hover:border-purple-500/30 group-hover:bg-purple-50 dark:group-hover:bg-purple-500/10 transition-all duration-200">
               <Store size={15} />
             </div>
           </div>
-          <div className="text-2xl sm:text-[28px] font-extrabold text-white tracking-tight group-hover:text-purple-300 transition-colors">
+          <div className="text-2xl sm:text-[28px] font-extrabold text-slate-900 dark:text-white tracking-tight group-hover:text-purple-600 dark:group-hover:text-purple-300 transition-colors">
             {kpiDataMap.customers.value}
           </div>
-          <div className="flex items-center gap-1.5 mt-2.5 text-xs font-medium text-slate-400">
+          <div className="flex items-center gap-1.5 mt-2.5 text-xs font-medium text-slate-500 dark:text-slate-400">
             <span>Verified commercial accounts</span>
           </div>
         </div>
@@ -551,24 +551,24 @@ export default function DashboardPage() {
               <Sparkles size={18} />
               <span>AI Executive Strategic Briefing</span>
             </div>
-            <p className="text-xs text-slate-400 mb-4">
+            <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
               Real-time operational alerts, demand anomalies, and growth opportunities generated by the intelligence engine.
             </p>
 
             <div className="space-y-3">
               {aiFeed.slice(0, 3).map((insight: { type?: string; title?: string; message?: string }, idx: number) => (
-                <div key={idx} className="p-3 bg-slate-800/60 rounded-lg border border-slate-700/50">
-                  <div className={`text-xs font-bold mb-1 ${insight.type === 'warning' ? 'text-amber-400' : insight.type === 'danger' ? 'text-rose-400' : 'text-indigo-600 dark:text-indigo-400'}`}>
+                <div key={idx} className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200/80 dark:border-slate-700/50">
+                  <div className={`text-xs font-bold mb-1 ${insight.type === 'warning' ? 'text-amber-600 dark:text-amber-400' : insight.type === 'danger' ? 'text-rose-600 dark:text-rose-400' : 'text-indigo-600 dark:text-indigo-400'}`}>
                     {insight.title}
                   </div>
-                  <div className="text-xs text-slate-400 leading-relaxed">{insight.message}</div>
+                  <div className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">{insight.message}</div>
                 </div>
               ))}
             </div>
           </div>
 
-          <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between text-xs">
-            <span className="text-slate-400">Need deeper SKU-level demand projection?</span>
+          <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
+            <span className="text-slate-500 dark:text-slate-400">Need deeper SKU-level demand projection?</span>
             <Link href="/management/demand-forecast" className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:text-indigo-300 font-semibold flex items-center gap-1">
               <span>View AI Demand Forecast</span>
               <ArrowUpRight size={14} />
@@ -579,61 +579,61 @@ export default function DashboardPage() {
 
       {/* ── Row 5: Deep Dive Navigation Grid ────────────────────────────── */}
       <div>
-        <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">
+        <div className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3">
           Dedicated Intelligence Modules
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           <Link
             href="/management/sales"
-            className="p-4 bg-slate-900/60 hover:bg-slate-800/80 border border-slate-800 hover:border-indigo-300 dark:border-indigo-700/60 rounded-xl transition-all group cursor-pointer"
+            className="p-4 bg-white dark:bg-slate-900/60 hover:bg-slate-50 dark:hover:bg-slate-800/80 border border-slate-200 dark:border-slate-800 hover:border-indigo-300 dark:hover:border-indigo-700/60 rounded-2xl shadow-xs dark:shadow-none transition-all group cursor-pointer"
           >
-            <TrendingUp className="w-5 h-5 text-sky-400 mb-2 group-hover:scale-110 transition-transform" />
-            <div className="font-bold text-xs text-slate-200">Sales & Revenue</div>
+            <TrendingUp className="w-5 h-5 text-sky-600 dark:text-sky-400 mb-2 group-hover:scale-110 transition-transform" />
+            <div className="font-bold text-xs text-slate-900 dark:text-slate-200">Sales & Revenue</div>
             <div className="text-[10px] text-slate-500 mt-0.5">Velocity & Rankings</div>
           </Link>
 
           <Link
             href="/management/dealers"
-            className="p-4 bg-slate-900/60 hover:bg-slate-800/80 border border-slate-800 hover:border-indigo-300 dark:border-indigo-700/60 rounded-xl transition-all group cursor-pointer"
+            className="p-4 bg-white dark:bg-slate-900/60 hover:bg-slate-50 dark:hover:bg-slate-800/80 border border-slate-200 dark:border-slate-800 hover:border-indigo-300 dark:hover:border-indigo-700/60 rounded-2xl shadow-xs dark:shadow-none transition-all group cursor-pointer"
           >
-            <Store className="w-5 h-5 text-purple-400 mb-2 group-hover:scale-110 transition-transform" />
-            <div className="font-bold text-xs text-slate-200">Dealers & Network</div>
+            <Store className="w-5 h-5 text-purple-600 dark:text-purple-400 mb-2 group-hover:scale-110 transition-transform" />
+            <div className="font-bold text-xs text-slate-900 dark:text-slate-200">Dealers & Network</div>
             <div className="text-[10px] text-slate-500 mt-0.5">804 Connected Outlets</div>
           </Link>
 
           <Link
             href="/management/inventory-velocity"
-            className="p-4 bg-slate-900/60 hover:bg-slate-800/80 border border-slate-800 hover:border-indigo-300 dark:border-indigo-700/60 rounded-xl transition-all group cursor-pointer"
+            className="p-4 bg-white dark:bg-slate-900/60 hover:bg-slate-50 dark:hover:bg-slate-800/80 border border-slate-200 dark:border-slate-800 hover:border-indigo-300 dark:hover:border-indigo-700/60 rounded-2xl shadow-xs dark:shadow-none transition-all group cursor-pointer"
           >
             <Activity className="w-5 h-5 text-indigo-600 dark:text-indigo-400 mb-2 group-hover:scale-110 transition-transform" />
-            <div className="font-bold text-xs text-slate-200">Inventory Velocity</div>
+            <div className="font-bold text-xs text-slate-900 dark:text-slate-200">Inventory Velocity</div>
             <div className="text-[10px] text-slate-500 mt-0.5">Turnover & Fast Movers</div>
           </Link>
 
           <Link
             href="/management/procurement"
-            className="p-4 bg-slate-900/60 hover:bg-slate-800/80 border border-slate-800 hover:border-indigo-300 dark:border-indigo-700/60 rounded-xl transition-all group cursor-pointer"
+            className="p-4 bg-white dark:bg-slate-900/60 hover:bg-slate-50 dark:hover:bg-slate-800/80 border border-slate-200 dark:border-slate-800 hover:border-indigo-300 dark:hover:border-indigo-700/60 rounded-2xl shadow-xs dark:shadow-none transition-all group cursor-pointer"
           >
-            <Truck className="w-5 h-5 text-amber-400 mb-2 group-hover:scale-110 transition-transform" />
-            <div className="font-bold text-xs text-slate-200">Procurement</div>
+            <Truck className="w-5 h-5 text-amber-600 dark:text-amber-400 mb-2 group-hover:scale-110 transition-transform" />
+            <div className="font-bold text-xs text-slate-900 dark:text-slate-200">Procurement</div>
             <div className="text-[10px] text-slate-500 mt-0.5">211 Sourcing Vendors</div>
           </Link>
 
           <Link
             href="/management/geography"
-            className="p-4 bg-slate-900/60 hover:bg-slate-800/80 border border-slate-800 hover:border-indigo-300 dark:border-indigo-700/60 rounded-xl transition-all group cursor-pointer"
+            className="p-4 bg-white dark:bg-slate-900/60 hover:bg-slate-50 dark:hover:bg-slate-800/80 border border-slate-200 dark:border-slate-800 hover:border-indigo-300 dark:hover:border-indigo-700/60 rounded-2xl shadow-xs dark:shadow-none transition-all group cursor-pointer"
           >
             <Compass className="w-5 h-5 text-indigo-600 dark:text-indigo-400 mb-2 group-hover:scale-110 transition-transform" />
-            <div className="font-bold text-xs text-slate-200">Geographic GIS</div>
+            <div className="font-bold text-xs text-slate-900 dark:text-slate-200">Geographic GIS</div>
             <div className="text-[10px] text-slate-500 mt-0.5">State & Territory Maps</div>
           </Link>
 
           <Link
             href="/management/explorer"
-            className="p-4 bg-slate-900/60 hover:bg-slate-800/80 border border-slate-800 hover:border-indigo-300 dark:border-indigo-700/60 rounded-xl transition-all group cursor-pointer"
+            className="p-4 bg-white dark:bg-slate-900/60 hover:bg-slate-50 dark:hover:bg-slate-800/80 border border-slate-200 dark:border-slate-800 hover:border-indigo-300 dark:hover:border-indigo-700/60 rounded-2xl shadow-xs dark:shadow-none transition-all group cursor-pointer"
           >
-            <Search className="w-5 h-5 text-rose-400 mb-2 group-hover:scale-110 transition-transform" />
-            <div className="font-bold text-xs text-slate-200">360° Explorer</div>
+            <Search className="w-5 h-5 text-rose-600 dark:text-rose-400 mb-2 group-hover:scale-110 transition-transform" />
+            <div className="font-bold text-xs text-slate-900 dark:text-slate-200">360° Explorer</div>
             <div className="text-[10px] text-slate-500 mt-0.5">Deep SKU / Entity Telemetry</div>
           </Link>
         </div>

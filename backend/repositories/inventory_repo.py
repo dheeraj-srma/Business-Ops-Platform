@@ -207,6 +207,19 @@ class InventoryRepository:
         records = []
         seen_keys = set()
         for p in prods:
+            sku_val = str(p.get("sku") or "").strip().upper()
+            name_val = str(p.get("name") or "").strip().upper()
+            if (
+                any(sku_val.startswith(pfx) for pfx in [
+                    "TEST", "TST-", "NLK-TEST", "NLK-RES-", "NLK-REL-", "NLK-SKUR-",
+                    "NLK-IRES-", "REC-SKU-", "NLK-TST-", "NLK-OUT-", "NLK-ADJ-",
+                    "NLK-INC-", "NLK-LOCK-", "NLK-IDEM-", "NLK-INS-", "PROBE-", "TX-PROBE-",
+                    "AUTO-INV-", "NLK-DEB-", "DEBUG-"
+                ]) or
+                "TEST" in name_val or "IDEMPOTENT" in name_val or "STOCK IN TEST" in name_val or "STOCK OUT TEST" in name_val or "RES TEST" in name_val or "DEBUG" in name_val or "PROBE" in name_val
+            ):
+                continue
+
             pkey = p.get("id") or p.get("sku")
             if pkey and pkey in seen_keys:
                 continue

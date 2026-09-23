@@ -15,10 +15,11 @@ export default function DemandForecastPage() {
     suppliersList,
     inwardsList,
     biData,
-    loading
+    loading,
+    hasData
   } = useBi();
 
-  if (loading) {
+  if (loading && !hasData) {
     return <InScreenLoader message="Loading AI Demand Forecast & Predictive Modeling..." />;
   }
 

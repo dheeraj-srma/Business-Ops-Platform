@@ -9,7 +9,7 @@ import { fmtDayMonth } from '../utils/formatters';
 import { InScreenLoader } from '../components/common/InScreenLoader';
 
 export default function InventoryVelocityPage() {
-  const { inv, sales, kpis, inventoryList, loading, selectedRange } = useBi();
+  const { inv, sales, kpis, inventoryList, loading, hasData, selectedRange } = useBi();
 
   const movementTimelineData = useMemo(() => {
     return (sales.daily_sales || []).map(d => ({
@@ -129,7 +129,7 @@ export default function InventoryVelocityPage() {
     ];
   }, [inventoryList]);
 
-  if (loading) {
+  if (loading && !hasData) {
     return <InScreenLoader message="Loading Inventory Movement & Velocity Analytics..." />;
   }
 

@@ -733,7 +733,7 @@ export default function CentralAdminPage() {
       )}
 
       {/* Navigation Sub-Tabs */}
-      <div style={{ display: 'flex', gap: '6px', borderBottom: '1px solid #334155', marginBottom: '1.5rem', overflowX: 'auto', paddingBottom: '4px' }}>
+      <div className="flex gap-1.5 border-b border-slate-200 dark:border-slate-800 mb-6 overflow-x-auto pb-1">
         {[
           { id: 'overview', label: 'Overview', icon: Layers },
           { id: 'users', label: 'Users', icon: Users },
@@ -748,22 +748,11 @@ export default function CentralAdminPage() {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as TabType)}
-              style={{
-                padding: '10px 16px',
-                borderRadius: '8px 8px 0 0',
-                background: isActive ? '#1e293b' : 'transparent',
-                border: isActive ? '1px solid #334155' : '1px solid transparent',
-                borderBottom: isActive ? '2px solid #6366f1' : 'none',
-                color: isActive ? '#6366f1' : '#94a3b8',
-                fontWeight: isActive ? 700 : 500,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                fontSize: '0.88rem',
-                whiteSpace: 'nowrap',
-                transition: 'all 0.15s ease'
-              }}
+              className={`px-4 py-2.5 rounded-t-xl text-xs sm:text-sm font-semibold transition-all flex items-center gap-2 cursor-pointer border-b-2 whitespace-nowrap ${
+                isActive
+                  ? 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 border-b-indigo-600 text-indigo-600 dark:text-indigo-400 shadow-xs'
+                  : 'bg-transparent border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/50'
+              }`}
             >
               <Icon size={16} />
               <span>{tab.label}</span>
@@ -1282,30 +1271,33 @@ export default function CentralAdminPage() {
 
       {/* TAB 3: STAFF DIRECTORY */}
       {activeTab === 'staff' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.25rem' }}>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {['admin', 'warehouse_manager', 'manager', 'salesman', 'customer'].map((roleKey) => {
             const staffList = users.filter((u) => (u.role || '').toLowerCase() === roleKey);
             return (
-              <div key={roleKey} style={{ padding: '1.25rem', borderRadius: '12px', background: '#1e293b', border: '1px solid #334155' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', paddingBottom: '8px', borderBottom: '1px solid #334155' }}>
-                  <h3 style={{ fontSize: '0.95rem', fontWeight: 700, margin: 0, textTransform: 'capitalize' }}>
+              <div key={roleKey} className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
+                <div className="flex justify-between items-center mb-4 pb-2 border-b border-slate-100 dark:border-slate-800">
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 capitalize m-0">
                     {roleKey.replace('_', ' ')}s ({staffList.length})
                   </h3>
-                  <span className="badge" style={{ fontSize: '0.7rem' }}>{roleKey}</span>
+                  <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
+                    {roleKey}
+                  </span>
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div className="flex flex-col gap-2">
                   {staffList.length === 0 ? (
-                    <p style={{ fontSize: '0.8rem', color: '#64748b' }}>No active staff registered under role.</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 py-2">No active staff registered under role.</p>
                   ) : (
                     staffList.map((st) => (
-                      <div key={st.id} style={{ padding: '8px 10px', borderRadius: '6px', background: 'rgba(15, 23, 42, 0.4)', border: '1px solid rgba(255, 255, 255, 0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div key={st.id} className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200/70 dark:border-slate-800/80 flex justify-between items-center transition-colors">
                         <div>
-                          <div style={{ fontSize: '0.85rem', fontWeight: 600 }}>{st.full_name || st.email}</div>
-                          <div style={{ fontSize: '0.72rem', color: '#94a3b8' }}>{st.email}</div>
+                          <div className="text-xs font-semibold text-slate-900 dark:text-slate-100">{st.full_name || st.email}</div>
+                          <div className="text-[11px] text-slate-500 dark:text-slate-400">{st.email}</div>
                         </div>
-                        <span style={{ fontSize: '0.72rem', color: st.is_active ? '#10b981' : '#ef4444' }}>
-                          {st.is_active ? '● Active' : '● Inactive'}
+                        <span className={`text-[11px] font-medium flex items-center gap-1.5 ${st.is_active ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${st.is_active ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+                          {st.is_active ? 'Active' : 'Inactive'}
                         </span>
                       </div>
                     ))

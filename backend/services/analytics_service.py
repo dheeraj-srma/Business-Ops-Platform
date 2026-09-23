@@ -9,6 +9,7 @@ from repositories.dealer_repo import DealerRepository
 from repositories.supplier_repo import SupplierRepository
 from repositories.historical_sales_repo import HistoricalSalesRepository
 from services.snapshot_service import SnapshotService
+from services.forecasting.forecast_adapter import forecast_adapter
 
 logger = logging.getLogger("analytics_service")
 
@@ -880,6 +881,33 @@ class AnalyticsService:
             end_date=end_date,
         )
 
+    @staticmethod
+    def get_demand_forecast(
+        metric: str = "sales_and_purchases",
+        horizon: int = 7,
+        demand_shift: float = 0.0,
+        safety_stock_factor: float = 1.0
+    ) -> Dict[str, Any]:
+        return forecast_adapter.generate_forecast(
+            metric=metric,
+            horizon=horizon,
+            demand_shift=demand_shift,
+            safety_stock_factor=safety_stock_factor
+        )
+
+    @staticmethod
+    def get_ai_insights(
+        demand_shift: float = 0.0,
+        lead_time_shift: int = 0,
+        safety_stock_factor: float = 1.0
+    ) -> Dict[str, Any]:
+        return HistoricalSalesRepository.get_ai_insights_data(
+            demand_shift=demand_shift,
+            lead_time_shift=lead_time_shift,
+            safety_stock_factor=safety_stock_factor
+        )
+
 analytics_service = AnalyticsService()
+
 
 

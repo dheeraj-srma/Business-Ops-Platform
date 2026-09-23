@@ -138,11 +138,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const navContent = (collapsed: boolean, isMobileView: boolean = false) => {
     return (
-      <div className="flex flex-col h-full w-full bg-slate-900 text-slate-200 select-none border-r border-slate-800 transition-colors">
+      <div className="flex flex-col h-full w-full bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 select-none border-r border-slate-200 dark:border-slate-800 transition-colors shadow-xs dark:shadow-none">
         {/* Top Header: Brand & Collapse / Expand Toggle */}
         <div
           className={cn(
-            'h-16 flex items-center shrink-0 border-b border-slate-800 transition-all overflow-hidden',
+            'h-16 flex items-center shrink-0 border-b border-slate-200 dark:border-slate-800 transition-all overflow-hidden',
             collapsed ? 'px-3 justify-center' : 'px-4 justify-between'
           )}
         >
@@ -158,7 +158,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   N
                 </div>
                 <div className="flex items-center gap-1.5 min-w-0 overflow-hidden whitespace-nowrap">
-                  <span className="font-bold text-base tracking-tight text-white group-hover:text-indigo-600 dark:text-indigo-400 transition-colors truncate">
+                  <span className="font-bold text-base tracking-tight text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors truncate">
                     nalka
                   </span>
                   <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/60 shrink-0">
@@ -171,7 +171,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <button
                   onClick={onCloseMobile}
                   title="Close menu"
-                  className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer shrink-0"
+                  className="p-1.5 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors cursor-pointer shrink-0"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -181,9 +181,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     id="btn-toggle-sidebar-collapse"
                     onClick={onToggleCollapse}
                     title="Collapse sidebar (Ctrl+B)"
-                    className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800 active:scale-95 rounded-lg transition-all cursor-pointer shrink-0"
+                    className="p-1.5 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 active:scale-95 rounded-lg transition-all cursor-pointer shrink-0"
                   >
-                    <ChevronsLeft className="w-4 h-4 text-slate-400" />
+                    <ChevronsLeft className="w-4 h-4 text-slate-500 dark:text-slate-400" />
                   </button>
                 )
               )}
@@ -217,7 +217,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           {NAV_GROUPS.map((group, groupIdx) => (
             <div key={groupIdx} className="space-y-1">
               {!collapsed && (
-                <div className="px-3 pt-2 pb-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider overflow-hidden whitespace-nowrap">
+                <div className="px-3 pt-2 pb-1 text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider overflow-hidden whitespace-nowrap">
                   {group.groupTitle}
                 </div>
               )}
@@ -238,15 +238,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       'w-full flex items-center rounded-lg text-xs font-medium transition-all duration-150 text-left cursor-pointer group relative border overflow-hidden whitespace-nowrap',
                       collapsed ? 'justify-center p-2.5' : 'justify-between px-3 py-2.5',
                       isActive
-                        ? 'bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 font-semibold border-indigo-200 dark:border-indigo-800/60 shadow-sm'
-                        : 'text-slate-400 hover:bg-slate-800/70 hover:text-slate-200 border-transparent'
+                        ? 'bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 font-semibold border-indigo-200 dark:border-indigo-800/60 shadow-xs'
+                        : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/70 hover:text-slate-900 dark:hover:text-slate-200 border-transparent'
                     )}
                   >
                     <div className={cn('flex items-center min-w-0 overflow-hidden whitespace-nowrap', collapsed ? 'justify-center' : 'gap-3')}>
                       <Icon
                         className={cn(
                           'w-4 h-4 shrink-0 transition-transform duration-150 group-hover:scale-110',
-                          isActive ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-500 group-hover:text-slate-300'
+                          isActive ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400 dark:text-slate-500 group-hover:text-slate-700 dark:group-hover:text-slate-300'
                         )}
                       />
                       {!collapsed && <span className="truncate whitespace-nowrap">{item.label}</span>}
@@ -275,12 +275,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Footer Info Pill */}
         {!collapsed && (
-          <div className="p-3 border-t border-slate-800">
-            <div className="flex items-center gap-2 p-2 bg-slate-800/40 rounded-lg border border-slate-800 text-[11px] text-slate-400">
+          <div className="p-3 border-t border-slate-200 dark:border-slate-800">
+            <div className="flex items-center gap-2 p-2 bg-slate-50 dark:bg-slate-800/40 rounded-lg border border-slate-200 dark:border-slate-800 text-[11px] text-slate-600 dark:text-slate-400">
               <ShieldCheck className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
               <div className="truncate">
-                <span className="text-slate-300 font-semibold">PostgreSQL</span>
-                <span className="mx-1 text-slate-600">•</span>
+                <span className="text-slate-800 dark:text-slate-300 font-semibold">PostgreSQL</span>
+                <span className="mx-1 text-slate-400 dark:text-slate-600">•</span>
                 <span className="text-indigo-600 dark:text-indigo-400">Live BI Engine</span>
               </div>
             </div>

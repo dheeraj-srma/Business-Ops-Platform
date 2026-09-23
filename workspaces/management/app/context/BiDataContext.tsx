@@ -163,6 +163,8 @@ interface BiDataContextType {
   biData: BIData;
   dataQuality: DataQualityReport | null;
   loading: boolean;
+  isRefreshing: boolean;
+  hasData: boolean;
   dataStatus: DataQualityStatus;
   dataAsOf: string | null;
   dataMinDate: string;
@@ -194,7 +196,7 @@ interface BiDataContextType {
   fin?: FinancialIntelligence;
   aiFeed: any[];
   skuMap: Record<string, { name: string; category: string; price: number }>;
-  refreshBiData: () => Promise<void>;
+  refreshBiData: (isBackground?: boolean) => Promise<void>;
   invalidateAnalytics: (scope?: string) => Promise<void>;
 }
 
@@ -203,6 +205,12 @@ const BiDataContext = createContext<BiDataContextType | null>(null);
 export const BiDataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [biData, setBiData] = useState<BIData>(EMPTY_BI_DATA);
   const [loading, setLoading] = useState<boolean>(true);
+  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
+  const [hasData, setHasData] = useState<boolean>(false);
+  const hasDataRef = useRef<boolean>(false);
+  const lastFetchTimeRef = useRef<number>(Date.now());
+  const isFetchingRef = useRef<boolean>(false);
+
   const [dataStatus, setDataStatus] = useState<DataQualityStatus>('LIVE');
   const [dataAsOf, setDataAsOf] = useState<string | null>(null);
   const [dataMinDate, setDataMinDate] = useState<string>(EARLIEST_DATA_DATE);
@@ -247,9 +255,17 @@ export const BiDataProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, []);
 
-  const fetchAllData = useCallback(async () => {
+  const fetchAllData = useCallback(async (isBackground: boolean = false) => {
+    // Avoid duplicate simultaneous requests
+    if (isFetchingRef.current) return;
+    isFetchingRef.current = true;
+
     try {
-      setLoading(true);
+      if (!hasDataRef.current && !isBackground) {
+        setLoading(true);
+      } else {
+        setIsRefreshing(true);
+      }
 
       const bounds = getDateRangeBounds(
         selectedRange,
@@ -288,6 +304,9 @@ export const BiDataProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
         if (val && Object.keys(val).length > 0) {
           setBiData(val);
+          hasDataRef.current = true;
+          setHasData(true);
+          lastFetchTimeRef.current = Date.now();
           const isSnapshot = val.data_mode === 'SNAPSHOT' || val.status === 'SNAPSHOT' || dbMode === 'READ_ONLY';
           setDataStatus(isSnapshot ? 'SNAPSHOT' : 'LIVE');
           setDataAsOf(val.data_as_of || null);
@@ -295,13 +314,13 @@ export const BiDataProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             setDataMinDate(val.data_min_date);
           }
           setSnapshotUpdatedAt(val.snapshot_updated_at || snapHeaderTime || null);
-        } else {
-          setBiData(prev => (prev && Object.keys(prev).length > 0 ? prev : EMPTY_BI_DATA));
-          setDataStatus(prev => (prev === 'LIVE' ? 'SNAPSHOT' : 'UNAVAILABLE'));
+        } else if (!hasDataRef.current) {
+          setBiData(EMPTY_BI_DATA);
+          setDataStatus('UNAVAILABLE');
         }
-      } else {
-        setBiData(prev => (prev && Object.keys(prev).length > 0 ? prev : EMPTY_BI_DATA));
-        setDataStatus(prev => (prev === 'LIVE' ? 'SNAPSHOT' : 'UNAVAILABLE'));
+      } else if (!hasDataRef.current) {
+        setBiData(EMPTY_BI_DATA);
+        setDataStatus('UNAVAILABLE');
       }
 
       // Record last sync time in Asia/Kolkata
@@ -364,52 +383,57 @@ export const BiDataProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         setCustomersAnalyticsList(list);
       }
     } catch {
-      setBiData(EMPTY_BI_DATA);
-      setDataStatus('UNAVAILABLE');
-      setDataAsOf(null);
+      if (!hasDataRef.current) {
+        setBiData(EMPTY_BI_DATA);
+        setDataStatus('UNAVAILABLE');
+        setDataAsOf(null);
+      }
     } finally {
       setLoading(false);
+      setIsRefreshing(false);
+      isFetchingRef.current = false;
     }
   }, [selectedRange, referenceDate, customStart, customEnd, dataMinDate]);
 
   // Initial fetch and fetch on range change
   useEffect(() => {
-    fetchAllData();
+    fetchAllData(false);
   }, [fetchAllData]);
 
-  // Automatic refresh on tab focus / window visibility
+  // Background refresh on tab focus / window visibility ONLY if data is stale (>= 5 minutes)
   useEffect(() => {
-    const handleVisibilityChange = () => {
+    const handleRevalidation = () => {
       if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
-        fetchAllData();
+        const elapsed = Date.now() - lastFetchTimeRef.current;
+        // Only trigger quiet background sync if at least 5 minutes have elapsed since last fetch
+        if (elapsed >= 300000) {
+          fetchAllData(true);
+        }
       }
-    };
-    const handleFocus = () => {
-      fetchAllData();
     };
 
     if (typeof window !== 'undefined') {
-      document.addEventListener('visibilitychange', handleVisibilityChange);
-      window.addEventListener('focus', handleFocus);
+      document.addEventListener('visibilitychange', handleRevalidation);
+      window.addEventListener('focus', handleRevalidation);
       return () => {
-        document.removeEventListener('visibilitychange', handleVisibilityChange);
-        window.removeEventListener('focus', handleFocus);
+        document.removeEventListener('visibilitychange', handleRevalidation);
+        window.removeEventListener('focus', handleRevalidation);
       };
     }
   }, [fetchAllData]);
 
-  // Periodic refresh every 60s
+  // Periodic quiet background refresh every 60s
   useEffect(() => {
     const interval = setInterval(() => {
       if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
-        fetchAllData();
+        fetchAllData(true);
       }
     }, 60000);
     return () => clearInterval(interval);
   }, [fetchAllData]);
 
   const invalidateAnalytics = useCallback(async (scope?: string) => {
-    await fetchAllData();
+    await fetchAllData(false);
   }, [fetchAllData]);
 
   // Strict Authoritative Metrics
@@ -452,6 +476,8 @@ export const BiDataProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         biData,
         dataQuality,
         loading,
+        isRefreshing,
+        hasData,
         dataStatus,
         dataAsOf,
         dataMinDate,

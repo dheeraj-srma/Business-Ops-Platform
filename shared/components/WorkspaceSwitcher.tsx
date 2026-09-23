@@ -58,6 +58,7 @@ export default function WorkspaceSwitcher({ currentWorkspace: propWorkspace }: W
   const containerRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
+  const lastProfileCheckRef = useRef<number>(0);
 
   useEffect(() => {
     setIsClient(true);
@@ -113,14 +114,20 @@ export default function WorkspaceSwitcher({ currentWorkspace: propWorkspace }: W
       refreshProfile();
     };
 
+    const handleFocus = () => {
+      if (Date.now() - lastProfileCheckRef.current > 300000) {
+        refreshProfile();
+      }
+    };
+
     window.addEventListener('nalka_auth_change', handleAuthEvent);
     window.addEventListener('storage', handleAuthEvent);
-    window.addEventListener('focus', handleAuthEvent);
+    window.addEventListener('focus', handleFocus);
 
     return () => {
       window.removeEventListener('nalka_auth_change', handleAuthEvent);
       window.removeEventListener('storage', handleAuthEvent);
-      window.removeEventListener('focus', handleAuthEvent);
+      window.removeEventListener('focus', handleFocus);
     };
   }, []);
 

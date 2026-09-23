@@ -9,7 +9,7 @@ import { fmtDayMonth } from '../utils/formatters';
 import { InScreenLoader } from '../components/common/InScreenLoader';
 
 export default function SalesPage() {
-  const { sales, kpis, activeBounds, loading, selectedRange } = useBi();
+  const { sales, kpis, activeBounds, loading, hasData, selectedRange } = useBi();
   const [activeTab, setActiveTab] = useState<'overview' | 'salesman'>('salesman');
 
   useEffect(() => {
@@ -98,44 +98,44 @@ export default function SalesPage() {
     }));
   }, [orderDist]);
 
-  if (loading) {
+  if (loading && !hasData) {
     return <InScreenLoader message="Loading Sales & Revenue Intelligence..." />;
   }
 
   return (
     <div className="space-y-6 pb-12">
       {/* ── Page Header ─────────────────────────────────────────────────── */}
-      <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-5 shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="bg-white dark:bg-slate-900/70 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-xs dark:shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 text-sky-400 font-bold text-xs uppercase tracking-wider mb-1">
+          <div className="flex items-center gap-2 text-sky-600 dark:text-sky-400 font-bold text-xs uppercase tracking-wider mb-1">
             <TrendingUp size={16} />
             <span>Sales</span>
           </div>
-          <h1 className="text-xl sm:text-2xl font-extrabold text-white tracking-tight">
+          <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">
             Sales Performance
           </h1>
-          <p className="text-xs text-slate-400 mt-0.5">
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
             Authoritative sales trends, product dispatches, verified customer rankings, and salesman telemetry.
           </p>
         </div>
 
         <div className="flex items-center gap-3 flex-wrap">
           <DataFreshnessBadge />
-          <div className="px-3.5 py-2 bg-slate-800/60 rounded-xl border border-slate-700/50">
-            <div className="text-[10px] text-slate-400 uppercase font-semibold">Total Sales</div>
-            <div className="text-base font-extrabold text-sky-400">₹{Number(kpis.total_revenue || 0).toLocaleString('en-IN')}</div>
+          <div className="px-3.5 py-2 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700/50">
+            <div className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-semibold">Total Sales</div>
+            <div className="text-base font-extrabold text-sky-600 dark:text-sky-400">₹{Number(kpis.total_revenue || 0).toLocaleString('en-IN')}</div>
           </div>
         </div>
       </div>
 
       {/* ── Section Navigation Tabs ──────────────────────────────────────── */}
-      <div className="flex items-center gap-2 bg-slate-900/80 p-1.5 rounded-2xl border border-slate-800 w-fit backdrop-blur-md">
+      <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-900/80 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-800 w-fit backdrop-blur-md">
         <button
           onClick={() => setActiveTab('salesman')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
             activeTab === 'salesman'
-              ? 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800/60 shadow-md'
-              : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+              ? 'bg-white dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800/60 shadow-xs'
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-slate-800/50'
           }`}
         >
           <UserCheck size={16} />

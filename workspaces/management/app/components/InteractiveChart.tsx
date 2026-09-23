@@ -108,8 +108,8 @@ function WalkingPieLegendItem({
       onMouseLeave={onLeave}
       className={`relative flex items-center justify-between px-2.5 py-1.5 min-h-[32px] rounded-lg transition-all duration-200 text-xs select-none cursor-default overflow-hidden ${
         isHovered
-          ? 'bg-slate-800/95 border border-slate-600 shadow-md ring-1 ring-slate-600/50'
-          : 'bg-slate-900/80 border border-slate-800/90 hover:border-slate-700'
+          ? 'bg-slate-100 dark:bg-slate-800/95 border border-indigo-400 dark:border-slate-600 shadow-sm dark:shadow-md ring-1 ring-indigo-300 dark:ring-slate-600/50'
+          : 'bg-slate-50 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800/90 hover:border-slate-300 dark:hover:border-slate-700'
       }`}
       style={{ cursor: 'default', userSelect: 'none', WebkitUserSelect: 'none' }}
     >
@@ -132,22 +132,22 @@ function WalkingPieLegendItem({
           >
             <div className="animate-legend-walk select-none cursor-default">
               <span className="inline-flex items-center gap-2 pr-6 select-none cursor-default">
-                <span className="font-bold text-slate-100">{item.name}</span>
-                <span className="text-slate-500">•</span>
-                <span className="text-slate-300 font-mono">{formattedVal}</span>
-                <span className="text-sky-400 font-bold text-[10px] bg-sky-500/15 px-1.5 py-0.5 rounded border border-sky-500/20">
+                <span className="font-bold text-slate-900 dark:text-slate-100">{item.name}</span>
+                <span className="text-slate-400 dark:text-slate-500">•</span>
+                <span className="text-slate-700 dark:text-slate-300 font-mono font-medium">{formattedVal}</span>
+                <span className="text-indigo-600 dark:text-sky-400 font-bold text-[10px] bg-indigo-50 dark:bg-sky-500/15 px-1.5 py-0.5 rounded border border-indigo-200 dark:border-sky-500/20">
                   {pct}%
                 </span>
-                <span className="text-slate-600 text-xs">✦</span>
+                <span className="text-slate-400 dark:text-slate-600 text-xs">✦</span>
               </span>
               <span className="inline-flex items-center gap-2 pr-6 select-none cursor-default" aria-hidden="true">
-                <span className="font-bold text-slate-100">{item.name}</span>
-                <span className="text-slate-500">•</span>
-                <span className="text-slate-300 font-mono">{formattedVal}</span>
-                <span className="text-sky-400 font-bold text-[10px] bg-sky-500/15 px-1.5 py-0.5 rounded border border-sky-500/20">
+                <span className="font-bold text-slate-900 dark:text-slate-100">{item.name}</span>
+                <span className="text-slate-400 dark:text-slate-500">•</span>
+                <span className="text-slate-700 dark:text-slate-300 font-mono font-medium">{formattedVal}</span>
+                <span className="text-indigo-600 dark:text-sky-400 font-bold text-[10px] bg-indigo-50 dark:bg-sky-500/15 px-1.5 py-0.5 rounded border border-indigo-200 dark:border-sky-500/20">
                   {pct}%
                 </span>
-                <span className="text-slate-600 text-xs">✦</span>
+                <span className="text-slate-400 dark:text-slate-600 text-xs">✦</span>
               </span>
             </div>
           </div>
@@ -161,7 +161,7 @@ function WalkingPieLegendItem({
               style={{ background: itemColor }}
             />
             <span
-              className={`font-semibold text-slate-200 truncate select-none cursor-default ${
+              className={`font-semibold text-slate-800 dark:text-slate-200 truncate select-none cursor-default ${
                 isWide ? 'text-xs' : 'text-[11px]'
               }`}
             >
@@ -169,10 +169,10 @@ function WalkingPieLegendItem({
             </span>
           </div>
           <div className="flex items-center gap-1.5 shrink-0 text-right select-none cursor-default">
-            <span className={`text-slate-300 font-mono select-none cursor-default ${isWide ? 'text-xs' : 'text-[11px]'}`}>
+            <span className={`text-slate-700 dark:text-slate-300 font-mono font-medium select-none cursor-default ${isWide ? 'text-xs' : 'text-[11px]'}`}>
               {formattedVal}
             </span>
-            <span className="text-sky-400 font-bold text-[10px] bg-sky-500/15 px-1.5 py-0.5 rounded border border-sky-500/20 select-none cursor-default">
+            <span className="text-indigo-600 dark:text-sky-400 font-bold text-[10px] bg-indigo-50 dark:bg-sky-500/15 px-1.5 py-0.5 rounded border border-indigo-200 dark:border-sky-500/20 select-none cursor-default">
               {pct}%
             </span>
           </div>
@@ -749,30 +749,30 @@ export default function InteractiveChart({
   return (
     <div
       ref={containerRef}
-      className="bg-slate-900/70 border border-slate-800 rounded-xl p-4 shadow-lg backdrop-blur-sm flex flex-col min-h-[420px] h-full w-full min-w-0 box-border gap-2 overflow-hidden"
+      className="bg-white dark:bg-slate-900/70 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xs dark:shadow-lg flex flex-col min-h-[420px] h-full w-full min-w-0 box-border gap-2 overflow-hidden"
     >
       {/* ── Header Toolbar ─────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between gap-2 border-b border-slate-800/80 pb-2.5 min-w-0">
+      <div className="flex items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800/80 pb-2.5 min-w-0">
         <div className="min-w-0 flex-1 pr-1">
           <div className="flex items-center gap-1.5 min-w-0">
             <BarChart3 className="text-indigo-600 dark:text-indigo-400 shrink-0" size={15} />
-            <h3 className="font-bold text-xs sm:text-sm text-slate-100 truncate" title={title}>
+            <h3 className="font-bold text-xs sm:text-sm text-slate-900 dark:text-slate-100 truncate" title={title}>
               {title}
             </h3>
             {statusBadge && (
               <span className={`px-1.5 py-0.5 rounded text-[8px] sm:text-[9px] font-bold tracking-wider uppercase font-mono shrink-0 ${
-                statusBadge === 'LIVE' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
-                statusBadge === 'MODELLED' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
-                statusBadge === 'UNAVAILABLE' ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' :
-                statusBadge === 'HEURISTIC' ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' :
-                'bg-slate-800 text-slate-400 border border-slate-700'
+                statusBadge === 'LIVE' ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20' :
+                statusBadge === 'MODELLED' ? 'bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-500/20' :
+                statusBadge === 'UNAVAILABLE' ? 'bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-500/20' :
+                statusBadge === 'HEURISTIC' ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-500/20' :
+                'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700'
               }`}>
                 {statusBadge}
               </span>
             )}
           </div>
           {subtitle && (
-            <p className="text-[11px] text-slate-400 truncate mt-0.5" title={subtitle}>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate mt-0.5" title={subtitle}>
               {subtitle}
             </p>
           )}
@@ -781,7 +781,7 @@ export default function InteractiveChart({
         <div className="flex items-center gap-1 shrink-0">
           {/* View Mode Selector */}
           <select
-            className="bg-slate-800 border border-slate-700 hover:border-slate-600 focus:border-indigo-600 dark:border-indigo-500 rounded-lg px-1.5 py-1 text-[11px] font-medium text-slate-200 outline-none transition-colors cursor-pointer max-w-[82px] sm:max-w-[90px]"
+            className="bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 focus:border-indigo-600 rounded-lg px-2 py-1 text-[11px] font-medium text-slate-800 dark:text-slate-200 outline-none transition-colors cursor-pointer max-w-[82px] sm:max-w-[90px]"
             value={chartType}
             onChange={e => setChartType(e.target.value as any)}
             title="Select Chart Type"
@@ -799,10 +799,10 @@ export default function InteractiveChart({
           {/* Time Range Dropdown */}
           <div className="flex items-center gap-1">
             {isFetching && (
-              <div className="w-3 h-3 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin shrink-0" />
+              <div className="w-3 h-3 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin shrink-0" />
             )}
             <select
-              className="bg-slate-800 border border-slate-700 hover:border-slate-600 focus:border-indigo-600 dark:border-indigo-500 rounded-lg px-1.5 py-1 text-[11px] font-medium text-slate-200 outline-none transition-colors cursor-pointer max-w-[88px] sm:max-w-[96px]"
+              className="bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 focus:border-indigo-600 rounded-lg px-2 py-1 text-[11px] font-medium text-slate-800 dark:text-slate-200 outline-none transition-colors cursor-pointer max-w-[88px] sm:max-w-[96px]"
               value={timeRange}
               onChange={e => {
                 const newRange = e.target.value as DateRangeType;
@@ -839,7 +839,7 @@ export default function InteractiveChart({
 
           {/* Reset Button */}
           <button
-            className="p-1 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-400 hover:text-slate-200 transition-colors cursor-pointer shrink-0"
+            className="p-1 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 transition-colors cursor-pointer shrink-0"
             onClick={() => {
               setChartType(defaultChartType);
               const defaultRange = defaultTimeRange || '30d';
@@ -860,10 +860,10 @@ export default function InteractiveChart({
       </div>
 
       {/* Inline Time Range Sub-Bar & Custom Date Inputs */}
-      <div className="flex items-center justify-between gap-2 text-[11px] text-indigo-400 dark:text-indigo-400 mb-1 flex-wrap min-w-0">
+      <div className="flex items-center justify-between gap-2 text-[11px] text-indigo-600 dark:text-indigo-400 mb-1 flex-wrap min-w-0">
         <div className="flex items-center gap-1.5 min-w-0 truncate">
           <Calendar size={11} className="shrink-0" />
-          <span className="truncate">Range: {timeRangeLabel}</span>
+          <span className="truncate font-medium">Range: {timeRangeLabel}</span>
           {shouldPaginate && totalPages > 1 && (
             <span className="text-slate-500 font-mono text-[10px] ml-1.5 shrink-0">
               (Visible: {startIndex + 1}–{endIndex} of {totalItems})
@@ -872,18 +872,18 @@ export default function InteractiveChart({
         </div>
 
         {timeRange === 'custom' && (
-          <div className="flex items-center gap-1.5 bg-slate-950/80 px-2 py-1 rounded-xl border border-slate-800 text-xs text-slate-300 shadow-sm shrink-0">
-            <span className="text-[10px] text-slate-400 font-semibold uppercase">From</span>
+          <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-950/80 px-2 py-1 rounded-xl border border-slate-200 dark:border-slate-800 text-xs text-slate-700 dark:text-slate-300 shadow-xs shrink-0">
+            <span className="text-[10px] text-slate-500 font-semibold uppercase">From</span>
             <input
               type="date"
-              className="bg-slate-800 border border-slate-700 rounded-lg px-2 py-0.5 text-[11px] font-mono text-slate-200 outline-none focus:border-indigo-500 [color-scheme:dark] cursor-pointer"
+              className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-0.5 text-[11px] font-mono text-slate-800 dark:text-slate-200 outline-none focus:border-indigo-500 cursor-pointer"
               value={startDate}
               onChange={e => setStartDate(e.target.value)}
             />
-            <span className="text-[10px] text-slate-400 font-semibold uppercase">To</span>
+            <span className="text-[10px] text-slate-500 font-semibold uppercase">To</span>
             <input
               type="date"
-              className="bg-slate-800 border border-slate-700 rounded-lg px-2 py-0.5 text-[11px] font-mono text-slate-200 outline-none focus:border-indigo-500 [color-scheme:dark] cursor-pointer"
+              className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-0.5 text-[11px] font-mono text-slate-800 dark:text-slate-200 outline-none focus:border-indigo-500 cursor-pointer"
               value={endDate}
               onChange={e => setEndDate(e.target.value)}
             />
@@ -893,22 +893,22 @@ export default function InteractiveChart({
 
       {/* Phase 8: Dynamic Contextual Metrics Summary Banner for Time-Series */}
       {timeSeriesSummary && (
-        <div className="flex items-center gap-2 sm:gap-4 py-1.5 px-2.5 mb-1 bg-slate-800/40 rounded-lg border border-slate-800 text-[11px] flex-wrap transition-opacity duration-300">
+        <div className="flex items-center gap-2 sm:gap-4 py-1.5 px-2.5 mb-1 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200/80 dark:border-slate-800 text-[11px] flex-wrap transition-opacity duration-300">
           <div className="flex items-center gap-1">
-            <span className="text-slate-400">Latest:</span>
-            <span className="font-bold text-slate-200 font-mono">
+            <span className="text-slate-500 dark:text-slate-400">Latest:</span>
+            <span className="font-bold text-slate-900 dark:text-slate-200 font-mono">
               {unit === '₹' ? `₹${formatYAxis(timeSeriesSummary.latest)}` : `${formatYAxis(timeSeriesSummary.latest)} ${unit}`.trim()}
             </span>
           </div>
           <div className="flex items-center gap-1">
-            <span className="text-slate-400">Average:</span>
-            <span className="font-bold text-slate-300 font-mono">
+            <span className="text-slate-500 dark:text-slate-400">Average:</span>
+            <span className="font-bold text-slate-800 dark:text-slate-300 font-mono">
               {unit === '₹' ? `₹${formatYAxis(timeSeriesSummary.avg)}` : `${formatYAxis(timeSeriesSummary.avg)} ${unit}`.trim()}
             </span>
           </div>
           <div className="flex items-center gap-1">
-            <span className="text-slate-400">Peak:</span>
-            <span className="font-bold text-amber-400 font-mono">
+            <span className="text-slate-500 dark:text-slate-400">Peak:</span>
+            <span className="font-bold text-amber-600 dark:text-amber-400 font-mono">
               {unit === '₹' ? `₹${formatYAxis(timeSeriesSummary.peak)}` : `${formatYAxis(timeSeriesSummary.peak)} ${unit}`.trim()}
             </span>
             {timeSeriesSummary.peakDate && (
@@ -945,24 +945,25 @@ export default function InteractiveChart({
                     data={normalizedVisibleData}
                     margin={{ top: 10, right: 30, left: 10, bottom: 10 }}
                   >
-                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.4} horizontal={false} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#cbd5e1" opacity={0.6} horizontal={false} />
                     <XAxis
                       type="number"
-                      stroke="#94a3b8"
+                      stroke="#64748b"
                       fontSize={10}
                       tickFormatter={formatYAxis}
                       tickLine={false}
-                      axisLine={{ stroke: '#334155' }}
+                      tick={{ fill: '#475569', fontSize: 10, fontWeight: 500 }}
+                      axisLine={{ stroke: '#cbd5e1' }}
                     />
                     <YAxis
                       type="category"
                       dataKey="name"
-                      stroke="#94a3b8"
+                      stroke="#64748b"
                       fontSize={10}
                       tickLine={false}
                       width={120}
-                      tick={{ fill: '#cbd5e1', fontSize: 10 }}
-                      axisLine={{ stroke: '#334155' }}
+                      tick={{ fill: '#1e293b', fontSize: 10, fontWeight: 600 }}
+                      axisLine={{ stroke: '#cbd5e1' }}
                     />
                     <Tooltip content={renderCustomTooltip} />
                     {multiSeries ? (
@@ -979,17 +980,17 @@ export default function InteractiveChart({
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="w-full h-full min-h-[250px] bg-slate-800/30 animate-pulse rounded-xl" />
+                <div className="w-full h-full min-h-[250px] bg-slate-100 dark:bg-slate-800/30 animate-pulse rounded-xl" />
               )}
             </div>
             {/* Bottom Legend */}
             {showLegend && (
-              <div className="shrink-0 flex flex-wrap gap-x-3 gap-y-1 justify-center items-center pt-2 pb-0.5 border-t border-slate-800/60 mt-auto select-none">
+              <div className="shrink-0 flex flex-wrap gap-x-3 gap-y-1 justify-center items-center pt-2 pb-0.5 border-t border-slate-100 dark:border-slate-800/60 mt-auto select-none">
                 {multiSeries ? (
                   multiSeries.map((s, idx) => (
-                    <div key={idx} className="flex items-center gap-1.5 text-xs text-slate-400">
+                    <div key={idx} className="flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-400">
                       <span className="w-2 h-2 rounded-full shrink-0" style={{ background: s.color }} />
-                      <span className="font-semibold text-slate-200">{s.label}</span>
+                      <span className="font-semibold text-slate-800 dark:text-slate-200">{s.label}</span>
                     </div>
                   ))
                 ) : (
@@ -997,10 +998,10 @@ export default function InteractiveChart({
                     const val = Number(item.value) || 0;
                     const pct = totalValue > 0 ? ((val / totalValue) * 100).toFixed(0) : '0';
                     return (
-                      <div key={idx} className="flex items-center gap-1.5 text-xs text-slate-400">
+                      <div key={idx} className="flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-400">
                         <span className="w-2 h-2 rounded-full shrink-0" style={{ background: item.color || COLORS[(startIndex + idx) % COLORS.length] }} />
-                        <span className="font-semibold text-slate-200 truncate max-w-[130px]" title={item.name}>{item.name}</span>
-                        {totalValue > 0 && <span className="text-sky-400 font-bold text-[10px]">({pct}%)</span>}
+                        <span className="font-semibold text-slate-800 dark:text-slate-200 truncate max-w-[130px]" title={item.name}>{item.name}</span>
+                        {totalValue > 0 && <span className="text-indigo-600 dark:text-sky-400 font-bold text-[10px]">({pct}%)</span>}
                       </div>
                     );
                   })
@@ -1010,28 +1011,28 @@ export default function InteractiveChart({
           </div>
         ) : chartType === 'table' ? (
           /* ── 1. Table View Mode (Paginated) ──────────────────────────── */
-          <div style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, overflowY: 'auto', borderRadius: '6px', border: '1px solid var(--border)' }}>
-            <table className="table" style={{ width: '100%', fontSize: '0.78rem', borderCollapse: 'collapse' }}>
+          <div className="absolute inset-0 overflow-y-auto rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+            <table className="w-full text-xs text-left border-collapse">
               <thead>
-                <tr style={{ background: 'rgba(15, 23, 42, 0.95)', color: 'var(--text-muted)', textAlign: 'left', position: 'sticky', top: 0, zIndex: 10 }}>
-                  <th style={{ padding: '6px 10px' }}>#</th>
-                  <th style={{ padding: '6px 10px' }}>Label / Metric</th>
-                  <th style={{ padding: '6px 10px', textAlign: 'right' }}>Value</th>
-                  <th style={{ padding: '6px 10px', textAlign: 'right' }}>Share (%)</th>
+                <tr className="bg-slate-50 dark:bg-slate-800/90 text-slate-700 dark:text-slate-300 font-bold uppercase text-[10px] tracking-wider sticky top-0 z-10 border-b border-slate-200 dark:border-slate-800">
+                  <th className="py-2.5 px-3">#</th>
+                  <th className="py-2.5 px-3">Label / Metric</th>
+                  <th className="py-2.5 px-3 text-right">Value</th>
+                  <th className="py-2.5 px-3 text-right">Share (%)</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
                 {visiblePieData.map((item, idx) => {
                   const val = Number(item.value) || 0;
                   const formattedVal = unit === '₹' ? `₹${val.toLocaleString('en-IN')}` : `${val.toLocaleString('en-IN')} ${unit}`;
                   const pct = totalValue > 0 ? ((val / totalValue) * 100).toFixed(1) : '0.0';
                   const rowNumber = startIndex + idx + 1;
                   return (
-                    <tr key={idx} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.05)', background: idx % 2 === 0 ? 'rgba(19, 27, 46, 0.4)' : 'transparent' }}>
-                      <td style={{ padding: '6px 10px', color: 'var(--text-muted)' }}>{rowNumber}</td>
-                      <td style={{ padding: '6px 10px', fontWeight: 600 }}>{item.name}</td>
-                      <td style={{ padding: '6px 10px', textAlign: 'right', fontWeight: 700, color: '#6366f1' }}>{formattedVal}</td>
-                      <td style={{ padding: '6px 10px', textAlign: 'right', color: '#10b981', fontWeight: 600 }}>{pct}%</td>
+                    <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+                      <td className="py-2 px-3 text-slate-400 dark:text-slate-500">{rowNumber}</td>
+                      <td className="py-2 px-3 font-semibold text-slate-800 dark:text-slate-200">{item.name}</td>
+                      <td className="py-2 px-3 text-right font-bold text-indigo-600 dark:text-indigo-400">{formattedVal}</td>
+                      <td className="py-2 px-3 text-right text-emerald-600 dark:text-emerald-400 font-bold">{pct}%</td>
                     </tr>
                   );
                 })}
@@ -1040,45 +1041,45 @@ export default function InteractiveChart({
           </div>
         ) : chartType === 'kpi' ? (
           /* ── 2. KPI Summary Mode ─────────────────────────────────────── */
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px', padding: '8px 0', alignContent: 'center', height: '100%' }}>
-            <div style={{ padding: '0.8rem', background: 'rgba(15, 23, 42, 0.7)', borderRadius: '6px', border: '1px solid rgba(99, 102, 241, 0.3)' }}>
-              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>Aggregate Total</div>
-              <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#6366f1', marginTop: '2px' }}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 py-2 h-full content-center">
+            <div className="p-3.5 bg-slate-50 dark:bg-slate-900/70 rounded-xl border border-indigo-200 dark:border-indigo-900/40 shadow-xs">
+              <div className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-bold tracking-wider">Aggregate Total</div>
+              <div className="text-xl font-extrabold text-indigo-600 dark:text-indigo-400 mt-1">
                 {unit === '₹' ? `₹${totalValue.toLocaleString('en-IN')}` : `${totalValue.toLocaleString('en-IN')} ${unit}`}
               </div>
-              <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+              <div className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">
                 Across {allPieData.length} records in active range
               </div>
             </div>
 
-            <div style={{ padding: '0.8rem', background: 'rgba(15, 23, 42, 0.7)', borderRadius: '6px', border: '1px solid rgba(16, 185, 129, 0.3)' }}>
-              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>Average per Entry</div>
-              <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#10b981', marginTop: '2px' }}>
+            <div className="p-3.5 bg-slate-50 dark:bg-slate-900/70 rounded-xl border border-emerald-200 dark:border-emerald-900/40 shadow-xs">
+              <div className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-bold tracking-wider">Average per Entry</div>
+              <div className="text-xl font-extrabold text-emerald-600 dark:text-emerald-400 mt-1">
                 {unit === '₹'
                   ? `₹${allPieData.length > 0 ? Math.round(totalValue / allPieData.length).toLocaleString('en-IN') : 0}`
                   : `${allPieData.length > 0 ? (totalValue / allPieData.length).toFixed(1) : 0} ${unit}`}
               </div>
-              <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+              <div className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">
                 Mean contribution
               </div>
             </div>
 
-            <div style={{ padding: '0.8rem', background: 'rgba(15, 23, 42, 0.7)', borderRadius: '6px', border: '1px solid rgba(192, 132, 252, 0.3)' }}>
-              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>Top Contributor</div>
-              <div style={{ fontSize: '1rem', fontWeight: 700, color: '#c084fc', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <div className="p-3.5 bg-slate-50 dark:bg-slate-900/70 rounded-xl border border-purple-200 dark:border-purple-900/40 shadow-xs">
+              <div className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-bold tracking-wider">Top Contributor</div>
+              <div className="text-sm font-bold text-purple-600 dark:text-purple-400 mt-1 truncate">
                 {topContributor.name || 'N/A'}
               </div>
-              <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+              <div className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">
                 {unit === '₹' ? `₹${Number(topContributor.value || 0).toLocaleString('en-IN')}` : `${topContributor.value || 0} ${unit}`} ({totalValue > 0 ? ((Number(topContributor.value || 0) / totalValue) * 100).toFixed(1) : 0}%)
               </div>
             </div>
 
-            <div style={{ padding: '0.8rem', background: 'rgba(15, 23, 42, 0.7)', borderRadius: '6px', border: '1px solid rgba(245, 158, 11, 0.3)' }}>
-              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>Minimum Record</div>
-              <div style={{ fontSize: '1rem', fontWeight: 700, color: '#f59e0b', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <div className="p-3.5 bg-slate-50 dark:bg-slate-900/70 rounded-xl border border-amber-200 dark:border-amber-900/40 shadow-xs">
+              <div className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-bold tracking-wider">Minimum Record</div>
+              <div className="text-sm font-bold text-amber-600 dark:text-amber-400 mt-1 truncate">
                 {minContributor.name || 'N/A'}
               </div>
-              <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+              <div className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">
                 {unit === '₹' ? `₹${Number(minContributor.value || 0).toLocaleString('en-IN')}` : `${minContributor.value || 0} ${unit}`}
               </div>
             </div>
@@ -1121,8 +1122,8 @@ export default function InteractiveChart({
               </ResponsiveContainer>
               {chartType === 'donut' && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                  <span className={`${isWide ? 'text-xs' : 'text-[9px]'} uppercase tracking-wider text-slate-400 font-semibold`}>Total</span>
-                  <span className={`${isWide ? 'text-base sm:text-lg font-extrabold' : 'text-xs font-bold'} text-slate-100 font-mono mt-0.5`}>
+                  <span className={`${isWide ? 'text-xs' : 'text-[9px]'} uppercase tracking-wider text-slate-500 dark:text-slate-400 font-semibold`}>Total</span>
+                  <span className={`${isWide ? 'text-base sm:text-lg font-extrabold' : 'text-xs font-bold'} text-slate-900 dark:text-slate-100 font-mono mt-0.5`}>
                     {unit === '₹' ? formatYAxis(pieTotalValue) : `${formatYAxis(pieTotalValue)}`}
                   </span>
                 </div>
@@ -1186,27 +1187,27 @@ export default function InteractiveChart({
                         </linearGradient>
                       )}
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.4} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#cbd5e1" opacity={0.6} />
                     <XAxis
                       dataKey="name"
-                      stroke={xAxisConfig.showTicks ? "#94a3b8" : "#334155"}
+                      stroke={xAxisConfig.showTicks ? "#64748b" : "#cbd5e1"}
                       fontSize={10}
                       tickLine={false}
-                      tick={xAxisConfig.showTicks ? { fill: '#94a3b8', fontSize: 10 } : false}
+                      tick={xAxisConfig.showTicks ? { fill: '#64748b', fontSize: 10 } : false}
                       tickFormatter={xAxisConfig.showTicks ? formatXAxisTick : undefined}
                       interval={xAxisConfig.interval}
                       angle={xAxisConfig.angle}
                       textAnchor={xAxisConfig.textAnchor}
                       height={xAxisConfig.height}
-                      axisLine={{ stroke: '#334155' }}
+                      axisLine={{ stroke: '#cbd5e1' }}
                     />
                     {hasSecondaryYAxis ? (
                       <>
-                        <YAxis yAxisId="left" stroke="#94a3b8" fontSize={10} tickFormatter={formatYAxis} tickLine={false} />
-                        <YAxis yAxisId="right" orientation="right" stroke="#94a3b8" fontSize={10} tickFormatter={formatYAxis} tickLine={false} style={{ textAnchor: 'start' }} />
+                        <YAxis yAxisId="left" stroke="#64748b" fontSize={10} tickFormatter={formatYAxis} tickLine={false} />
+                        <YAxis yAxisId="right" orientation="right" stroke="#64748b" fontSize={10} tickFormatter={formatYAxis} tickLine={false} style={{ textAnchor: 'start' }} />
                       </>
                     ) : (
-                      <YAxis stroke="#94a3b8" fontSize={10} tickFormatter={formatYAxis} tickLine={false} />
+                      <YAxis stroke="#64748b" fontSize={10} tickFormatter={formatYAxis} tickLine={false} />
                     )}
                     <Tooltip content={renderCustomTooltip} />
                     {multiSeries ? (
@@ -1219,17 +1220,17 @@ export default function InteractiveChart({
                   </AreaChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="w-full h-full min-h-[250px] bg-slate-800/30 animate-pulse rounded-xl" />
+                <div className="w-full h-full min-h-[250px] bg-slate-100 dark:bg-slate-800/30 animate-pulse rounded-xl" />
               )}
             </div>
             {/* Bottom Legend */}
             {showLegend && (
-              <div className="shrink-0 flex flex-wrap gap-x-3 gap-y-1 justify-center items-center pt-2 pb-0.5 border-t border-slate-800/60 mt-auto select-none">
+              <div className="shrink-0 flex flex-wrap gap-x-3 gap-y-1 justify-center items-center pt-2 pb-0.5 border-t border-slate-100 dark:border-slate-800/60 mt-auto select-none">
                 {multiSeries ? (
                   multiSeries.map((s, idx) => (
-                    <div key={idx} className="flex items-center gap-1.5 text-xs text-slate-400">
+                    <div key={idx} className="flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-400">
                       <span className="w-2 h-2 rounded-full shrink-0" style={{ background: s.color }} />
-                      <span className="font-semibold text-slate-200">{s.label}</span>
+                      <span className="font-semibold text-slate-800 dark:text-slate-200">{s.label}</span>
                     </div>
                   ))
                 ) : (
@@ -1237,10 +1238,10 @@ export default function InteractiveChart({
                     const val = Number(item.value) || 0;
                     const pct = totalValue > 0 ? ((val / totalValue) * 100).toFixed(0) : '0';
                     return (
-                      <div key={idx} className="flex items-center gap-1.5 text-xs text-slate-400">
+                      <div key={idx} className="flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-400">
                         <span className="w-2 h-2 rounded-full shrink-0" style={{ background: item.color || COLORS[(startIndex + idx) % COLORS.length] }} />
-                        <span className="font-semibold text-slate-200 truncate max-w-[130px]" title={item.name}>{item.name}</span>
-                        {totalValue > 0 && <span className="text-sky-400 font-bold text-[10px]">({pct}%)</span>}
+                        <span className="font-semibold text-slate-800 dark:text-slate-200 truncate max-w-[130px]" title={item.name}>{item.name}</span>
+                        {totalValue > 0 && <span className="text-indigo-600 dark:text-sky-400 font-bold text-[10px]">({pct}%)</span>}
                       </div>
                     );
                   })
@@ -1255,27 +1256,27 @@ export default function InteractiveChart({
               {isMounted ? (
                 <ResponsiveContainer width="100%" height="100%" minHeight={isEffectiveHero ? 340 : 250}>
                   <BarChart data={normalizedVisibleData} margin={{ top: 10, right: hasSecondaryYAxis ? 35 : 15, left: -5, bottom: xAxisConfig.bottomMargin }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.4} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#94a3b8" opacity={0.2} />
                     <XAxis
                       dataKey="name"
-                      stroke={xAxisConfig.showTicks ? "#94a3b8" : "#334155"}
+                      stroke={xAxisConfig.showTicks ? "#64748b" : "#94a3b8"}
                       fontSize={10}
                       tickLine={false}
-                      tick={xAxisConfig.showTicks ? { fill: '#94a3b8', fontSize: 10 } : false}
+                      tick={xAxisConfig.showTicks ? { fill: '#64748b', fontSize: 10 } : false}
                       tickFormatter={xAxisConfig.showTicks ? formatXAxisTick : undefined}
                       interval={xAxisConfig.interval}
                       angle={xAxisConfig.angle}
                       textAnchor={xAxisConfig.textAnchor}
                       height={xAxisConfig.height}
-                      axisLine={{ stroke: '#334155' }}
+                      axisLine={{ stroke: '#cbd5e1' }}
                     />
                     {hasSecondaryYAxis ? (
                       <>
-                        <YAxis yAxisId="left" stroke="#94a3b8" fontSize={10} tickFormatter={formatYAxis} tickLine={false} />
-                        <YAxis yAxisId="right" orientation="right" stroke="#94a3b8" fontSize={10} tickFormatter={formatYAxis} tickLine={false} style={{ textAnchor: 'start' }} />
+                        <YAxis yAxisId="left" stroke="#64748b" fontSize={10} tickFormatter={formatYAxis} tickLine={false} />
+                        <YAxis yAxisId="right" orientation="right" stroke="#64748b" fontSize={10} tickFormatter={formatYAxis} tickLine={false} style={{ textAnchor: 'start' }} />
                       </>
                     ) : (
-                      <YAxis stroke="#94a3b8" fontSize={10} tickFormatter={formatYAxis} tickLine={false} />
+                      <YAxis stroke="#64748b" fontSize={10} tickFormatter={formatYAxis} tickLine={false} />
                     )}
                     <Tooltip content={renderCustomTooltip} />
                     {multiSeries ? (
@@ -1292,17 +1293,17 @@ export default function InteractiveChart({
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="w-full h-full min-h-[250px] bg-slate-800/30 animate-pulse rounded-xl" />
+                <div className="w-full h-full min-h-[250px] bg-slate-100 dark:bg-slate-800/30 animate-pulse rounded-xl" />
               )}
             </div>
             {/* Bottom Legend */}
             {showLegend && (
-              <div className="shrink-0 flex flex-wrap gap-x-3 gap-y-1 justify-center items-center pt-2 pb-0.5 border-t border-slate-800/60 mt-auto select-none">
+              <div className="shrink-0 flex flex-wrap gap-x-3 gap-y-1 justify-center items-center pt-2 pb-0.5 border-t border-slate-100 dark:border-slate-800/60 mt-auto select-none">
                 {multiSeries ? (
                   multiSeries.map((s, idx) => (
-                    <div key={idx} className="flex items-center gap-1.5 text-xs text-slate-400">
+                    <div key={idx} className="flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-400">
                       <span className="w-2 h-2 rounded-full shrink-0" style={{ background: s.color }} />
-                      <span className="font-semibold text-slate-200">{s.label}</span>
+                      <span className="font-semibold text-slate-800 dark:text-slate-200">{s.label}</span>
                     </div>
                   ))
                 ) : (
@@ -1310,10 +1311,10 @@ export default function InteractiveChart({
                     const val = Number(item.value) || 0;
                     const pct = totalValue > 0 ? ((val / totalValue) * 100).toFixed(0) : '0';
                     return (
-                      <div key={idx} className="flex items-center gap-1.5 text-xs text-slate-400">
+                      <div key={idx} className="flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-400">
                         <span className="w-2 h-2 rounded-full shrink-0" style={{ background: item.color || COLORS[(startIndex + idx) % COLORS.length] }} />
-                        <span className="font-semibold text-slate-200 truncate max-w-[130px]" title={item.name}>{item.name}</span>
-                        {totalValue > 0 && <span className="text-sky-400 font-bold text-[10px]">({pct}%)</span>}
+                        <span className="font-semibold text-slate-800 dark:text-slate-200 truncate max-w-[130px]" title={item.name}>{item.name}</span>
+                        {totalValue > 0 && <span className="text-indigo-600 dark:text-sky-400 font-bold text-[10px]">({pct}%)</span>}
                       </div>
                     );
                   })
@@ -1328,27 +1329,27 @@ export default function InteractiveChart({
               {isMounted ? (
                 <ResponsiveContainer width="100%" height="100%" minHeight={isEffectiveHero ? 340 : 250}>
                   <LineChart data={normalizedVisibleData} margin={{ top: 10, right: hasSecondaryYAxis ? 35 : 15, left: -5, bottom: xAxisConfig.bottomMargin }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.4} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#94a3b8" opacity={0.2} />
                     <XAxis
                       dataKey="name"
-                      stroke={xAxisConfig.showTicks ? "#94a3b8" : "#334155"}
+                      stroke={xAxisConfig.showTicks ? "#64748b" : "#94a3b8"}
                       fontSize={10}
                       tickLine={false}
-                      tick={xAxisConfig.showTicks ? { fill: '#94a3b8', fontSize: 10 } : false}
+                      tick={xAxisConfig.showTicks ? { fill: '#64748b', fontSize: 10 } : false}
                       tickFormatter={xAxisConfig.showTicks ? formatXAxisTick : undefined}
                       interval={xAxisConfig.interval}
                       angle={xAxisConfig.angle}
                       textAnchor={xAxisConfig.textAnchor}
                       height={xAxisConfig.height}
-                      axisLine={{ stroke: '#334155' }}
+                      axisLine={{ stroke: '#cbd5e1' }}
                     />
                     {hasSecondaryYAxis ? (
                       <>
-                        <YAxis yAxisId="left" stroke="#94a3b8" fontSize={10} tickFormatter={formatYAxis} tickLine={false} />
-                        <YAxis yAxisId="right" orientation="right" stroke="#94a3b8" fontSize={10} tickFormatter={formatYAxis} tickLine={false} style={{ textAnchor: 'start' }} />
+                        <YAxis yAxisId="left" stroke="#64748b" fontSize={10} tickFormatter={formatYAxis} tickLine={false} />
+                        <YAxis yAxisId="right" orientation="right" stroke="#64748b" fontSize={10} tickFormatter={formatYAxis} tickLine={false} style={{ textAnchor: 'start' }} />
                       </>
                     ) : (
-                      <YAxis stroke="#94a3b8" fontSize={10} tickFormatter={formatYAxis} tickLine={false} />
+                      <YAxis stroke="#64748b" fontSize={10} tickFormatter={formatYAxis} tickLine={false} />
                     )}
                     <Tooltip content={renderCustomTooltip} />
                     {multiSeries ? (
@@ -1361,17 +1362,17 @@ export default function InteractiveChart({
                   </LineChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="w-full h-full min-h-[250px] bg-slate-800/30 animate-pulse rounded-xl" />
+                <div className="w-full h-full min-h-[250px] bg-slate-100 dark:bg-slate-800/30 animate-pulse rounded-xl" />
               )}
             </div>
             {/* Bottom Legend */}
             {showLegend && (
-              <div className="shrink-0 flex flex-wrap gap-x-3 gap-y-1 justify-center items-center pt-2 pb-0.5 border-t border-slate-800/60 mt-auto select-none">
+              <div className="shrink-0 flex flex-wrap gap-x-3 gap-y-1 justify-center items-center pt-2 pb-0.5 border-t border-slate-100 dark:border-slate-800/60 mt-auto select-none">
                 {multiSeries ? (
                   multiSeries.map((s, idx) => (
-                    <div key={idx} className="flex items-center gap-1.5 text-xs text-slate-400">
+                    <div key={idx} className="flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-400">
                       <span className="w-2 h-2 rounded-full shrink-0" style={{ background: s.color }} />
-                      <span className="font-semibold text-slate-200">{s.label}</span>
+                      <span className="font-semibold text-slate-800 dark:text-slate-200">{s.label}</span>
                     </div>
                   ))
                 ) : (
@@ -1379,10 +1380,10 @@ export default function InteractiveChart({
                     const val = Number(item.value) || 0;
                     const pct = totalValue > 0 ? ((val / totalValue) * 100).toFixed(0) : '0';
                     return (
-                      <div key={idx} className="flex items-center gap-1.5 text-xs text-slate-400">
+                      <div key={idx} className="flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-400">
                         <span className="w-2 h-2 rounded-full shrink-0" style={{ background: item.color || COLORS[(startIndex + idx) % COLORS.length] }} />
-                        <span className="font-semibold text-slate-200 truncate max-w-[130px]" title={item.name}>{item.name}</span>
-                        {totalValue > 0 && <span className="text-sky-400 font-bold text-[10px]">({pct}%)</span>}
+                        <span className="font-semibold text-slate-800 dark:text-slate-200 truncate max-w-[130px]" title={item.name}>{item.name}</span>
+                        {totalValue > 0 && <span className="text-indigo-600 dark:text-sky-400 font-bold text-[10px]">({pct}%)</span>}
                       </div>
                     );
                   })
@@ -1395,26 +1396,26 @@ export default function InteractiveChart({
 
       {/* ── Prominent & Clearly Visible Chart Pagination Footer ─────────────────── */}
       {shouldPaginate && totalPages > 1 && (
-        <div className="shrink-0 flex items-center justify-center gap-3 pt-2 pb-0.5 border-t border-slate-800/80 mt-auto select-none">
+        <div className="shrink-0 flex items-center justify-center gap-3 pt-2 pb-0.5 border-t border-slate-100 dark:border-slate-800/80 mt-auto select-none">
           <button
             type="button"
             onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
             disabled={safeCurrentPage <= 1}
             aria-label="Previous batch"
-            className="flex items-center justify-center w-7 h-7 rounded-lg bg-slate-800 border border-slate-700/80 text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:text-indigo-300 hover:bg-slate-700 hover:border-indigo-600 dark:border-indigo-500/60 active:scale-95 disabled:opacity-20 disabled:border-slate-800/40 disabled:bg-slate-900/40 disabled:text-slate-600 disabled:cursor-not-allowed transition-all cursor-pointer shadow-sm"
+            className="flex items-center justify-center w-7 h-7 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700/80 text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 hover:bg-slate-200 dark:hover:bg-slate-700 hover:border-indigo-400 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer shadow-xs"
             title="Previous batch"
           >
             <ChevronLeft size={16} strokeWidth={2.4} />
           </button>
-          <span className="text-xs font-mono font-semibold text-slate-200 bg-slate-800/80 border border-slate-700/60 px-3 py-0.5 rounded-md tracking-wider shadow-inner">
-            {startIndex + 1}–{endIndex} <span className="text-slate-400 font-normal">of</span> {totalItems}
+          <span className="text-xs font-mono font-semibold text-slate-800 dark:text-slate-200 bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/60 px-3 py-0.5 rounded-md tracking-wider">
+            {startIndex + 1}–{endIndex} <span className="text-slate-500 dark:text-slate-400 font-normal">of</span> {totalItems}
           </span>
           <button
             type="button"
             onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
             disabled={safeCurrentPage >= totalPages}
             aria-label="Next batch"
-            className="flex items-center justify-center w-7 h-7 rounded-lg bg-slate-800 border border-slate-700/80 text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:text-indigo-300 hover:bg-slate-700 hover:border-indigo-600 dark:border-indigo-500/60 active:scale-95 disabled:opacity-20 disabled:border-slate-800/40 disabled:bg-slate-900/40 disabled:text-slate-600 disabled:cursor-not-allowed transition-all cursor-pointer shadow-sm"
+            className="flex items-center justify-center w-7 h-7 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700/80 text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 hover:bg-slate-200 dark:hover:bg-slate-700 hover:border-indigo-400 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer shadow-xs"
             title="Next batch"
           >
             <ChevronRight size={16} strokeWidth={2.4} />

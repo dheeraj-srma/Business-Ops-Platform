@@ -29,7 +29,111 @@
   background: #64748b;
 }
 
-/* Split-Second Instant Theme Transition (Fast, Crisp, Zero Lag) */
+/* Split-Second Instant Theme Transition */
+:root {
+  --bg-app: #f8fafc;
+  --bg-card: #ffffff;
+  --bg-card-subtle: #f1f5f9;
+  --bg-panel: #ffffff;
+  --border: #e2e8f0;
+  --border-subtle: #cbd5e1;
+  --text: #0f172a;
+  --text-muted: #475569;
+  --text-subtle: #64748b;
+  --accent: #4f46e5;
+}
+
+.dark {
+  --bg-app: #090d16;
+  --bg-card: #0f172a;
+  --bg-card-subtle: #1e293b;
+  --bg-panel: #0f172a;
+  --border: #1e293b;
+  --border-subtle: #334155;
+  --text: #f8fafc;
+  --text-muted: #94a3b8;
+  --text-subtle: #64748b;
+  --accent: #6366f1;
+}
+
+.panel {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  color: var(--text);
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+}
+
+.dark .panel {
+  background-color: #0f172a;
+  border-color: #1e293b;
+  color: #f8fafc;
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.5);
+}
+
+.panel-title {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.stat-card {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  padding: 1rem;
+  color: var(--text);
+}
+
+.dark .stat-card {
+  background-color: #0f172a;
+  border-color: #1e293b;
+  color: #f8fafc;
+}
+
+.badge-success {
+  background-color: #ecfdf5;
+  color: #059669;
+  border: 1px solid #a7f3d0;
+}
+.dark .badge-success {
+  background-color: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.badge-warning {
+  background-color: #fffbeb;
+  color: #d97706;
+  border: 1px solid #fde68a;
+}
+.dark .badge-warning {
+  background-color: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.badge-danger {
+  background-color: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+}
+.dark .badge-danger {
+  background-color: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.badge-ghost {
+  background-color: #f1f5f9;
+  color: #64748b;
+  border: 1px solid #e2e8f0;
+}
+.dark .badge-ghost {
+  background-color: rgba(148, 163, 184, 0.1);
+  color: #94a3b8;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
 html, body {
   -webkit-tap-highlight-color: transparent;
   transition: background-color 75ms ease-out, color 75ms ease-out;
@@ -38,14 +142,14 @@ html, body {
 /* Hardware Accelerated Glitch-Free Sidebar Transitions */
 #desktop-sidebar {
   will-change: width;
-  transition: width 150ms cubic-bezier(0.2, 0, 0, 1) !important;
+  transition: width 150ms cubic-bezier(0.2, 0, 1) !important;
   backface-visibility: hidden;
   transform: translateZ(0);
 }
 
 #mobile-drawer {
   will-change: transform;
-  transition: transform 150ms cubic-bezier(0.2, 0, 0, 1) !important;
+  transition: transform 150ms cubic-bezier(0.2, 0, 1) !important;
   backface-visibility: hidden;
 }
 
@@ -92,12 +196,8 @@ html, body {
 
 /* Walking legend marquee ticker for pie/donut charts */
 @keyframes legendWalkLeft {
-  0% {
-    transform: translateX(0%);
-  }
-  100% {
-    transform: translateX(-50%);
-  }
+  0% { transform: translateX(0%); }
+  100% { transform: translateX(-50%); }
 }
 
 .animate-legend-walk {
@@ -108,25 +208,31 @@ html, body {
   will-change: transform;
 }
 
-/* ── POLISHED LIGHT THEME SYSTEM ────────────────────────────────────────── */
+/* ══════════════════════════════════════════════════════════════════════════════
+   HIGH-CONTRAST, POLISHED LIGHT THEME DESIGN SYSTEM (MANAGEMENT APP)
+   ══════════════════════════════════════════════════════════════════════════════ */
 
-/* Base Page Styling in Light Theme */
+/* 1. Page & Layout Canvas */
 html:not(.dark),
 html:not(.dark) body {
   background-color: #f8fafc !important;
   color: #0f172a !important;
 }
 
-/* 1. Main Panels, Cards & Hero Containers Override */
-html:not(.dark) [class*="bg-slate-9"],
+/* 2. Main Outer Panels, KPI Cards & Hero Containers */
 html:not(.dark) [class*="bg-slate-950"],
 html:not(.dark) [class*="bg-slate-900"],
+html:not(.dark) [class*="bg-slate-9"],
 html:not(.dark) [style*="0f172a"],
+html:not(.dark) [style*="020617"],
 html:not(.dark) [style*="1e293b"],
 html:not(.dark) [style*="15, 23, 42"],
 html:not(.dark) [style*="rgb(30, 41, 59)"],
 html:not(.dark) [style*="rgb(15, 23, 42)"],
+html:not(.dark) [style*="rgb(2, 6, 23)"],
 html:not(.dark) [style*="rgb(51, 65, 85)"],
+html:not(.dark) [style*="rgba(15, 23, 42"],
+html:not(.dark) [style*="rgba(30, 41, 59"],
 html:not(.dark) [style*="linear-gradient(to right, #ffffff, #94a3b8)"],
 html:not(.dark) [style*="linear-gradient(to right,#ffffff,#94a3b8)"] {
   background-image: none !important;
@@ -134,71 +240,129 @@ html:not(.dark) [style*="linear-gradient(to right,#ffffff,#94a3b8)"] {
   border-color: #e2e8f0 !important;
   color: #0f172a !important;
   -webkit-text-fill-color: initial !important;
-  box-shadow: 0 4px 16px -2px rgba(15, 23, 42, 0.05), 0 2px 4px -1px rgba(15, 23, 42, 0.03) !important;
+  box-shadow: 0 2px 8px -1px rgba(15, 23, 42, 0.05), 0 1px 3px -1px rgba(15, 23, 42, 0.03) !important;
 }
 
-html:not(.dark) [style*="color: rgb(248, 250, 252)"],
-html:not(.dark) [style*="color: rgb(241, 245, 249)"],
-html:not(.dark) [style*="color: #f8fafc"],
-html:not(.dark) [style*="color:#f8fafc"] {
-  color: #0f172a !important;
-}
-
-html:not(.dark) [style*="color: rgb(148, 163, 184)"],
-html:not(.dark) [style*="color: #94a3b8"],
-html:not(.dark) [style*="color:#94a3b8"] {
-  color: #64748b !important;
-}
-
-/* 2. Secondary & Inner Containers Override */
-html:not(.dark) [class*="bg-slate-8"],
+/* 3. Secondary Sub-Containers, Badges, Metrics & Inner Cards */
 html:not(.dark) [class*="bg-slate-850"],
-html:not(.dark) [class*="bg-slate-800"] {
-  background-color: #f8fafc !important;
-  border-color: #e2e8f0 !important;
-}
-
-/* Subtle Inner Badges & Sub-Cards */
+html:not(.dark) [class*="bg-slate-800"],
+html:not(.dark) [class*="bg-slate-8"],
+html:not(.dark) [class*="bg-slate-800/40"],
 html:not(.dark) [class*="bg-slate-800/50"],
 html:not(.dark) [class*="bg-slate-800/60"],
+html:not(.dark) [class*="bg-slate-800/70"],
 html:not(.dark) [class*="bg-slate-800/80"],
+html:not(.dark) [class*="bg-slate-900/40"],
+html:not(.dark) [class*="bg-slate-900/60"],
+html:not(.dark) [class*="bg-slate-900/70"],
 html:not(.dark) [class*="bg-slate-900/80"],
+html:not(.dark) [class*="bg-slate-950/40"],
+html:not(.dark) [class*="bg-slate-950/50"],
+html:not(.dark) [class*="bg-slate-950/60"],
 html:not(.dark) [class*="bg-slate-950/70"],
-html:not(.dark) [class*="bg-slate-950/80"] {
-  background-color: #ffffff !important;
+html:not(.dark) [class*="bg-slate-950/80"],
+html:not(.dark) [style*="334155"],
+html:not(.dark) [style*="rgba(255, 255, 255, 0.05)"],
+html:not(.dark) [style*="rgba(255, 255, 255, 0.06)"],
+html:not(.dark) [style*="rgba(255, 255, 255, 0.08)"],
+html:not(.dark) [style*="rgba(255, 255, 255, 0.1)"],
+html:not(.dark) [style*="rgba(255, 255, 255, 0.15)"] {
+  background-color: #f8fafc !important;
   border-color: #e2e8f0 !important;
+  color: #1e293b !important;
 }
 
-/* 3. Borders & Dividers Override */
+/* 4. Borders & Dividers Across All Panels */
 html:not(.dark) [class*="border-slate-8"],
 html:not(.dark) [class*="border-slate-7"],
 html:not(.dark) [class*="border-slate-6"],
+html:not(.dark) [style*="border: 1px solid #334155"],
+html:not(.dark) [style*="border: 1px solid #1e293b"],
+html:not(.dark) [style*="border: 1px solid #475569"],
+html:not(.dark) [style*="border-bottom: 1px solid #334155"],
+html:not(.dark) [style*="border-bottom: 1px solid #1e293b"],
+html:not(.dark) [style*="border-top: 1px solid #334155"],
+html:not(.dark) [style*="border-top: 1px solid #1e293b"],
 html:not(.dark) [class*="divide-slate-8"] > * + *,
 html:not(.dark) [class*="divide-slate-7"] > * + * {
   border-color: #e2e8f0 !important;
 }
 
-/* 4. Typography & Text Colors */
-html:not(.dark) .text-white,
-html:not(.dark) [class*="text-slate-100"],
-html:not(.dark) [class*="text-slate-200"],
-html:not(.dark) [class*="text-slate-1"] {
+/* 5. Typography — Headings & High-Contrast Titles */
+html:not(.dark) h1,
+html:not(.dark) h2,
+html:not(.dark) h3,
+html:not(.dark) h4,
+html:not(.dark) h5,
+html:not(.dark) h6 {
   color: #0f172a !important;
 }
 
+/* 6. Primary Text, Numbers & Metric Values */
+html:not(.dark) .text-white,
+html:not(.dark) .text-slate-50,
+html:not(.dark) .text-slate-100,
+html:not(.dark) .text-slate-200,
+html:not(.dark) [class*="text-slate-100"],
+html:not(.dark) [class*="text-slate-200"],
+html:not(.dark) [class*="text-slate-1"],
+html:not(.dark) [class*="text-slate-2"],
+html:not(.dark) [style*="color: #ffffff"],
+html:not(.dark) [style*="color: rgb(255, 255, 255)"],
+html:not(.dark) [style*="color: #f8fafc"],
+html:not(.dark) [style*="color: rgb(248, 250, 252)"],
+html:not(.dark) [style*="color: #f1f5f9"],
+html:not(.dark) [style*="color: rgb(241, 245, 249)"],
+html:not(.dark) [style*="color: #cbd5e1"],
+html:not(.dark) [style*="color: rgb(203, 213, 225)"] {
+  color: #0f172a !important;
+}
+
+/* 7. Secondary Text & Dark Slate Contrast */
+html:not(.dark) .text-slate-300,
 html:not(.dark) [class*="text-slate-300"],
 html:not(.dark) [class*="text-slate-3"] {
   color: #1e293b !important;
 }
 
+/* 8. Subtitles, Labels, Captions & Muted Text */
+html:not(.dark) .text-slate-400,
+html:not(.dark) .text-slate-500,
 html:not(.dark) [class*="text-slate-400"],
 html:not(.dark) [class*="text-slate-500"],
 html:not(.dark) [class*="text-slate-4"],
-html:not(.dark) [class*="text-slate-5"] {
-  color: #64748b !important;
+html:not(.dark) [class*="text-slate-5"],
+html:not(.dark) [style*="color: #94a3b8"],
+html:not(.dark) [style*="color: rgb(148, 163, 184)"],
+html:not(.dark) [style*="color: #64748b"],
+html:not(.dark) [style*="color: rgb(100, 116, 139)"] {
+  color: #475569 !important;
 }
 
-/* 5. Form Inputs, Selects & Dropdowns */
+/* 9. Interactive Tabs, Nav Buttons & Section Switchers */
+html:not(.dark) [class*="bg-slate-900/80"],
+html:not(.dark) [class*="bg-slate-900/70"] {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+}
+
+html:not(.dark) button.bg-slate-900,
+html:not(.dark) button.bg-slate-800,
+html:not(.dark) button[style*="background: #1e293b"],
+html:not(.dark) button[style*="background: rgb(30, 41, 59)"] {
+  background-color: #f1f5f9 !important;
+  border-color: #cbd5e1 !important;
+  color: #334155 !important;
+}
+
+html:not(.dark) button[style*="background: #4f46e5"],
+html:not(.dark) button[style*="background: rgb(79, 70, 229)"],
+html:not(.dark) button.bg-indigo-600 {
+  background-color: #4f46e5 !important;
+  color: #ffffff !important;
+}
+
+/* 10. Form Inputs, Selects, Date Pickers & Dropdowns */
 html:not(.dark) input,
 html:not(.dark) select,
 html:not(.dark) textarea,
@@ -213,10 +377,11 @@ html:not(.dark) textarea::placeholder {
   color: #94a3b8 !important;
 }
 
-/* 6. Tables & Data Grids */
+/* 11. Tables & Data Grids */
 html:not(.dark) table thead,
 html:not(.dark) table th,
-html:not(.dark) thead tr {
+html:not(.dark) thead tr,
+html:not(.dark) tr[style*="rgba(15, 23, 42"] {
   background-color: #f8fafc !important;
   color: #475569 !important;
   border-bottom: 1px solid #e2e8f0 !important;
@@ -234,22 +399,27 @@ html:not(.dark) table td {
   color: #1e293b !important;
 }
 
-/* 7. Indigo Accent Contrast in Light Mode */
+/* 12. Indigo & Accent Highlights */
 html:not(.dark) [class*="text-indigo-6"],
-html:not(.dark) [class*="text-indigo-5"] {
+html:not(.dark) [class*="text-indigo-5"],
+html:not(.dark) [class*="text-indigo-4"],
+html:not(.dark) [class*="text-purple-4"],
+html:not(.dark) [class*="text-purple-5"] {
   color: #4f46e5 !important;
 }
 
-html:not(.dark) [class*="bg-indigo-50"] {
+html:not(.dark) [class*="bg-indigo-50"],
+html:not(.dark) [class*="bg-indigo-950"] {
   background-color: #eef2ff !important;
 }
 
 html:not(.dark) [class*="border-indigo-200"],
-html:not(.dark) [class*="border-indigo-300"] {
+html:not(.dark) [class*="border-indigo-300"],
+html:not(.dark) [class*="border-indigo-800"] {
   border-color: #c7d2fe !important;
 }
 
-/* 8. Recharts & Chart Tooltips in Light Mode */
+/* 13. Recharts & Chart Tooltips in Light Mode */
 html:not(.dark) .recharts-default-tooltip,
 html:not(.dark) .recharts-tooltip-wrapper > div {
   background-color: #ffffff !important;
@@ -258,14 +428,14 @@ html:not(.dark) .recharts-tooltip-wrapper > div {
   box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1) !important;
 }
 
-/* 9. Navigation Sidebar & Header Overrides */
+/* 14. Navigation Sidebar & Header Overrides */
 html:not(.dark) aside,
 html:not(.dark) header {
   background-color: #ffffff !important;
   border-color: #e2e8f0 !important;
 }
 
-/* 10. Modals, Dialogs & Backdrop Overrides */
+/* 15. Modals, Dialogs & Backdrops */
 html:not(.dark) .fixed.inset-0.bg-black\/70,
 html:not(.dark) .fixed.inset-0.bg-black\/80,
 html:not(.dark) .fixed.inset-0.bg-slate-950\/80 {
@@ -273,11 +443,15 @@ html:not(.dark) .fixed.inset-0.bg-slate-950\/80 {
   backdrop-filter: blur(4px);
 }
 
-/* 11. Heatmap Inactive Cell Overrides */
-html:not(.dark) .bg-slate-950\/70 {
+/* 16. Heatmap Inactive & Metric Cells */
+html:not(.dark) .bg-slate-950\/70,
+html:not(.dark) .bg-slate-950\/80 {
   background-color: #f1f5f9 !important;
   border-color: #e2e8f0 !important;
 }
 
-
-
+/* 17. Time-Series Contextual Metrics Summary Bar */
+html:not(.dark) [class*="bg-slate-800/40"] {
+  background-color: #f1f5f9 !important;
+  border-color: #e2e8f0 !important;
+}

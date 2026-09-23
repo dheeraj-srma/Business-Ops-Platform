@@ -8,7 +8,7 @@ import DataFreshnessBadge from '../components/DataFreshnessBadge';
 import { InScreenLoader } from '../components/common/InScreenLoader';
 
 export default function GeographyPage() {
-  const { sales, kpis, dealersList, loading, selectedRange } = useBi();
+  const { sales, kpis, dealersList, loading, hasData, selectedRange } = useBi();
 
   // 1. Authoritative State Revenue Ranking from Historical Sales Ledger
   const stateRevenueData = useMemo(() => {
@@ -43,7 +43,7 @@ export default function GeographyPage() {
     ? `${topState.state} (${topState.share_percent}%)`
     : 'Haryana';
 
-  if (loading) {
+  if (loading && !hasData) {
     return <InScreenLoader message="Loading Geographic Intelligence & GIS Mapping..." />;
   }
 

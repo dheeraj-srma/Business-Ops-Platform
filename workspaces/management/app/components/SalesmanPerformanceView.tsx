@@ -436,14 +436,14 @@ export default function SalesmanPerformanceView() {
   return (
     <div className="space-y-6">
       {/* ── Top Unified Date Range & Selector Control Bar ────────────────── */}
-      <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 shadow-lg flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 backdrop-blur-md">
+      <div className="bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-xs dark:shadow-lg flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 backdrop-blur-md">
         <div className="flex items-center gap-3">
           <div className="p-2.5 bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/40 rounded-xl text-indigo-600 dark:text-indigo-400">
             <Calendar size={20} />
           </div>
           <div>
-            <div className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Scope</div>
-            <div className="text-sm font-bold text-white flex items-center gap-2">
+            <div className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider">Scope</div>
+            <div className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
               <span>Salesmen Performance</span>
             </div>
           </div>
@@ -452,16 +452,16 @@ export default function SalesmanPerformanceView() {
         {/* Filters */}
         <div className="flex flex-wrap items-center gap-3">
           {/* Salesman Focus Dropdown */}
-          <div className="flex items-center gap-2 bg-slate-950/80 px-3 py-2 rounded-xl border border-slate-800 text-xs">
-            <Users size={14} className="text-sky-400" />
+          <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-950/80 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 text-xs shadow-xs dark:shadow-none">
+            <Users size={14} className="text-sky-600 dark:text-sky-400" />
             <select
               value={selectedSalesmanId}
               onChange={(e) => setSelectedSalesmanId(e.target.value)}
-              className="bg-transparent text-white font-semibold focus:outline-none cursor-pointer"
+              className="bg-transparent text-slate-800 dark:text-white font-semibold focus:outline-none cursor-pointer"
             >
-              <option value="all" className="bg-slate-900 text-white">All Salesmen</option>
+              <option value="all" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-white">All Salesmen</option>
               {salesmenList.map(s => (
-                <option key={s.salesman_id} value={s.salesman_id} className="bg-slate-900 text-white">
+                <option key={s.salesman_id} value={s.salesman_id} className="bg-white dark:bg-slate-900 text-slate-800 dark:text-white">
                   {s.name} ({s.salesman_code})
                 </option>
               ))}
@@ -469,27 +469,27 @@ export default function SalesmanPerformanceView() {
           </div>
 
           {/* Date Range Selector */}
-          <div className="flex items-center gap-2 bg-slate-950/80 px-3 py-2 rounded-xl border border-slate-800 text-xs">
-            <span className="text-slate-400 font-medium">Period:</span>
+          <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-950/80 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 text-xs shadow-xs dark:shadow-none">
+            <span className="text-slate-500 dark:text-slate-400 font-medium">Period:</span>
             <select
               value={dateRange}
               onChange={(e) => handleDateRangeChange(e.target.value)}
               className="bg-transparent text-indigo-600 dark:text-indigo-400 font-bold focus:outline-none cursor-pointer"
             >
-              <option value="today" className="bg-slate-900 text-white">Today</option>
-              <option value="yesterday" className="bg-slate-900 text-white">Yesterday</option>
-              <option value="7d" className="bg-slate-900 text-white">Last 7 Days</option>
-              <option value="this_week" className="bg-slate-900 text-white">This Week</option>
-              <option value="this_month" className="bg-slate-900 text-white">This Month</option>
-              <option value="last_month" className="bg-slate-900 text-white">Last Month</option>
-              <option value="30d" className="bg-slate-900 text-white">Last 30 Days</option>
-              <option value="60d" className="bg-slate-900 text-white">Last 60 Days</option>
-              <option value="90d" className="bg-slate-900 text-white">Last 90 Days</option>
-              <option value="this_quarter" className="bg-slate-900 text-white">This Quarter</option>
-              <option value="ytd" className="bg-slate-900 text-white">Year-to-Date (YTD)</option>
-              <option value="12m" className="bg-slate-900 text-white">Last 12 Months</option>
-              <option value="all" className="bg-slate-900 text-white">All History</option>
-              <option value="custom" className="bg-slate-900 text-white">Custom Range</option>
+              <option value="today" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-white">Today</option>
+              <option value="yesterday" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-white">Yesterday</option>
+              <option value="7d" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-white">Last 7 Days</option>
+              <option value="this_week" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-white">This Week</option>
+              <option value="this_month" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-white">This Month</option>
+              <option value="last_month" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-white">Last Month</option>
+              <option value="30d" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-white">Last 30 Days</option>
+              <option value="60d" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-white">Last 60 Days</option>
+              <option value="90d" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-white">Last 90 Days</option>
+              <option value="this_quarter" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-white">This Quarter</option>
+              <option value="ytd" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-white">Year-to-Date (YTD)</option>
+              <option value="12m" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-white">Last 12 Months</option>
+              <option value="all" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-white">All History</option>
+              <option value="custom" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-white">Custom Range</option>
             </select>
           </div>
 
@@ -499,24 +499,24 @@ export default function SalesmanPerformanceView() {
                 type="date"
                 value={customStart}
                 onChange={(e) => setCustomStart(e.target.value)}
-                className="bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-1.5 text-white focus:outline-none focus:border-indigo-500"
+                className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-2.5 py-1.5 text-slate-800 dark:text-white focus:outline-none focus:border-indigo-500"
               />
-              <span className="text-slate-500">to</span>
+              <span className="text-slate-400">to</span>
               <input
                 type="date"
                 value={customEnd}
                 onChange={(e) => setCustomEnd(e.target.value)}
-                className="bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-1.5 text-white focus:outline-none focus:border-indigo-500"
+                className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-2.5 py-1.5 text-slate-800 dark:text-white focus:outline-none focus:border-indigo-500"
               />
               {customStart && customEnd && customStart > customEnd && (
-                <span className="text-[10px] text-rose-400 font-semibold">Start date must be before end date</span>
+                <span className="text-[10px] text-rose-500 font-semibold">Start date must be before end date</span>
               )}
             </div>
           )}
 
           <button
             onClick={() => { fetchSummary(); fetchSalesmenList(); if (selectedSalesmanId) fetchSalesmanDetail(selectedSalesmanId); }}
-            className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl transition-all border border-slate-700/50"
+            className="p-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-xl transition-all border border-slate-200 dark:border-slate-700/50 cursor-pointer shadow-xs dark:shadow-none"
             title="Refresh Data"
           >
             <RefreshCw size={14} className={loadingSummary || loadingList || loadingDetail ? 'animate-spin' : ''} />
@@ -526,70 +526,70 @@ export default function SalesmanPerformanceView() {
 
       {/* ── 1. Team Summary Aggregate KPI Cards ─────────────────────────── */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-        <div className="bg-slate-900/70 border border-slate-800/80 rounded-2xl p-4 shadow-lg">
-          <div className="flex items-center justify-between text-slate-400 mb-2">
+        <div className="bg-white dark:bg-slate-900/70 border border-slate-200 dark:border-slate-800/80 rounded-2xl p-4 shadow-xs dark:shadow-lg">
+          <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-2">
             <span className="text-[11px] font-semibold uppercase tracking-wider">Total Sales</span>
             <DollarSign size={16} className="text-indigo-600 dark:text-indigo-400" />
           </div>
-          <div className="text-lg font-extrabold text-white">
+          <div className="text-lg font-extrabold text-slate-900 dark:text-white">
             ₹{loadingSummary ? '...' : (teamSummary?.total_team_sales || 0).toLocaleString('en-IN')}
           </div>
-          <div className="text-[10px] text-slate-500 mt-1">Live data</div>
+          <div className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">Live data</div>
         </div>
 
-        <div className="bg-slate-900/70 border border-slate-800/80 rounded-2xl p-4 shadow-lg">
-          <div className="flex items-center justify-between text-slate-400 mb-2">
+        <div className="bg-white dark:bg-slate-900/70 border border-slate-200 dark:border-slate-800/80 rounded-2xl p-4 shadow-xs dark:shadow-lg">
+          <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-2">
             <span className="text-[11px] font-semibold uppercase tracking-wider">Orders</span>
-            <ShoppingCart size={16} className="text-sky-400" />
+            <ShoppingCart size={16} className="text-sky-600 dark:text-sky-400" />
           </div>
-          <div className="text-lg font-extrabold text-white">
+          <div className="text-lg font-extrabold text-slate-900 dark:text-white">
             {loadingSummary ? '...' : (teamSummary?.total_orders || 0)}
           </div>
-          <div className="text-[10px] text-slate-500 mt-1">Completed orders</div>
+          <div className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">Completed orders</div>
         </div>
 
-        <div className="bg-slate-900/70 border border-slate-800/80 rounded-2xl p-4 shadow-lg">
-          <div className="flex items-center justify-between text-slate-400 mb-2">
+        <div className="bg-white dark:bg-slate-900/70 border border-slate-200 dark:border-slate-800/80 rounded-2xl p-4 shadow-xs dark:shadow-lg">
+          <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-2">
             <span className="text-[11px] font-semibold uppercase tracking-wider">Average Order</span>
-            <TrendingUp size={16} className="text-amber-400" />
+            <TrendingUp size={16} className="text-amber-600 dark:text-amber-400" />
           </div>
-          <div className="text-lg font-extrabold text-white">
+          <div className="text-lg font-extrabold text-slate-900 dark:text-white">
             ₹{loadingSummary ? '...' : (teamSummary?.average_order_value || 0).toLocaleString('en-IN')}
           </div>
-          <div className="text-[10px] text-slate-500 mt-1">Average order value</div>
+          <div className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">Average order value</div>
         </div>
 
-        <div className="bg-slate-900/70 border border-slate-800/80 rounded-2xl p-4 shadow-lg">
-          <div className="flex items-center justify-between text-slate-400 mb-2">
+        <div className="bg-white dark:bg-slate-900/70 border border-slate-200 dark:border-slate-800/80 rounded-2xl p-4 shadow-xs dark:shadow-lg">
+          <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-2">
             <span className="text-[11px] font-semibold uppercase tracking-wider">Units Sold</span>
-            <Package size={16} className="text-indigo-400" />
+            <Package size={16} className="text-indigo-600 dark:text-indigo-400" />
           </div>
-          <div className="text-lg font-extrabold text-white">
+          <div className="text-lg font-extrabold text-slate-900 dark:text-white">
             {loadingSummary ? '...' : (teamSummary?.total_units_sold || 0).toLocaleString('en-IN')}
           </div>
-          <div className="text-[10px] text-slate-500 mt-1">Total units</div>
+          <div className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">Total units</div>
         </div>
 
-        <div className="bg-slate-900/70 border border-slate-800/80 rounded-2xl p-4 shadow-lg">
-          <div className="flex items-center justify-between text-slate-400 mb-2">
+        <div className="bg-white dark:bg-slate-900/70 border border-slate-200 dark:border-slate-800/80 rounded-2xl p-4 shadow-xs dark:shadow-lg">
+          <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-2">
             <span className="text-[11px] font-semibold uppercase tracking-wider">Customers</span>
-            <Users size={16} className="text-purple-400" />
+            <Users size={16} className="text-purple-600 dark:text-purple-400" />
           </div>
-          <div className="text-lg font-extrabold text-white">
+          <div className="text-lg font-extrabold text-slate-900 dark:text-white">
             {loadingSummary ? '...' : (teamSummary?.total_customers_served || 0)}
           </div>
-          <div className="text-[10px] text-slate-500 mt-1">Unique customers</div>
+          <div className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">Unique customers</div>
         </div>
 
-        <div className="bg-slate-900/70 border border-slate-800/80 rounded-2xl p-4 shadow-lg">
-          <div className="flex items-center justify-between text-slate-400 mb-2">
+        <div className="bg-white dark:bg-slate-900/70 border border-slate-200 dark:border-slate-800/80 rounded-2xl p-4 shadow-xs dark:shadow-lg">
+          <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-2">
             <span className="text-[11px] font-semibold uppercase tracking-wider">Active Salesmen</span>
             <UserCheck size={16} className="text-indigo-600 dark:text-indigo-400" />
           </div>
           <div className="text-lg font-extrabold text-indigo-600 dark:text-indigo-400">
             {loadingSummary ? '...' : (teamSummary?.total_active_salesmen || 0)}
           </div>
-          <div className="text-[10px] text-slate-500 mt-1">Active team</div>
+          <div className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">Active team</div>
         </div>
       </div>
 
@@ -605,25 +605,25 @@ export default function SalesmanPerformanceView() {
 
       {/* ── 3. Selected Salesman Focus Analytics Detail View ──────────────── */}
       {selectedSalesmanId !== 'all' && salesmanDetail && (
-        <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-5">
+        <div className="bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-xs dark:shadow-xl space-y-5">
           {/* Header Card */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200 dark:border-slate-800">
             <div>
               <div className="flex items-center gap-2 mb-1">
                 <span className="px-2.5 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 text-[10px] font-bold border border-indigo-200 dark:border-indigo-800/40 uppercase">
                   {salesmanDetail.header.role || 'Sales Executive'}
                 </span>
-                <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${salesmanDetail.header.is_active ? 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400' : 'bg-rose-500/20 text-rose-400'}`}>
+                <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${salesmanDetail.header.is_active ? 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800/60' : 'bg-rose-50 dark:bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800/40'}`}>
                   {salesmanDetail.header.is_active ? 'ACTIVE' : 'INACTIVE'}
                 </span>
               </div>
-              <h2 className="text-xl font-extrabold text-white tracking-tight flex items-center gap-2">
+              <h2 className="text-xl font-extrabold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
                 {salesmanDetail.header.name}
-                <span className="text-xs font-medium text-slate-400">({salesmanDetail.header.salesman_code})</span>
+                <span className="text-xs font-medium text-slate-500 dark:text-slate-400">({salesmanDetail.header.salesman_code})</span>
               </h2>
-              <div className="text-xs text-slate-400 mt-1 flex items-center gap-3">
+              <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-3">
                 <span className="flex items-center gap-1">
-                  <MapPin size={12} className="text-sky-400" />
+                  <MapPin size={12} className="text-sky-600 dark:text-sky-400" />
                   {salesmanDetail.header.location || 'Northern Region'}
                 </span>
               </div>
@@ -631,7 +631,7 @@ export default function SalesmanPerformanceView() {
 
             <button
               onClick={() => setSelectedSalesmanId('all')}
-              className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl transition-all border border-slate-700/60 flex items-center gap-2 self-start sm:self-auto"
+              className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold rounded-xl transition-all border border-slate-200 dark:border-slate-700/60 flex items-center gap-2 self-start sm:self-auto cursor-pointer shadow-xs dark:shadow-none"
             >
               <span>View All Salesmen</span>
               <ChevronRight size={14} />
@@ -640,27 +640,27 @@ export default function SalesmanPerformanceView() {
 
           {/* Exact Sales Breakdown Panel */}
           <div>
-            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
-              <FileText size={14} className="text-sky-400" />
+            <h4 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+              <FileText size={14} className="text-sky-600 dark:text-sky-400" />
               Sales Breakdown
             </h4>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
-              <div className="bg-slate-950/60 p-3 rounded-xl border border-slate-800/80">
-                <div className="text-slate-400 mb-1">Gross Sales</div>
-                <div className="text-sm font-extrabold text-white">₹{salesmanDetail.metrics.total_sales.toLocaleString('en-IN')}</div>
+              <div className="bg-slate-50 dark:bg-slate-950/60 p-3 rounded-xl border border-slate-200 dark:border-slate-800/80">
+                <div className="text-slate-500 dark:text-slate-400 mb-1">Gross Sales</div>
+                <div className="text-sm font-extrabold text-slate-900 dark:text-white">₹{salesmanDetail.metrics.total_sales.toLocaleString('en-IN')}</div>
               </div>
-              <div className="bg-slate-950/60 p-3 rounded-xl border border-slate-800/80">
-                <div className="text-slate-400 mb-1">Cancelled / Returns</div>
-                <div className="text-sm font-extrabold text-rose-400">₹{salesmanDetail.metrics.cancelled_returned_value.toLocaleString('en-IN')}</div>
-                <div className="text-[10px] text-slate-500 mt-0.5">{salesmanDetail.metrics.cancelled_returned_orders} orders affected</div>
+              <div className="bg-slate-50 dark:bg-slate-950/60 p-3 rounded-xl border border-slate-200 dark:border-slate-800/80">
+                <div className="text-slate-500 dark:text-slate-400 mb-1">Cancelled / Returns</div>
+                <div className="text-sm font-extrabold text-rose-600 dark:text-rose-400">₹{salesmanDetail.metrics.cancelled_returned_value.toLocaleString('en-IN')}</div>
+                <div className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">{salesmanDetail.metrics.cancelled_returned_orders} orders affected</div>
               </div>
-              <div className="bg-slate-950/60 p-3 rounded-xl border border-slate-800/80">
-                <div className="text-slate-400 mb-1">Net Sales</div>
+              <div className="bg-slate-50 dark:bg-slate-950/60 p-3 rounded-xl border border-slate-200 dark:border-slate-800/80">
+                <div className="text-slate-500 dark:text-slate-400 mb-1">Net Sales</div>
                 <div className="text-sm font-extrabold text-indigo-600 dark:text-indigo-400">₹{salesmanDetail.metrics.net_sales.toLocaleString('en-IN')}</div>
               </div>
-              <div className="bg-slate-950/60 p-3 rounded-xl border border-slate-800/80">
-                <div className="text-slate-400 mb-1">Line Items</div>
-                <div className="text-sm font-extrabold text-indigo-400">{salesmanDetail.metrics.line_items_count}</div>
+              <div className="bg-slate-50 dark:bg-slate-950/60 p-3 rounded-xl border border-slate-200 dark:border-slate-800/80">
+                <div className="text-slate-500 dark:text-slate-400 mb-1">Line Items</div>
+                <div className="text-sm font-extrabold text-indigo-600 dark:text-indigo-400">{salesmanDetail.metrics.line_items_count}</div>
               </div>
             </div>
           </div>
@@ -668,16 +668,16 @@ export default function SalesmanPerformanceView() {
           {/* Interactive Chart for Time-Series Trend */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+              <h4 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-2">
                 <BarChart3 size={14} className="text-indigo-600 dark:text-indigo-400" />
                 Sales Timeline
               </h4>
-              <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-lg border border-slate-800 text-[11px]">
+              <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-950 p-1 rounded-lg border border-slate-200 dark:border-slate-800 text-[11px]">
                 {(['daily', 'weekly', 'monthly'] as const).map(g => (
                   <button
                     key={g}
                     onClick={() => setChartGranularity(g)}
-                    className={`px-2.5 py-1 rounded-md capitalize font-medium transition-all ${chartGranularity === g ? 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 font-bold' : 'text-slate-400 hover:text-white'}`}
+                    className={`px-2.5 py-1 rounded-md capitalize font-medium transition-all cursor-pointer ${chartGranularity === g ? 'bg-white dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-400 font-bold shadow-xs' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}`}
                   >
                     {g}
                   </button>
@@ -697,21 +697,21 @@ export default function SalesmanPerformanceView() {
           {/* Assigned Customers Directory */}
           <div>
             <div className="flex items-center justify-between mb-3">
-              <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
-                <Store size={14} className="text-emerald-400" />
+              <h4 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                <Store size={14} className="text-emerald-600 dark:text-emerald-400" />
                 Assigned Customers
-                <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
+                <span className="text-[10px] font-mono text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-800/40 px-1.5 py-0.5 rounded">
                   {assignedCustomers.length}
                 </span>
               </h4>
               <div className="relative">
-                <Search size={12} className="absolute left-2.5 top-1/2 transform -translate-y-1/2 text-slate-500" />
+                <Search size={12} className="absolute left-2.5 top-1/2 transform -translate-y-1/2 text-slate-400 dark:text-slate-500" />
                 <input
                   type="text"
                   placeholder="Search customers..."
                   value={customerSearch}
                   onChange={(e) => setCustomerSearch(e.target.value)}
-                  className="pl-7 pr-3 py-1.5 bg-slate-950/80 border border-slate-800 rounded-xl text-[11px] text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 w-40 sm:w-52"
+                  className="pl-7 pr-3 py-1.5 bg-white dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800 rounded-xl text-[11px] text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-emerald-500 w-40 sm:w-52"
                 />
               </div>
             </div>
@@ -727,30 +727,30 @@ export default function SalesmanPerformanceView() {
                 {filteredAssignedCustomers.map((c, idx) => (
                   <div
                     key={c.customer_id || c.customer_code || idx}
-                    className="bg-slate-950/50 border border-slate-800/70 rounded-xl p-3 hover:border-emerald-500/30 transition-all group"
+                    className="bg-slate-50 dark:bg-slate-950/50 border border-slate-200 dark:border-slate-800/70 rounded-xl p-3 hover:border-emerald-500/40 transition-all group"
                   >
                     <div className="flex items-start gap-2.5">
-                      <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 text-[11px] font-bold shrink-0 mt-0.5">
+                      <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400 text-[11px] font-bold shrink-0 mt-0.5">
                         {(c.shop_name || c.name || '?').charAt(0).toUpperCase()}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <div className="text-xs font-bold text-white truncate group-hover:text-emerald-300 transition-colors">
+                        <div className="text-xs font-bold text-slate-900 dark:text-white truncate group-hover:text-emerald-600 dark:group-hover:text-emerald-300 transition-colors">
                           {c.shop_name || c.name}
                         </div>
-                        <div className="text-[10px] text-slate-400 font-mono mt-0.5">{c.customer_code}</div>
+                        <div className="text-[10px] text-slate-500 dark:text-slate-400 font-mono mt-0.5">{c.customer_code}</div>
                         {c.contact_person && c.contact_person !== c.name && (
-                          <div className="text-[10px] text-slate-400 mt-0.5 truncate">Contact: {c.contact_person}</div>
+                          <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 truncate">Contact: {c.contact_person}</div>
                         )}
-                        <div className="flex items-center gap-3 mt-1.5 text-[10px] text-slate-500">
+                        <div className="flex items-center gap-3 mt-1.5 text-[10px] text-slate-400 dark:text-slate-500">
                           {(c.city || c.state) && (
                             <span className="flex items-center gap-1">
-                              <MapPin size={10} className="text-sky-400" />
+                              <MapPin size={10} className="text-sky-600 dark:text-sky-400" />
                               {[c.city, c.state].filter(Boolean).join(', ')}
                             </span>
                           )}
                           {c.phone && (
                             <span className="flex items-center gap-1">
-                              <Phone size={10} className="text-indigo-400" />
+                              <Phone size={10} className="text-indigo-600 dark:text-indigo-400" />
                               {c.phone}
                             </span>
                           )}
@@ -766,41 +766,41 @@ export default function SalesmanPerformanceView() {
       )}
 
       {/* ── 4. Salesman Comparison Table ───────────────────────────────── */}
-      <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-xl backdrop-blur-md">
+      <div className="bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-xs dark:shadow-xl backdrop-blur-md">
         {/* Table Filter Controls */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 pb-4 border-b border-slate-800">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 pb-4 border-b border-slate-200 dark:border-slate-800">
           <div>
-            <h3 className="text-base sm:text-lg font-bold text-white tracking-tight flex items-center gap-2">
-              <Users size={18} className="text-sky-400" />
+            <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
+              <Users size={18} className="text-sky-600 dark:text-sky-400" />
               Sales Comparison
             </h3>
-            <p className="text-xs text-slate-400 mt-0.5">Sales performance by salesman</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Sales performance by salesman</p>
           </div>
 
           <div className="flex items-center gap-3">
             {/* Search Input */}
             <div className="relative">
-              <Search size={14} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
+              <Search size={14} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 dark:text-slate-500" />
               <input
                 type="text"
                 placeholder="Search salesman..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 pr-3 py-1.5 bg-slate-950/80 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-sky-500 w-44 sm:w-56"
+                className="pl-9 pr-3 py-1.5 bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-sky-500 w-44 sm:w-56"
               />
             </div>
 
             {/* Status Filter */}
-            <div className="flex items-center gap-1.5 bg-slate-950/80 px-2.5 py-1.5 rounded-xl border border-slate-800 text-xs text-slate-400">
+            <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-950/80 px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 text-xs text-slate-500 dark:text-slate-400">
               <Filter size={12} />
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="bg-transparent text-white focus:outline-none cursor-pointer"
+                className="bg-transparent text-slate-800 dark:text-white focus:outline-none cursor-pointer"
               >
-                <option value="all" className="bg-slate-900">All Status</option>
-                <option value="active" className="bg-slate-900">Active Only</option>
-                <option value="inactive" className="bg-slate-900">Inactive Only</option>
+                <option value="all" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-white">All Status</option>
+                <option value="active" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-white">Active Only</option>
+                <option value="inactive" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-white">Inactive Only</option>
               </select>
             </div>
           </div>
@@ -813,20 +813,20 @@ export default function SalesmanPerformanceView() {
           </div>
         ) : salesmenList.length === 0 ? (
           <div className="py-12 text-center text-slate-400 text-sm flex flex-col items-center gap-2">
-            <AlertCircle size={24} className="text-amber-400" />
+            <AlertCircle size={24} className="text-amber-500" />
             <span>No salesmen found.</span>
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs text-slate-300 border-collapse">
+            <table className="w-full text-left text-xs text-slate-700 dark:text-slate-300 border-collapse">
               <thead>
-                <tr className="border-b border-slate-800 text-slate-400 uppercase font-semibold tracking-wider text-[11px]">
+                <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 uppercase font-semibold tracking-wider text-[11px] bg-slate-50 dark:bg-slate-900/50">
                   <th className="py-3 px-3">Salesman</th>
                   <th className="py-3 px-3">Ref Code</th>
                   <th className="py-3 px-3">Location</th>
                   <th className="py-3 px-3">Status</th>
                   <th
-                    className="py-3 px-3 text-right cursor-pointer hover:text-sky-400 transition-all"
+                    className="py-3 px-3 text-right cursor-pointer hover:text-sky-600 dark:hover:text-sky-400 transition-all"
                     onClick={() => handleSort('sales')}
                   >
                     <div className="flex items-center justify-end gap-1">
@@ -835,7 +835,7 @@ export default function SalesmanPerformanceView() {
                     </div>
                   </th>
                   <th
-                    className="py-3 px-3 text-right cursor-pointer hover:text-sky-400 transition-all"
+                    className="py-3 px-3 text-right cursor-pointer hover:text-sky-600 dark:hover:text-sky-400 transition-all"
                     onClick={() => handleSort('orders')}
                   >
                     <div className="flex items-center justify-end gap-1">
@@ -844,7 +844,7 @@ export default function SalesmanPerformanceView() {
                     </div>
                   </th>
                   <th
-                    className="py-3 px-3 text-right cursor-pointer hover:text-sky-400 transition-all"
+                    className="py-3 px-3 text-right cursor-pointer hover:text-sky-600 dark:hover:text-sky-400 transition-all"
                     onClick={() => handleSort('average_order_value')}
                   >
                     <div className="flex items-center justify-end gap-1">
@@ -853,7 +853,7 @@ export default function SalesmanPerformanceView() {
                     </div>
                   </th>
                   <th
-                    className="py-3 px-3 text-right cursor-pointer hover:text-sky-400 transition-all"
+                    className="py-3 px-3 text-right cursor-pointer hover:text-sky-600 dark:hover:text-sky-400 transition-all"
                     onClick={() => handleSort('units_sold')}
                   >
                     <div className="flex items-center justify-end gap-1">
@@ -862,7 +862,7 @@ export default function SalesmanPerformanceView() {
                     </div>
                   </th>
                   <th
-                    className="py-3 px-3 text-right cursor-pointer hover:text-sky-400 transition-all"
+                    className="py-3 px-3 text-right cursor-pointer hover:text-sky-600 dark:hover:text-sky-400 transition-all"
                     onClick={() => handleSort('customers')}
                   >
                     <div className="flex items-center justify-end gap-1">
@@ -871,7 +871,7 @@ export default function SalesmanPerformanceView() {
                     </div>
                   </th>
                   <th
-                    className="py-3 px-3 text-right cursor-pointer hover:text-sky-400 transition-all"
+                    className="py-3 px-3 text-right cursor-pointer hover:text-sky-600 dark:hover:text-sky-400 transition-all"
                     onClick={() => handleSort('active_days')}
                   >
                     <div className="flex items-center justify-end gap-1">
@@ -881,35 +881,35 @@ export default function SalesmanPerformanceView() {
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/60">
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
                 {salesmenList.map((row) => (
                   <tr
                     key={row.salesman_id}
                     onClick={() => setSelectedSalesmanId(row.salesman_id)}
-                    className={`hover:bg-slate-800/50 cursor-pointer transition-all ${selectedSalesmanId === row.salesman_id ? 'bg-sky-500/10 border-l-2 border-sky-400' : ''}`}
+                    className={`hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-all ${selectedSalesmanId === row.salesman_id ? 'bg-sky-50 dark:bg-sky-500/10 border-l-2 border-sky-500' : ''}`}
                   >
-                    <td className="py-3.5 px-3 font-bold text-white flex items-center gap-2">
-                      <div className="w-7 h-7 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-sky-400 text-xs font-bold">
+                    <td className="py-3.5 px-3 font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-sky-600 dark:text-sky-400 text-xs font-bold">
                         {row.name.charAt(0)}
                       </div>
                       <span>{row.name}</span>
                     </td>
-                    <td className="py-3.5 px-3 font-mono text-slate-400">{row.salesman_code}</td>
-                    <td className="py-3.5 px-3 text-slate-400">{row.location || 'Northern Region'}</td>
+                    <td className="py-3.5 px-3 font-mono text-slate-500 dark:text-slate-400">{row.salesman_code}</td>
+                    <td className="py-3.5 px-3 text-slate-500 dark:text-slate-400">{row.location || 'Northern Region'}</td>
                     <td className="py-3.5 px-3">
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${row.is_active ? 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400' : 'bg-slate-800 text-slate-400'}`}>
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${row.is_active ? 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800/40' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'}`}>
                         {row.is_active ? 'Active' : 'Inactive'}
                       </span>
                     </td>
-                    <td className="py-3.5 px-3 text-right font-bold text-sky-400">
+                    <td className="py-3.5 px-3 text-right font-bold text-sky-600 dark:text-sky-400">
                       ₹{row.sales.toLocaleString('en-IN')}
                     </td>
-                    <td className="py-3.5 px-3 text-right font-extrabold text-white">{row.orders}</td>
-                    <td className="py-3.5 px-3 text-right text-slate-300">
+                    <td className="py-3.5 px-3 text-right font-extrabold text-slate-900 dark:text-white">{row.orders}</td>
+                    <td className="py-3.5 px-3 text-right text-slate-700 dark:text-slate-300">
                       ₹{row.average_order_value.toLocaleString('en-IN')}
                     </td>
-                    <td className="py-3.5 px-3 text-right text-indigo-300 font-semibold">{row.units_sold}</td>
-                    <td className="py-3.5 px-3 text-right text-slate-300 font-semibold">{row.customers}</td>
+                    <td className="py-3.5 px-3 text-right text-indigo-700 dark:text-indigo-300 font-semibold">{row.units_sold}</td>
+                    <td className="py-3.5 px-3 text-right text-slate-700 dark:text-slate-300 font-semibold">{row.customers}</td>
                     <td className="py-3.5 px-3 text-right text-indigo-600 dark:text-indigo-400 font-bold">{row.active_days}</td>
                   </tr>
                 ))}
