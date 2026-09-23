@@ -20,6 +20,7 @@ from . import geography_router
 from . import settings_router
 
 from . import coupon_router
+from . import data_exchange_router
 
 __all__ = [
     "auth_router",
@@ -40,4 +41,5 @@ __all__ = [
     "geography_router",
     "settings_router",
     "coupon_router",
+    "data_exchange_router",
 ]

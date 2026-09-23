@@ -41,6 +41,7 @@ from routers import (
     geography_router,
     settings_router,
     coupon_router,
+    data_exchange_router,
 )
 
 logging.basicConfig(
@@ -158,6 +159,7 @@ app.include_router(salesman_router.router)
 app.include_router(geography_router.router)
 app.include_router(settings_router.router)
 app.include_router(coupon_router.router)
+app.include_router(data_exchange_router.router)
 
 # ─── Health & Database Readiness Endpoints ────────────────────────────────────
 @app.get("/health", tags=["Observability"])
