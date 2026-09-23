@@ -47,12 +47,72 @@ function downloadBlob(content: BlobPart, filename: string, mimeType: string) {
 }
 
 /**
+ * Unified movement sign helper: determines whether transaction increases inventory (+) or decreases it (-)
+ */
+export function isPositiveMovement(type?: string, notes?: string): boolean {
+  const norm = String(type || '').toUpperCase();
+  if (
+    [
+      'STOCK_IN',
+      'INWARD',
+      'INITIAL_STOCK',
+      'ADJUSTMENT_INCREASE',
+      'CUSTOMER_RETURN',
+      'RETURN_IN',
+      'RECEIPT',
+      'PURCHASE',
+    ].includes(norm)
+  ) {
+    return true;
+  }
+  if (
+    [
+      'STOCK_OUT',
+      'OUTWARD',
+      'SALE',
+      'SALES',
+      'DISPATCH',
+      'ISSUE',
+      'ADJUSTMENT_DECREASE',
+      'SUPPLIER_RETURN',
+      'RETURN_OUT',
+    ].includes(norm)
+  ) {
+    return false;
+  }
+  if (norm === 'ADJUSTMENT') {
+    const notesLower = String(notes || '').toLowerCase();
+    if (
+      notesLower.includes('delta: -') ||
+      notesLower.includes('variance: -') ||
+      notesLower.includes('decrease') ||
+      notesLower.includes('damage') ||
+      notesLower.includes('loss') ||
+      notesLower.includes('shrinkage') ||
+      notesLower.includes('theft') ||
+      notesLower.includes('scrap')
+    ) {
+      return false;
+    }
+    return true;
+  }
+  return true;
+}
+
+/**
  * 1. Export Consignment / Transaction to Excel (SpreadsheetML XML format)
  */
 export function exportConsignmentToExcel(consignment: ExportableConsignment) {
-  const isStockIn = consignment.type === 'STOCK_IN';
-  const typeLabel = isStockIn ? 'Stock Inward Receipt' : consignment.type === 'STOCK_OUT' ? 'Stock Issue Note' : 'Stock Adjustment';
-  const partyLabel = consignment.partyRole || (isStockIn ? 'Supplier / Vendor' : 'Customer / Salesman');
+  const isPositive = isPositiveMovement(consignment.type, consignment.notes);
+  const typeLabel =
+    consignment.type === 'CUSTOMER_RETURN' || consignment.type === 'RETURN_IN'
+      ? 'Customer Return Voucher'
+      : consignment.type === 'STOCK_IN' || consignment.type === 'INWARD'
+      ? 'Stock Inward Receipt'
+      : consignment.type === 'STOCK_OUT' || consignment.type === 'SALE'
+      ? 'Stock Issue Note'
+      : 'Stock Adjustment Voucher';
+  const partyLabel = consignment.partyRole || (isPositive ? 'Supplier / Vendor' : 'Customer / Recipient');
 
   const escapeXml = (str: any) =>
     String(str ?? '')
@@ -66,9 +126,10 @@ export function exportConsignmentToExcel(consignment: ExportableConsignment) {
 
   const itemRows = consignment.items
     .map((item, idx) => {
-      const prev = item.previousStock !== undefined ? item.previousStock : '-';
-      const change = (isStockIn ? '+' : '-') + item.quantity;
-      const finalBal = item.newStock !== undefined ? item.newStock : '-';
+      const prev = item.previousStock !== undefined && item.previousStock !== null ? item.previousStock : '-';
+      const itemIsPos = isPositiveMovement(consignment.type, item.notes || consignment.notes);
+      const change = (itemIsPos ? '+' : '-') + item.quantity;
+      const finalBal = item.newStock !== undefined && item.newStock !== null ? item.newStock : '-';
 
       return `<Row>
         <Cell><Data ss:Type="Number">${idx + 1}</Data></Cell>
@@ -77,7 +138,7 @@ export function exportConsignmentToExcel(consignment: ExportableConsignment) {
         <Cell><Data ss:Type="String">${escapeXml(item.categoryName || '-')}</Data></Cell>
         <Cell><Data ss:Type="String">${escapeXml(item.unit)}</Data></Cell>
         <Cell><Data ss:Type="${typeof prev === 'number' ? 'Number' : 'String'}">${prev}</Data></Cell>
-        <Cell ss:StyleID="${isStockIn ? 'PositiveQty' : 'NegativeQty'}"><Data ss:Type="String">${change}</Data></Cell>
+        <Cell ss:StyleID="${itemIsPos ? 'PositiveQty' : 'NegativeQty'}"><Data ss:Type="String">${change}</Data></Cell>
         <Cell><Data ss:Type="${typeof finalBal === 'number' ? 'Number' : 'String'}">${finalBal}</Data></Cell>
         <Cell><Data ss:Type="String">${escapeXml(item.notes || '-')}</Data></Cell>
       </Row>`;
@@ -172,7 +233,7 @@ export function exportConsignmentToExcel(consignment: ExportableConsignment) {
     <Cell><Data ss:Type="String"></Data></Cell>
     <Cell><Data ss:Type="String"></Data></Cell>
     <Cell><Data ss:Type="String"></Data></Cell>
-    <Cell ss:StyleID="${isStockIn ? 'PositiveQty' : 'NegativeQty'}"><Data ss:Type="String">${isStockIn ? '+' : '-'}${totalQuantity}</Data></Cell>
+    <Cell ss:StyleID="${isPositive ? 'PositiveQty' : 'NegativeQty'}"><Data ss:Type="String">${isPositive ? '+' : '-'}${totalQuantity}</Data></Cell>
     <Cell><Data ss:Type="String"></Data></Cell>
     <Cell><Data ss:Type="String"></Data></Cell>
    </Row>
@@ -188,11 +249,12 @@ export function exportConsignmentToExcel(consignment: ExportableConsignment) {
  * 2. Export Consignment / Transaction to JSON (.json)
  */
 export function exportConsignmentToJson(consignment: ExportableConsignment) {
+  const isPositive = isPositiveMovement(consignment.type, consignment.notes);
   const exportPayload = {
     receiptType: consignment.type,
     referenceNumber: consignment.referenceNumber,
     partyName: consignment.partyName,
-    partyRole: consignment.partyRole || (consignment.type === 'STOCK_IN' ? 'Supplier' : 'Recipient'),
+    partyRole: consignment.partyRole || (isPositive ? 'Supplier / Source' : 'Recipient / Customer'),
     date: consignment.date,
     loggedBy: consignment.loggedBy || 'Store Manager',
     notes: consignment.notes || '',
@@ -221,8 +283,8 @@ export function exportConsignmentToJson(consignment: ExportableConsignment) {
  * 3. Export Consignment / Transaction to CSV (.csv)
  */
 export function exportConsignmentToCsv(consignment: ExportableConsignment) {
-  const isStockIn = consignment.type === 'STOCK_IN';
-  const partyLabel = consignment.partyRole || (isStockIn ? 'Supplier' : 'Party');
+  const isPositive = isPositiveMovement(consignment.type, consignment.notes);
+  const partyLabel = consignment.partyRole || (isPositive ? 'Supplier / Vendor' : 'Customer / Recipient');
 
   const escapeCsv = (str: any) => {
     const val = String(str ?? '');
@@ -248,21 +310,24 @@ export function exportConsignmentToCsv(consignment: ExportableConsignment) {
     'Logged By',
   ];
 
-  const rows = consignment.items.map((it) => [
-    escapeCsv(consignment.referenceNumber),
-    escapeCsv(consignment.type),
-    escapeCsv(consignment.partyName),
-    escapeCsv(consignment.date),
-    escapeCsv(it.sku),
-    escapeCsv(it.productName),
-    escapeCsv(it.categoryName || 'General'),
-    escapeCsv(it.unit),
-    it.previousStock !== undefined ? it.previousStock : '',
-    `${isStockIn ? '+' : '-'}${it.quantity}`,
-    it.newStock !== undefined ? it.newStock : '',
-    escapeCsv(it.notes || consignment.notes || ''),
-    escapeCsv(consignment.loggedBy || ''),
-  ]);
+  const rows = consignment.items.map((it) => {
+    const itemIsPos = isPositiveMovement(consignment.type, it.notes || consignment.notes);
+    return [
+      escapeCsv(consignment.referenceNumber),
+      escapeCsv(consignment.type),
+      escapeCsv(consignment.partyName),
+      escapeCsv(consignment.date),
+      escapeCsv(it.sku),
+      escapeCsv(it.productName),
+      escapeCsv(it.categoryName || 'General'),
+      escapeCsv(it.unit),
+      it.previousStock !== undefined && it.previousStock !== null ? it.previousStock : '',
+      `${itemIsPos ? '+' : '-'}${it.quantity}`,
+      it.newStock !== undefined && it.newStock !== null ? it.newStock : '',
+      escapeCsv(it.notes || consignment.notes || ''),
+      escapeCsv(consignment.loggedBy || ''),
+    ];
+  });
 
   const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
   const filename = `transaction_${sanitizeFilename(consignment.referenceNumber)}_${Date.now()}.csv`;
@@ -279,14 +344,17 @@ export function exportConsignmentToPdf(consignment: ExportableConsignment) {
     format: 'a4',
   });
 
-  const isStockIn = consignment.type === 'STOCK_IN';
-  const titleText = isStockIn
-    ? 'GOODS RECEIPT NOTE (STOCK-IN)'
-    : consignment.type === 'STOCK_OUT'
-    ? 'STOCK DISPATCH NOTE (STOCK-OUT)'
-    : 'INVENTORY ADJUSTMENT VOUCHER';
+  const isPositive = isPositiveMovement(consignment.type, consignment.notes);
+  const titleText =
+    consignment.type === 'CUSTOMER_RETURN' || consignment.type === 'RETURN_IN'
+      ? 'CUSTOMER RETURN NOTE'
+      : consignment.type === 'STOCK_IN' || consignment.type === 'INWARD'
+      ? 'GOODS RECEIPT NOTE (STOCK-IN)'
+      : consignment.type === 'STOCK_OUT' || consignment.type === 'SALE'
+      ? 'STOCK DISPATCH NOTE (STOCK-OUT)'
+      : 'INVENTORY ADJUSTMENT VOUCHER';
 
-  const partyLabel = consignment.partyRole || (isStockIn ? 'Supplier / Vendor' : 'Customer / Salesman');
+  const partyLabel = consignment.partyRole || (isPositive ? 'Supplier / Vendor' : 'Customer / Recipient');
   const totalQuantity = consignment.items.reduce((sum, it) => sum + (it.quantity || 0), 0);
 
   // Top Header Banner
@@ -340,15 +408,18 @@ export function exportConsignmentToPdf(consignment: ExportableConsignment) {
   y += 6;
 
   // Table using jspdf-autotable
-  const tableData = consignment.items.map((it, idx) => [
-    idx + 1,
-    it.sku,
-    it.productName,
-    it.categoryName || 'General',
-    it.previousStock !== undefined ? String(it.previousStock) : '-',
-    `${isStockIn ? '+' : '-'}${it.quantity} ${it.unit}`,
-    it.newStock !== undefined ? String(it.newStock) : '-',
-  ]);
+  const tableData = consignment.items.map((it, idx) => {
+    const itemIsPos = isPositiveMovement(consignment.type, it.notes || consignment.notes);
+    return [
+      idx + 1,
+      it.sku,
+      it.productName,
+      it.categoryName || 'General',
+      it.previousStock !== undefined && it.previousStock !== null ? String(it.previousStock) : '-',
+      `${itemIsPos ? '+' : '-'}${it.quantity} ${it.unit}`,
+      it.newStock !== undefined && it.newStock !== null ? String(it.newStock) : '-',
+    ];
+  });
 
   autoTable(doc, {
     startY: y + 2,
@@ -383,7 +454,7 @@ export function exportConsignmentToPdf(consignment: ExportableConsignment) {
         `${consignment.items.length} distinct item(s)`,
         '',
         '',
-        `${isStockIn ? '+' : '-'}${totalQuantity} units`,
+        `${isPositive ? '+' : '-'}${totalQuantity} units`,
         '',
       ],
     ],

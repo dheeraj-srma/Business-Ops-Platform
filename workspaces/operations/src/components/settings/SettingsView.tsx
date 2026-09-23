@@ -294,13 +294,24 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </div>
       )}
 
-      {/* TAB 2: USER ACCOUNTS & AUTHORIZATION ROLES */}
+      {/* TAB 2: USER ACCOUNTS & AUTHORIZATION ROLES (Centralized in Management -> Admin Settings) */}
       {activeTab === 'users' && (
-        <div className="space-y-4">
-          <UserManagementPanel
-            currentRole={role}
-            onRefresh={onRefresh}
-          />
+        <div className="bg-white dark:bg-slate-800 p-8 rounded-xl border border-slate-200 dark:border-slate-700 text-center space-y-4 shadow-2xs">
+          <div className="w-12 h-12 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mx-auto">
+            <UsersIcon className="w-6 h-6" />
+          </div>
+          <div className="max-w-md mx-auto space-y-2">
+            <h3 className="text-base font-extrabold text-slate-900 dark:text-slate-100">User Management is Centralized</h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+              To enforce enterprise user data security and role authority, user account administration, password management, and role assignments are exclusively managed inside <strong>Management → Admin Settings</strong>.
+            </p>
+          </div>
+          <a
+            href="/management"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-md transition-all cursor-pointer"
+          >
+            Go to Management Workspace
+          </a>
         </div>
       )}
 

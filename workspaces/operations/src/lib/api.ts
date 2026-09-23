@@ -368,14 +368,45 @@ export const api = {
 
     const transactions: StockTransaction[] = rawList.map((t: any) => {
       const rawType = String(t.transactionType || t.transaction_type || t.Type || 'ADJUSTMENT').toUpperCase();
-      let normType = rawType;
+      let normType: any = rawType;
+      const notesLower = String(t.notes || t.reason || '').toLowerCase();
+
       if (['INWARD', 'STOCK_IN'].includes(rawType)) normType = 'STOCK_IN';
       else if (['SALE', 'SALES', 'STOCK_OUT', 'OUTWARD', 'DISPATCH'].includes(rawType)) normType = 'STOCK_OUT';
       else if (['RETURN_IN', 'CUSTOMER_RETURN'].includes(rawType)) normType = 'CUSTOMER_RETURN';
-      else if (['RETURN_OUT'].includes(rawType)) normType = 'STOCK_OUT';
+      else if (['RETURN_OUT', 'SUPPLIER_RETURN'].includes(rawType)) normType = 'STOCK_OUT';
       else if (['INITIAL_STOCK'].includes(rawType)) normType = 'INITIAL_STOCK';
       else if (['ADJUSTMENT_INCREASE'].includes(rawType)) normType = 'ADJUSTMENT_INCREASE';
       else if (['ADJUSTMENT_DECREASE'].includes(rawType)) normType = 'ADJUSTMENT_DECREASE';
+      else if (rawType === 'ADJUSTMENT') {
+        if (
+          notesLower.includes('delta: -') ||
+          notesLower.includes('variance: -') ||
+          notesLower.includes('decrease') ||
+          notesLower.includes('damage') ||
+          notesLower.includes('loss') ||
+          notesLower.includes('shrinkage') ||
+          notesLower.includes('theft') ||
+          notesLower.includes('scrap')
+        ) {
+          normType = 'ADJUSTMENT_DECREASE';
+        } else if (
+          notesLower.includes('delta: +') ||
+          notesLower.includes('variance: +') ||
+          notesLower.includes('opening quantity') ||
+          notesLower.includes('initial') ||
+          notesLower.includes('imported') ||
+          notesLower.includes('increase') ||
+          notesLower.includes('surplus')
+        ) {
+          normType = 'ADJUSTMENT_INCREASE';
+        } else {
+          normType = 'ADJUSTMENT_INCREASE';
+        }
+      }
+
+      const rawPrev = t.previousStock ?? t.previous_stock ?? t.previousQuantity ?? t.previous_quantity;
+      const rawNew = t.newStock ?? t.new_stock ?? t.newQuantity ?? t.new_quantity;
 
       return {
         ...t,
@@ -388,8 +419,8 @@ export const api = {
         transactionType: normType,
         rawTransactionType: rawType,
         quantity: Number(t.quantity ?? t.Quantity ?? 0),
-        previousStock: Number(t.previousStock ?? t.previous_stock ?? 0),
-        newStock: Number(t.newStock ?? t.new_stock ?? 0),
+        previousStock: rawPrev !== undefined && rawPrev !== null ? Number(rawPrev) : undefined,
+        newStock: rawNew !== undefined && rawNew !== null ? Number(rawNew) : undefined,
         reason: String(t.reason || t.notes || t.Reference || ''),
         supplierOrRecipient: t.supplierOrRecipient || t.supplier_or_recipient || t['supplierOrRecipient'] || '',
         referenceNumber: t.referenceNumber || t.reference_number || t.Reference || '',

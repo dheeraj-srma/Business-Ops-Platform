@@ -210,9 +210,29 @@ export default function SalesmanPortal() {
   const userRole = profile?.role === 'customer' ? 'Customer' : profile?.role === 'admin' ? 'Admin' : profile?.role === 'stock_manager' || profile?.role === 'manager' ? 'Stock Manager' : 'Salesman';
   const isAdminOrManager = profile?.role === 'admin' || profile?.role === 'manager' || profile?.role === 'stock_manager';
   const [adminSelectedSalesman, setAdminSelectedSalesman] = useState<string>('');
+
+  // Canonical salesman name resolution from server-side profile
+  const resolvedSalesmanName = useMemo(() => {
+    if (profile?.salesman_id) {
+      const match = VALID_SALESMEN.find(s => s.id === profile.salesman_id);
+      if (match) return match.name;
+    }
+    if (profile?.salesman_name) return profile.salesman_name;
+    if (profile?.full_name) {
+      const fnLower = profile.full_name.toLowerCase().trim();
+      const canonical = VALID_SALESMEN.find(s =>
+        s.name.toLowerCase() === fnLower ||
+        fnLower.includes(s.name.toLowerCase()) ||
+        s.name.toLowerCase().includes(fnLower)
+      );
+      if (canonical) return canonical.name;
+    }
+    return profile?.full_name || '';
+  }, [profile]);
+
   const selectedSalesman = isAdminOrManager
-    ? (adminSelectedSalesman || (profile?.role === 'salesman' ? profile?.salesman_name : '') || '')
-    : (profile?.salesman_name || profile?.full_name || '');
+    ? (adminSelectedSalesman || (profile?.role === 'salesman' ? resolvedSalesmanName : '') || '')
+    : (resolvedSalesmanName || profile?.salesman_name || profile?.full_name || '');
 
   // Selected Shop (Locked to profile for customer; selected from assigned dealers for salesman)
   const [selectedShop, setSelectedShop] = useState<string>('');
@@ -1029,8 +1049,22 @@ export default function SalesmanPortal() {
   // Assigned Customers for the currently selected Salesman (Sorted alphabetically)
   const assignedCustomers = useMemo(() => {
     if (!selectedSalesman) return [];
+    const smLower = selectedSalesman.toLowerCase().trim();
+    const smMatch = VALID_SALESMEN.find(s => s.name.toLowerCase() === smLower || s.id.toLowerCase() === smLower);
+    const smId = smMatch?.id?.toLowerCase();
+    const smCanonical = smMatch?.name?.toLowerCase();
+
     return dealers
-      .filter(d => d['Salesman Name'] === selectedSalesman && d['Shop Name'])
+      .filter(d => {
+        const dName = (d['Salesman Name'] || '').toLowerCase().trim();
+        const dId = (d['Salesman ID'] || '').toLowerCase().trim();
+        const isMatch = (
+          dName === smLower ||
+          (smCanonical && dName === smCanonical) ||
+          (smId && (dId === smId || dName === smId))
+        );
+        return isMatch && Boolean(d['Shop Name']);
+      })
       .sort((a, b) => a['Shop Name'].localeCompare(b['Shop Name']));
   }, [dealers, selectedSalesman]);
 
@@ -1055,8 +1089,22 @@ export default function SalesmanPortal() {
   // Matched Dealer Record (Auto-resolved when both fields are selected)
   const matchedDealer = useMemo(() => {
     if (!selectedSalesman || !selectedShop) return null;
+    const smLower = selectedSalesman.toLowerCase().trim();
+    const smMatch = VALID_SALESMEN.find(s => s.name.toLowerCase() === smLower || s.id.toLowerCase() === smLower);
+    const smId = smMatch?.id?.toLowerCase();
+    const smCanonical = smMatch?.name?.toLowerCase();
+
     return (
-      dealers.find(d => d['Salesman Name'] === selectedSalesman && d['Shop Name'] === selectedShop) ||
+      dealers.find(d => {
+        const dName = (d['Salesman Name'] || '').toLowerCase().trim();
+        const dId = (d['Salesman ID'] || '').toLowerCase().trim();
+        const isMatch = (
+          dName === smLower ||
+          (smCanonical && dName === smCanonical) ||
+          (smId && (dId === smId || dName === smId))
+        );
+        return isMatch && d['Shop Name'] === selectedShop;
+      }) ||
       dealers.find(d => d['Shop Name'] === selectedShop) ||
       null
     );

@@ -64,6 +64,30 @@ export const PendingOrdersView: React.FC<PendingOrdersViewProps> = ({
   const [activeSubTab, setActiveSubTab] = useState<'pending' | 'history'>('pending');
   const [pendingOrders, setPendingOrders] = useState<OrderPreview[]>([]);
   const [orderHistory, setOrderHistory] = useState<ProcessedOrder[]>([]);
+  const [lastProcessedOrder, setLastProcessedOrder] = useState<ProcessedOrder | null>(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const saved = localStorage.getItem('nalka_last_processed_order');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const updateLastProcessedOrder = (order: ProcessedOrder | null) => {
+    setLastProcessedOrder(order);
+    try {
+      if (typeof window !== 'undefined') {
+        if (order) {
+          localStorage.setItem('nalka_last_processed_order', JSON.stringify(order));
+        } else {
+          localStorage.removeItem('nalka_last_processed_order');
+        }
+      }
+    } catch (e) {
+      console.warn('localStorage error:', e);
+    }
+  };
   const [historyItems, setHistoryItems] = useState<ProcessedOrderItem[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
@@ -88,11 +112,33 @@ export const PendingOrdersView: React.FC<PendingOrdersViewProps> = ({
   const [isAddProductOpen, setIsAddProductOpen] = useState<boolean>(false);
   const addProductRef = useRef<HTMLDivElement>(null);
 
-  // Close add product dropdown on outside click
+  // Download Popover & Preferences state
+  const [downloadMenuTargetId, setDownloadMenuTargetId] = useState<string | null>(null);
+  const [downloadPrefs, setDownloadPrefs] = useState<{ pdf: boolean; json: boolean; remember: boolean }>(() => {
+    if (typeof window === 'undefined') return { pdf: true, json: false, remember: false };
+    try {
+      const saved = localStorage.getItem('nalka_order_download_pref');
+      if (saved) {
+        return JSON.parse(saved);
+      }
+    } catch (e) {
+      // ignore
+    }
+    return { pdf: true, json: false, remember: false };
+  });
+  const [menuPdfChecked, setMenuPdfChecked] = useState(true);
+  const [menuJsonChecked, setMenuJsonChecked] = useState(false);
+  const [menuRememberChecked, setMenuRememberChecked] = useState(false);
+  const downloadMenuRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdowns on outside click
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (addProductRef.current && !addProductRef.current.contains(e.target as Node)) {
         setIsAddProductOpen(false);
+      }
+      if (downloadMenuRef.current && !downloadMenuRef.current.contains(e.target as Node)) {
+        setDownloadMenuTargetId(null);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -163,7 +209,12 @@ export const PendingOrdersView: React.FC<PendingOrdersViewProps> = ({
       ]);
       setPendingOrders(pendingRes?.orders || []);
       setIsLiveConnected(Boolean(pendingRes?.isLiveConnected));
-      setOrderHistory(historyRes?.orders || []);
+      setOrderHistory((prev) => {
+        const backendOrders = historyRes?.orders || [];
+        const backendMap = new Set(backendOrders.map((o) => o.order_id));
+        const missingLocalOrders = prev.filter((o) => !backendMap.has(o.order_id));
+        return [...missingLocalOrders, ...backendOrders];
+      });
       setHistoryItems(historyRes?.items || []);
     } catch (err: any) {
       console.warn('Error loading orders:', err);
@@ -176,8 +227,8 @@ export const PendingOrdersView: React.FC<PendingOrdersViewProps> = ({
     fetchOrders();
     // Auto-poll orders every 15 seconds
     const interval = setInterval(() => fetchOrders(true), 15000);
-    // Timer tick every 10 seconds for live grace window countdowns
-    const timerInterval = setInterval(() => setCurrentTime(Date.now()), 10000);
+    // Timer tick every 1 second for live grace window countdowns
+    const timerInterval = setInterval(() => setCurrentTime(Date.now()), 1000);
     return () => {
       clearInterval(interval);
       clearInterval(timerInterval);
@@ -187,16 +238,29 @@ export const PendingOrdersView: React.FC<PendingOrdersViewProps> = ({
   // Helper: Calculate Grace Period Status (15 Minutes)
   const getGracePeriodInfo = (processedAt?: string) => {
     if (!processedAt) return { isActive: false, remainingMin: 0, text: 'Locked' };
-    const processedTime = new Date(processedAt).getTime();
-    const diff = currentTime - processedTime;
-    if (diff > GRACE_WINDOW_MS || diff < 0) {
+    let dateStr = String(processedAt).trim().replace(' ', 'T');
+    if (!dateStr.endsWith('Z') && !dateStr.includes('+') && !dateStr.match(/-\d{2}:\d{2}$/)) {
+      dateStr = dateStr + 'Z';
+    }
+    const processedTime = new Date(dateStr).getTime();
+    if (isNaN(processedTime)) return { isActive: false, remainingMin: 0, text: 'Locked' };
+
+    // Clamp elapsed to 0 to tolerate minor clock skew between server and client
+    const elapsed = Math.max(0, currentTime - processedTime);
+    if (elapsed >= GRACE_WINDOW_MS) {
       return { isActive: false, remainingMin: 0, text: 'Grace Window Closed (>15m)' };
     }
-    const remainingMin = Math.max(1, Math.ceil((GRACE_WINDOW_MS - diff) / (60 * 1000)));
+
+    const remainingMs = GRACE_WINDOW_MS - elapsed;
+    const remainingSecTotal = Math.max(0, Math.floor(remainingMs / 1000));
+    const remainingMin = Math.floor(remainingSecTotal / 60);
+    const remainingSec = remainingSecTotal % 60;
+    const secStr = remainingSec < 10 ? `0${remainingSec}` : `${remainingSec}`;
+
     return {
       isActive: true,
-      remainingMin: remainingMin,
-      text: `${remainingMin}m left to edit/reject`,
+      remainingMin: Math.max(1, Math.ceil(remainingMs / (60 * 1000))),
+      text: `${remainingMin}m ${secStr}s left to edit/reject`,
     };
   };
 
@@ -306,6 +370,52 @@ export const PendingOrdersView: React.FC<PendingOrdersViewProps> = ({
     };
 
     generateOrderPDF(pdfData);
+  };
+
+  // Helper: Handle main download button click
+  const handleDownloadButtonClick = (order: OrderPreview | ProcessedOrder, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    // If user has a remembered preference, execute directly
+    if (downloadPrefs.remember && (downloadPrefs.pdf || downloadPrefs.json)) {
+      if (downloadPrefs.pdf) exportOrderAsPDF(order);
+      if (downloadPrefs.json) exportOrderAsJSON(order);
+      return;
+    }
+    // Otherwise open the options popup menu
+    setMenuPdfChecked(downloadPrefs.pdf);
+    setMenuJsonChecked(downloadPrefs.json);
+    setMenuRememberChecked(downloadPrefs.remember);
+    setDownloadMenuTargetId((prev) => (prev === order.order_id ? null : order.order_id));
+  };
+
+  // Helper: Explicitly open options popup menu even if remembered preference is active
+  const handleOpenDownloadMenuExplicit = (order: OrderPreview | ProcessedOrder, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setMenuPdfChecked(downloadPrefs.pdf);
+    setMenuJsonChecked(downloadPrefs.json);
+    setMenuRememberChecked(downloadPrefs.remember);
+    setDownloadMenuTargetId((prev) => (prev === order.order_id ? null : order.order_id));
+  };
+
+  // Helper: Execute selected download from popup menu
+  const handleExecuteDownload = (order: OrderPreview | ProcessedOrder) => {
+    if (!menuPdfChecked && !menuJsonChecked) return;
+
+    if (menuPdfChecked) exportOrderAsPDF(order);
+    if (menuJsonChecked) exportOrderAsJSON(order);
+
+    const updated = {
+      pdf: menuPdfChecked,
+      json: menuJsonChecked,
+      remember: menuRememberChecked,
+    };
+    setDownloadPrefs(updated);
+    if (menuRememberChecked) {
+      localStorage.setItem('nalka_order_download_pref', JSON.stringify(updated));
+    } else {
+      localStorage.removeItem('nalka_order_download_pref');
+    }
+    setDownloadMenuTargetId(null);
   };
 
   // Sync Live Orders button
@@ -621,6 +731,29 @@ export const PendingOrdersView: React.FC<PendingOrdersViewProps> = ({
 
         setSelectedOrder(null);
         if (onRefreshProducts) onRefreshProducts();
+
+        const confirmedProcessed: ProcessedOrder = {
+          id: orderCopy.order_id,
+          order_id: orderCopy.order_id,
+          salesman_name: orderCopy.salesman_name,
+          salesman_id: orderCopy.salesman_id,
+          shop_name: orderCopy.shop_name,
+          city: orderCopy.city,
+          state: orderCopy.state,
+          location_id: orderCopy.location_id,
+          total_amount: orderCopy.total_amount,
+          status: 'CONFIRMED',
+          processed_at: res.processedOrder?.processed_at || new Date().toISOString(),
+          processed_by_name: 'Ops Manager',
+          items_count: orderCopy.items.length,
+          source: orderCopy.source,
+          created_at: orderCopy.created_at || new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        updateLastProcessedOrder(confirmedProcessed);
+        setOrderHistory((prev) => [confirmedProcessed, ...prev.filter((o) => o.order_id !== orderCopy.order_id)]);
+        setPendingOrders((prev) => prev.filter((o) => o.order_id !== orderCopy.order_id));
+
         await fetchOrders(true);
 
         // Prompt manager with both PDF & JSON export options
@@ -667,7 +800,30 @@ export const PendingOrdersView: React.FC<PendingOrdersViewProps> = ({
       isDestructive: true,
       onConfirm: async () => {
         try {
-          await api.rejectOrder(order.order_id, order.source, 'Rejected by inventory manager');
+          const res = await api.rejectOrder(order.order_id, order.source, 'Rejected by inventory manager');
+          const rejectedProcessed: ProcessedOrder = {
+            id: order.order_id,
+            order_id: order.order_id,
+            salesman_name: order.salesman_name,
+            salesman_id: order.salesman_id,
+            shop_name: order.shop_name,
+            city: order.city,
+            state: order.state,
+            location_id: order.location_id,
+            total_amount: order.total_amount,
+            status: 'REJECTED',
+            processed_at: new Date().toISOString(),
+            processed_by_name: 'Ops Manager',
+            items_count: order.items.length,
+            rejection_reason: 'Rejected by operations manager',
+            source: order.source,
+            created_at: order.created_at || new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          };
+          updateLastProcessedOrder(rejectedProcessed);
+          setOrderHistory((prev) => [rejectedProcessed, ...prev.filter((o) => o.order_id !== order.order_id)]);
+          setPendingOrders((prev) => prev.filter((o) => o.order_id !== order.order_id));
+
           dialog.showInfo({
             title: 'Order Rejected',
             message: `Order ${order.order_id} was rejected. You can reopen and accept it within 15 minutes from the Processed History tab.`,
@@ -707,6 +863,10 @@ export const PendingOrdersView: React.FC<PendingOrdersViewProps> = ({
       onConfirm: async () => {
         try {
           const res = await api.reopenOrder(order.order_id);
+          if (lastProcessedOrder?.order_id === order.order_id) {
+            updateLastProcessedOrder(null);
+          }
+          setOrderHistory((prev) => prev.filter((o) => o.order_id !== order.order_id));
           if (onRefreshProducts) onRefreshProducts();
           await fetchOrders(true);
           setActiveSubTab('pending');
@@ -746,6 +906,14 @@ export const PendingOrdersView: React.FC<PendingOrdersViewProps> = ({
       onConfirm: async () => {
         try {
           const res = await api.rollbackAndRejectOrder(order.order_id, 'Rejected during 15-minute grace window');
+          const updatedReject: ProcessedOrder = {
+            ...order,
+            status: 'REJECTED',
+            processed_at: new Date().toISOString(),
+            rejection_reason: 'Rejected during 15-minute grace window',
+          };
+          updateLastProcessedOrder(updatedReject);
+          setOrderHistory((prev) => [updatedReject, ...prev.filter((o) => o.order_id !== order.order_id)]);
           if (onRefreshProducts) onRefreshProducts();
           await fetchOrders(true);
           dialog.showInfo({
@@ -762,11 +930,27 @@ export const PendingOrdersView: React.FC<PendingOrdersViewProps> = ({
     });
   };
 
+  // Sort order history descending by processed timestamp with robust epoch fallback
+  const sortedOrderHistory = useMemo(() => {
+    return [...orderHistory].sort((a, b) => {
+      const timeA = new Date(a.processed_at || a.updated_at || a.created_at || 0).getTime() || 0;
+      const timeB = new Date(b.processed_at || b.updated_at || b.created_at || 0).getTime() || 0;
+      return timeB - timeA;
+    });
+  }, [orderHistory]);
+
   // Most recent processed order for quick grace window banner
   const mostRecentProcessed = useMemo(() => {
-    if (orderHistory.length === 0) return null;
-    return orderHistory[0];
-  }, [orderHistory]);
+    if (lastProcessedOrder) {
+      const grace = getGracePeriodInfo(lastProcessedOrder.processed_at);
+      if (grace.isActive) return lastProcessedOrder;
+    }
+    for (const ord of sortedOrderHistory) {
+      const grace = getGracePeriodInfo(ord.processed_at);
+      if (grace.isActive) return ord;
+    }
+    return lastProcessedOrder || sortedOrderHistory[0] || null;
+  }, [lastProcessedOrder, sortedOrderHistory, currentTime]);
 
   const recentGraceInfo = mostRecentProcessed ? getGracePeriodInfo(mostRecentProcessed.processed_at) : null;
 
@@ -912,69 +1096,147 @@ export const PendingOrdersView: React.FC<PendingOrdersViewProps> = ({
             </div>
           </div>
 
-          {/* Quick Actions */}
+          {/* Quick Actions: Download, Reopen, Reject */}
           <div className="flex items-center gap-2 flex-wrap w-full md:w-auto justify-end pt-2 md:pt-0 border-t md:border-t-0 border-slate-200 dark:border-slate-800">
-            {/* Export PDF Button (Available only for Accepted / Confirmed orders) */}
+            {/* 1. Download Button with Dropdown Options Popup */}
+            <div className="relative inline-block text-left">
+              <div className="inline-flex items-center rounded-lg shadow-2xs">
+                <button
+                  type="button"
+                  onClick={(e) => handleDownloadButtonClick(mostRecentProcessed, e)}
+                  disabled={mostRecentProcessed.status !== 'CONFIRMED'}
+                  className={cn(
+                    "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all cursor-pointer",
+                    mostRecentProcessed.status === 'CONFIRMED'
+                      ? "bg-cyan-50 hover:bg-cyan-100 dark:bg-cyan-950/70 dark:hover:bg-cyan-900 text-cyan-700 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-700/60"
+                      : "bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-600 border border-slate-200 dark:border-slate-700 opacity-40 cursor-not-allowed"
+                  )}
+                  title={
+                    mostRecentProcessed.status === 'CONFIRMED'
+                      ? downloadPrefs.remember
+                        ? `Download (${downloadPrefs.pdf && downloadPrefs.json ? 'PDF & JSON' : downloadPrefs.pdf ? 'PDF' : 'JSON'}) - Click arrow to change`
+                        : 'Download Order Files (PDF / JSON)'
+                      : 'Download is disabled for rejected / non-confirmed orders'
+                  }
+                >
+                  <FileDown className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400" />
+                  <span>Download</span>
+                  {mostRecentProcessed.status === 'CONFIRMED' && (
+                    <ChevronDown
+                      className="w-3 h-3 opacity-60 hover:opacity-100 cursor-pointer"
+                      onClick={(e) => handleOpenDownloadMenuExplicit(mostRecentProcessed, e)}
+                    />
+                  )}
+                </button>
+              </div>
+
+              {/* Download Options Popup Menu */}
+              {downloadMenuTargetId === mostRecentProcessed.order_id && (
+                <div
+                  ref={downloadMenuRef}
+                  className="absolute right-0 top-full mt-1.5 w-60 p-3 bg-white dark:bg-slate-800 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 z-50 text-left animate-in fade-in zoom-in-95 duration-100"
+                >
+                  <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-100 dark:border-slate-700">
+                    <span className="text-[11px] font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                      <FileDown className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400" />
+                      Download Files
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setDownloadMenuTargetId(null)}
+                      className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-0.5 cursor-pointer"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                  <div className="space-y-2 py-1 text-xs">
+                    <label className="flex items-center gap-2 text-slate-700 dark:text-slate-200 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={menuPdfChecked}
+                        onChange={(e) => setMenuPdfChecked(e.target.checked)}
+                        className="w-3.5 h-3.5 rounded text-cyan-600 focus:ring-cyan-500"
+                      />
+                      <span className="flex items-center gap-1 font-medium">
+                        <Printer className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400" />
+                        PDF Invoice
+                      </span>
+                    </label>
+
+                    <label className="flex items-center gap-2 text-slate-700 dark:text-slate-200 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={menuJsonChecked}
+                        onChange={(e) => setMenuJsonChecked(e.target.checked)}
+                        className="w-3.5 h-3.5 rounded text-cyan-600 focus:ring-cyan-500"
+                      />
+                      <span className="flex items-center gap-1 font-medium">
+                        <FileText className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
+                        JSON Payload
+                      </span>
+                    </label>
+                  </div>
+
+                  <div className="pt-2 mt-2 border-t border-slate-100 dark:border-slate-700">
+                    <label className="flex items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400 cursor-pointer select-none mb-2.5">
+                      <input
+                        type="checkbox"
+                        checked={menuRememberChecked}
+                        onChange={(e) => setMenuRememberChecked(e.target.checked)}
+                        className="w-3 h-3 rounded text-indigo-600 focus:ring-indigo-500"
+                      />
+                      <span>Remember my choice</span>
+                    </label>
+
+                    <button
+                      type="button"
+                      disabled={!menuPdfChecked && !menuJsonChecked}
+                      onClick={() => handleExecuteDownload(mostRecentProcessed)}
+                      className="w-full py-1.5 px-3 rounded-lg bg-cyan-600 hover:bg-cyan-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-semibold shadow-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <FileDown className="w-3.5 h-3.5" />
+                      <span>Download</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* 2. Reopen Button */}
             <button
-              onClick={() => exportOrderAsPDF(mostRecentProcessed)}
-              disabled={mostRecentProcessed.status !== 'CONFIRMED'}
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-cyan-50 hover:bg-cyan-100 dark:bg-cyan-950/70 dark:hover:bg-cyan-900 disabled:opacity-40 disabled:cursor-not-allowed text-cyan-700 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-700/60 text-[11px] font-semibold transition-all cursor-pointer shadow-2xs"
-              title={
+              type="button"
+              onClick={() => handleReopenOrder(mostRecentProcessed)}
+              disabled={!recentGraceInfo?.isActive}
+              className={cn(
+                "inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all cursor-pointer shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed",
                 mostRecentProcessed.status === 'CONFIRMED'
-                  ? 'Download Official Confirmation PDF'
-                  : 'PDF invoice is restricted to accepted/confirmed orders'
+                  ? "bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/80 dark:hover:bg-indigo-900 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-700/60"
+                  : "bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/80 dark:hover:bg-emerald-900 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-700/60"
+              )}
+              title={
+                recentGraceInfo?.isActive
+                  ? mostRecentProcessed.status === 'CONFIRMED'
+                    ? 'Reopen order to edit items & restore stock'
+                    : 'Reopen and accept order'
+                  : 'Grace window closed (>15m)'
               }
             >
-              <Printer className="w-3 h-3 text-cyan-600 dark:text-cyan-400" />
-              <span>Official PDF</span>
+              <RotateCcw className="w-3 h-3" />
+              <span>Reopen</span>
             </button>
 
-            {/* Export JSON Button (Available only for Accepted / Confirmed orders) */}
-            <button
-              onClick={() => exportOrderAsJSON(mostRecentProcessed)}
-              disabled={mostRecentProcessed.status !== 'CONFIRMED'}
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 text-[11px] font-semibold transition-all cursor-pointer shadow-2xs"
-              title={
-                mostRecentProcessed.status === 'CONFIRMED'
-                  ? 'Download Official JSON Payload'
-                  : 'JSON payload is restricted to accepted/confirmed orders'
-              }
-            >
-              <FileDown className="w-3 h-3 text-slate-600 dark:text-slate-300" />
-              <span>JSON</span>
-            </button>
-
-            {/* Reopen & Reject actions within 15-min window */}
-            {mostRecentProcessed.status === 'CONFIRMED' ? (
-              <>
-                <button
-                  onClick={() => handleReopenOrder(mostRecentProcessed)}
-                  disabled={!recentGraceInfo?.isActive}
-                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/80 dark:hover:bg-indigo-900 disabled:opacity-40 disabled:cursor-not-allowed text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-700/60 text-[11px] font-semibold transition-all cursor-pointer shadow-2xs"
-                  title={recentGraceInfo?.isActive ? 'Reopen order to edit items & restore stock' : 'Grace window closed (>15m)'}
-                >
-                  <RotateCcw className="w-3 h-3 text-indigo-600 dark:text-indigo-400" />
-                  <span>Reopen / Edit</span>
-                </button>
-                <button
-                  onClick={() => handleRollbackAndReject(mostRecentProcessed)}
-                  disabled={!recentGraceInfo?.isActive}
-                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/60 dark:hover:bg-rose-900 disabled:opacity-40 disabled:cursor-not-allowed text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800/60 text-[11px] font-semibold transition-all cursor-pointer shadow-2xs"
-                  title={recentGraceInfo?.isActive ? 'Reject order & restore stock' : 'Grace window closed (>15m)'}
-                >
-                  <XCircle className="w-3 h-3 text-rose-600 dark:text-rose-400" />
-                  <span>Reject</span>
-                </button>
-              </>
-            ) : (
+            {/* 3. Reject Button (For Confirmed orders) */}
+            {mostRecentProcessed.status === 'CONFIRMED' && (
               <button
-                onClick={() => handleReopenOrder(mostRecentProcessed)}
+                type="button"
+                onClick={() => handleRollbackAndReject(mostRecentProcessed)}
                 disabled={!recentGraceInfo?.isActive}
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/80 dark:hover:bg-emerald-900 disabled:opacity-40 disabled:cursor-not-allowed text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-700/60 text-[11px] font-semibold transition-all cursor-pointer shadow-2xs"
-                title={recentGraceInfo?.isActive ? 'Reopen and accept order' : 'Grace window closed (>15m)'}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/60 dark:hover:bg-rose-900 disabled:opacity-40 disabled:cursor-not-allowed text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800/60 text-[11px] font-semibold transition-all cursor-pointer shadow-2xs"
+                title={recentGraceInfo?.isActive ? 'Reject order & restore stock' : 'Grace window closed (>15m)'}
               >
-                <RotateCcw className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
-                <span>Reopen & Accept</span>
+                <XCircle className="w-3 h-3 text-rose-600 dark:text-rose-400" />
+                <span>Reject</span>
               </button>
             )}
           </div>
@@ -1302,7 +1564,7 @@ export const PendingOrdersView: React.FC<PendingOrdersViewProps> = ({
       {/* SUB-TAB 2: COMPLETED ORDER HISTORY */}
       {activeSubTab === 'history' && (
         <div className="space-y-4">
-          {orderHistory.length === 0 ? (
+          {sortedOrderHistory.length === 0 ? (
             <div className="py-16 text-center bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center gap-2">
               <History className="w-8 h-8 text-slate-400" />
               <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300">
@@ -1330,7 +1592,7 @@ export const PendingOrdersView: React.FC<PendingOrdersViewProps> = ({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-700/60">
-                    {orderHistory.map((po) => {
+                    {sortedOrderHistory.map((po) => {
                       const isConfirmed = po.status === 'CONFIRMED';
                       const grace = getGracePeriodInfo(po.processed_at);
 
@@ -1383,38 +1645,111 @@ export const PendingOrdersView: React.FC<PendingOrdersViewProps> = ({
                             ₹{po.total_amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                           </td>
                           <td className="py-3 px-4 text-right">
-                            <div className="flex items-center justify-end gap-1.5 flex-wrap">
-                              {/* Export PDF invoice (Only available for Accepted / Confirmed orders) */}
-                              <button
-                                type="button"
-                                onClick={() => exportOrderAsPDF(po)}
-                                disabled={!isConfirmed}
-                                title={
-                                  isConfirmed
-                                    ? 'Download Official PDF Invoice'
-                                    : 'PDF invoice is disabled for rejected / non-confirmed orders'
-                                }
-                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-cyan-50 hover:bg-cyan-100 dark:bg-cyan-950/70 dark:hover:bg-cyan-900 text-cyan-700 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-800/60 text-[11px] font-semibold transition-all cursor-pointer shadow-2xs disabled:opacity-30 disabled:cursor-not-allowed"
-                              >
-                                <Printer className="w-3 h-3 text-cyan-600 dark:text-cyan-400" />
-                                <span>PDF</span>
-                              </button>
+                            <div className="flex items-center justify-end gap-1.5 flex-nowrap relative">
+                              {/* 1. Download Button with Dropdown Popup */}
+                              <div className="relative inline-block text-left">
+                                <div className="inline-flex items-center rounded-lg shadow-2xs">
+                                  <button
+                                    type="button"
+                                    onClick={(e) => handleDownloadButtonClick(po, e)}
+                                    disabled={!isConfirmed}
+                                    className={cn(
+                                      "inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all cursor-pointer",
+                                      isConfirmed
+                                        ? "bg-cyan-50 hover:bg-cyan-100 dark:bg-cyan-950/70 dark:hover:bg-cyan-900 text-cyan-700 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-800/60"
+                                        : "bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-600 border border-slate-200 dark:border-slate-700 opacity-40 cursor-not-allowed"
+                                    )}
+                                    title={
+                                      isConfirmed
+                                        ? downloadPrefs.remember
+                                          ? `Download (${downloadPrefs.pdf && downloadPrefs.json ? 'PDF & JSON' : downloadPrefs.pdf ? 'PDF' : 'JSON'}) - Click arrow to change`
+                                          : 'Download Order Files (PDF / JSON)'
+                                        : 'Download is disabled for rejected / non-confirmed orders'
+                                    }
+                                  >
+                                    <FileDown className="w-3 h-3 text-cyan-600 dark:text-cyan-400" />
+                                    <span>Download</span>
+                                    {isConfirmed && (
+                                      <ChevronDown
+                                        className="w-3 h-3 opacity-60 hover:opacity-100 cursor-pointer"
+                                        onClick={(e) => handleOpenDownloadMenuExplicit(po, e)}
+                                      />
+                                    )}
+                                  </button>
+                                </div>
 
-                              {/* Export JSON button (Only available for Accepted / Confirmed orders) */}
-                              <button
-                                type="button"
-                                onClick={() => exportOrderAsJSON(po)}
-                                disabled={!isConfirmed}
-                                title={
-                                  isConfirmed
-                                    ? 'Export Order JSON File'
-                                    : 'JSON export is disabled for rejected / non-confirmed orders'
-                                }
-                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-700/80 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-[11px] font-semibold transition-all cursor-pointer shadow-2xs disabled:opacity-30 disabled:cursor-not-allowed"
-                              >
-                                <FileDown className="w-3 h-3 text-slate-600 dark:text-slate-300" />
-                                <span>JSON</span>
-                              </button>
+                                {/* Download Options Popup Menu */}
+                                {downloadMenuTargetId === po.order_id && (
+                                  <div
+                                    ref={downloadMenuRef}
+                                    className="absolute right-0 top-full mt-1.5 w-60 p-3 bg-white dark:bg-slate-800 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 z-50 text-left animate-in fade-in zoom-in-95 duration-100"
+                                  >
+                                    <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-100 dark:border-slate-700">
+                                      <span className="text-[11px] font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                                        <FileDown className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400" />
+                                        Download Files
+                                      </span>
+                                      <button
+                                        type="button"
+                                        onClick={() => setDownloadMenuTargetId(null)}
+                                        className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-0.5 cursor-pointer"
+                                      >
+                                        <X className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+
+                                    <div className="space-y-2 py-1 text-xs">
+                                      <label className="flex items-center gap-2 text-slate-700 dark:text-slate-200 cursor-pointer select-none">
+                                        <input
+                                          type="checkbox"
+                                          checked={menuPdfChecked}
+                                          onChange={(e) => setMenuPdfChecked(e.target.checked)}
+                                          className="w-3.5 h-3.5 rounded text-cyan-600 focus:ring-cyan-500"
+                                        />
+                                        <span className="flex items-center gap-1 font-medium">
+                                          <Printer className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400" />
+                                          PDF Invoice
+                                        </span>
+                                      </label>
+
+                                      <label className="flex items-center gap-2 text-slate-700 dark:text-slate-200 cursor-pointer select-none">
+                                        <input
+                                          type="checkbox"
+                                          checked={menuJsonChecked}
+                                          onChange={(e) => setMenuJsonChecked(e.target.checked)}
+                                          className="w-3.5 h-3.5 rounded text-cyan-600 focus:ring-cyan-500"
+                                        />
+                                        <span className="flex items-center gap-1 font-medium">
+                                          <FileText className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
+                                          JSON Payload
+                                        </span>
+                                      </label>
+                                    </div>
+
+                                    <div className="pt-2 mt-2 border-t border-slate-100 dark:border-slate-700">
+                                      <label className="flex items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400 cursor-pointer select-none mb-2.5">
+                                        <input
+                                          type="checkbox"
+                                          checked={menuRememberChecked}
+                                          onChange={(e) => setMenuRememberChecked(e.target.checked)}
+                                          className="w-3 h-3 rounded text-indigo-600 focus:ring-indigo-500"
+                                        />
+                                        <span>Remember my choice</span>
+                                      </label>
+
+                                      <button
+                                        type="button"
+                                        disabled={!menuPdfChecked && !menuJsonChecked}
+                                        onClick={() => handleExecuteDownload(po)}
+                                        className="w-full py-1.5 px-3 rounded-lg bg-cyan-600 hover:bg-cyan-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-semibold shadow-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                                      >
+                                        <FileDown className="w-3.5 h-3.5" />
+                                        <span>Download</span>
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
 
                               {/* Reopen / Edit / Accept Action (Active within 15 min) */}
                               <button
@@ -1436,7 +1771,7 @@ export const PendingOrdersView: React.FC<PendingOrdersViewProps> = ({
                                 )}
                               >
                                 <RotateCcw className="w-3 h-3" />
-                                <span>{isConfirmed ? 'Reopen & Edit' : 'Reopen & Accept'}</span>
+                                <span>Reopen</span>
                               </button>
 
                               {/* Reject action for Confirmed orders (Active within 15 min) */}

@@ -57,6 +57,9 @@ export const Header: React.FC<HeaderProps> = ({
   })();
   const { isDark, toggleTheme } = useTheme();
 
+  // Logout Confirmation
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+
   const handleLogout = async () => {
     try {
       await clearAuthSession();
@@ -246,7 +249,7 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Logout Button */}
           <button
             id="btn-header-logout"
-            onClick={handleLogout}
+            onClick={() => setShowLogoutConfirm(true)}
             title="Sign out of Operations Workspace"
             className="p-1.5 sm:px-2.5 sm:py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800/80 hover:bg-rose-50 dark:hover:bg-rose-950/40 border border-slate-200 dark:border-slate-700 hover:border-rose-200 dark:hover:border-rose-800/60 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition-all cursor-pointer flex items-center gap-1.5 ml-1"
           >
@@ -310,6 +313,36 @@ export const Header: React.FC<HeaderProps> = ({
                 ) : (
                   <span>Enable Override</span>
                 )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Logout Confirmation Modal */}
+      {showLogoutConfirm && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl p-6 max-w-sm w-full shadow-2xl space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center">
+                <LogOut className="w-5 h-5 text-rose-500" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white">Sign Out?</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Your session will be ended.</p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowLogoutConfirm(false)}
+                className="flex-1 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleLogout}
+                className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-lg transition-all cursor-pointer"
+              >
+                Sign Out
               </button>
             </div>
           </div>

@@ -794,74 +794,73 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   </td>
                 </tr>
               ) : (
-                recentMovements.map((tx) => (
-                  <tr key={tx.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-700/40 transition-colors">
-                    <td className="py-3 px-4 sm:px-5 text-slate-500 dark:text-slate-400 text-xs whitespace-nowrap">
-                      {formatDate(tx.createdAt || (tx as any).created_at)}
-                    </td>
-                    <td className="py-3 px-4 sm:px-5">
-                      <div
-                        onClick={() => onOpenProductDetail(tx.productId || (tx as any).product_id)}
-                        className="font-medium text-slate-900 dark:text-slate-100 hover:text-indigo-600 dark:hover:text-indigo-400 cursor-pointer text-xs"
-                      >
-                        {tx.productName || 'Product'}
-                      </div>
-                      <div className="text-[10px] font-mono text-slate-400 dark:text-slate-500">{tx.productSku}</div>
-                    </td>
-                    <td className="py-3 px-4 sm:px-5 whitespace-nowrap">
-                      <span
+                recentMovements.map((tx) => {
+                  const rawType = String(tx.transactionType || (tx as any).transaction_type || '').toUpperCase();
+                  const isStockIn = ['STOCK_IN', 'INWARD', 'INITIAL_STOCK', 'ADJUSTMENT_INCREASE'].includes(rawType);
+                  const isReturn = ['CUSTOMER_RETURN', 'RETURN_IN'].includes(rawType);
+                  const isStockOut = ['STOCK_OUT', 'SALE', 'SALES', 'DISPATCH', 'RETURN_OUT', 'SUPPLIER_RETURN', 'ADJUSTMENT_DECREASE'].includes(rawType);
+                  const isPositive = isStockIn || isReturn;
+
+                  return (
+                    <tr key={tx.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-700/40 transition-colors">
+                      <td className="py-3 px-4 sm:px-5 text-slate-500 dark:text-slate-400 text-xs whitespace-nowrap">
+                        {formatDate(tx.createdAt || (tx as any).created_at)}
+                      </td>
+                      <td className="py-3 px-4 sm:px-5">
+                        <div
+                          onClick={() => onOpenProductDetail(tx.productId || (tx as any).product_id)}
+                          className="font-medium text-slate-900 dark:text-slate-100 hover:text-indigo-600 dark:hover:text-indigo-400 cursor-pointer text-xs"
+                        >
+                          {tx.productName || 'Product'}
+                        </div>
+                        <div className="text-[10px] font-mono text-slate-400 dark:text-slate-500">{tx.productSku}</div>
+                      </td>
+                      <td className="py-3 px-4 sm:px-5 whitespace-nowrap">
+                        <span
+                          className={cn(
+                            'px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider',
+                            isReturn
+                              ? 'bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300'
+                              : isStockIn
+                              ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300'
+                              : isStockOut
+                              ? 'bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-300'
+                              : 'bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300'
+                          )}
+                        >
+                          {rawType === 'INWARD' ? 'STOCK IN' : rawType === 'SALE' ? 'STOCK OUT' : rawType.replace(/_/g, ' ')}
+                        </span>
+                      </td>
+                      <td
                         className={cn(
-                          'px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider',
-                          (tx.transactionType || (tx as any).transaction_type) === 'STOCK_IN'
-                            ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300'
-                            : (tx.transactionType || (tx as any).transaction_type) === 'STOCK_OUT'
-                            ? 'bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-300'
-                            : (tx.transactionType || (tx as any).transaction_type) === 'CUSTOMER_RETURN'
-                            ? 'bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300'
-                            : (tx.transactionType || (tx as any).transaction_type) === 'INITIAL_STOCK'
-                            ? 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200'
-                            : 'bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300'
+                          'py-3 px-4 sm:px-5 text-right font-mono font-bold text-xs whitespace-nowrap',
+                          isReturn
+                            ? 'text-purple-600 dark:text-purple-400'
+                            : isPositive
+                            ? 'text-emerald-600 dark:text-emerald-400'
+                            : 'text-red-600 dark:text-red-400'
                         )}
                       >
-                        {(tx.transactionType || (tx as any).transaction_type)?.replace('_', ' ')}
-                      </span>
-                    </td>
-                    <td
-                      className={cn(
-                        'py-3 px-4 sm:px-5 text-right font-mono font-bold text-xs whitespace-nowrap',
-                        (tx.transactionType || (tx as any).transaction_type) === 'CUSTOMER_RETURN'
-                          ? 'text-purple-600 dark:text-purple-400'
-                          : (tx.transactionType || (tx as any).transaction_type) === 'STOCK_IN' ||
-                            (tx.transactionType || (tx as any).transaction_type) === 'INITIAL_STOCK' ||
-                            (tx.transactionType || (tx as any).transaction_type) === 'ADJUSTMENT_INCREASE'
-                          ? 'text-emerald-600 dark:text-emerald-400'
-                          : 'text-red-600 dark:text-red-400'
-                      )}
-                    >
-                      {(tx.transactionType || (tx as any).transaction_type) === 'CUSTOMER_RETURN' ||
-                      (tx.transactionType || (tx as any).transaction_type) === 'STOCK_IN' ||
-                      (tx.transactionType || (tx as any).transaction_type) === 'INITIAL_STOCK' ||
-                      (tx.transactionType || (tx as any).transaction_type) === 'ADJUSTMENT_INCREASE'
-                        ? '+'
-                        : '-'}
-                      {tx.quantity} {tx.unit}
-                    </td>
-                    <td className="py-3 px-4 sm:px-5 text-right font-mono text-slate-900 dark:text-slate-100 font-bold text-xs whitespace-nowrap">
-                      {tx.newStock ?? (tx as any).new_stock} {tx.unit}
-                    </td>
-                    <td className="py-3 px-4 sm:px-5 text-slate-600 dark:text-slate-300 text-xs">
-                      <div className="truncate max-w-[150px] font-medium text-slate-700 dark:text-slate-200">
-                        {tx.referenceNumber || (tx as any).reference_number || tx.reason || (tx as any).reason || '-'}
-                      </div>
-                      <div className="text-[10px] text-slate-400 dark:text-slate-500 truncate max-w-[150px]">
-                        {tx.supplierOrRecipient || (tx as any).supplier_or_recipient || ''}
-                      </div>
-                    </td>
-                    <td className="py-3 px-4 sm:px-5 text-slate-500 dark:text-slate-400 text-xs whitespace-nowrap">
-                      {tx.createdByName || (tx as any).created_by_name}
-                    </td>
-                  </tr>
-                ))
+                        {isPositive ? '+' : '-'}
+                        {tx.quantity} {tx.unit || 'NOS'}
+                      </td>
+                      <td className="py-3 px-4 sm:px-5 text-right font-mono text-slate-900 dark:text-slate-100 font-bold text-xs whitespace-nowrap">
+                        {tx.newStock ?? (tx as any).new_stock} {tx.unit || 'NOS'}
+                      </td>
+                      <td className="py-3 px-4 sm:px-5 text-slate-600 dark:text-slate-300 text-xs">
+                        <div className="truncate max-w-[150px] font-medium text-slate-700 dark:text-slate-200">
+                          {tx.referenceNumber || (tx as any).reference_number || tx.reason || (tx as any).reason || '-'}
+                        </div>
+                        <div className="text-[10px] text-slate-400 dark:text-slate-500 truncate max-w-[150px]">
+                          {tx.supplierOrRecipient || (tx as any).supplier_or_recipient || ''}
+                        </div>
+                      </td>
+                      <td className="py-3 px-4 sm:px-5 text-slate-500 dark:text-slate-400 text-xs whitespace-nowrap">
+                        {tx.createdByName || (tx as any).created_by_name}
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>

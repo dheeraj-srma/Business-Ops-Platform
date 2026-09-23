@@ -74,8 +74,8 @@ export interface StockTransaction {
   unit: string;
   transactionType: TransactionType;
   quantity: number; // positive delta or magnitude
-  previousStock: number;
-  newStock: number;
+  previousStock?: number;
+  newStock?: number;
   reason: string;
   supplierOrRecipient: string;
   referenceNumber: string;
@@ -611,8 +611,8 @@ export interface ProcessedOrder {
   items_count: number;
   notes?: string;
   rejection_reason?: string;
-  created_at: string;
-  updated_at: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface ProcessedOrderItem {

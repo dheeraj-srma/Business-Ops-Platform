@@ -8,6 +8,7 @@ import {
   Download,
   ArrowDownLeft,
   ArrowUpRight,
+  RotateCcw,
   SlidersHorizontal,
   Calendar,
   Building2,
@@ -22,6 +23,7 @@ import {
   exportConsignmentToExcel,
   exportConsignmentToPdf,
   exportConsignmentToJson,
+  isPositiveMovement,
 } from '../../lib/transactionExport';
 import { cn } from '../../lib/utils';
 
@@ -40,8 +42,10 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
 }) => {
   if (!isOpen || !consignment) return null;
 
-  const isStockIn = consignment.type === 'STOCK_IN';
-  const isStockOut = consignment.type === 'STOCK_OUT';
+  const isPositive = isPositiveMovement(consignment.type, consignment.notes);
+  const isStockIn = consignment.type === 'STOCK_IN' || consignment.type === 'INWARD';
+  const isStockOut = consignment.type === 'STOCK_OUT' || consignment.type === 'SALE' || consignment.type === 'OUTWARD';
+  const isReturn = consignment.type === 'CUSTOMER_RETURN' || consignment.type === 'RETURN_IN';
   const totalQuantity = consignment.items.reduce((sum, it) => sum + (it.quantity || 0), 0);
 
   return createPortal(
@@ -59,26 +63,38 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
             <div
               className={cn(
                 'w-11 h-11 rounded-2xl flex items-center justify-center shadow-md shrink-0',
-                isStockIn && 'bg-emerald-600 text-white shadow-emerald-600/20',
-                isStockOut && 'bg-amber-600 text-white shadow-amber-600/20',
-                !isStockIn && !isStockOut && 'bg-blue-600 text-white shadow-blue-600/20'
+                isReturn && 'bg-purple-600 text-white shadow-purple-600/20',
+                !isReturn && isPositive && 'bg-emerald-600 text-white shadow-emerald-600/20',
+                !isReturn && !isPositive && 'bg-amber-600 text-white shadow-amber-600/20'
               )}
             >
-              {isStockIn && <ArrowDownLeft className="w-5 h-5" />}
-              {isStockOut && <ArrowUpRight className="w-5 h-5" />}
-              {!isStockIn && !isStockOut && <SlidersHorizontal className="w-5 h-5" />}
+              {isReturn && <RotateCcw className="w-5 h-5 -rotate-45" />}
+              {!isReturn && isPositive && <ArrowDownLeft className="w-5 h-5" />}
+              {!isReturn && !isPositive && <ArrowUpRight className="w-5 h-5" />}
             </div>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
                 <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                  {isStockIn ? 'Stock Inward Consignment' : isStockOut ? 'Outward Dispatch Note' : 'Stock Adjustment'}
+                  {isReturn
+                    ? 'Customer Return'
+                    : isStockIn
+                    ? 'Stock Inward Consignment'
+                    : isStockOut
+                    ? 'Outward Dispatch Note'
+                    : consignment.type === 'INITIAL_STOCK'
+                    ? 'Opening Stock'
+                    : consignment.type === 'ADJUSTMENT_INCREASE'
+                    ? 'Stock Adjustment (+)'
+                    : consignment.type === 'ADJUSTMENT_DECREASE'
+                    ? 'Stock Adjustment (-)'
+                    : 'Stock Adjustment'}
                 </h3>
                 <span
                   className={cn(
                     'text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider',
-                    isStockIn && 'bg-emerald-50 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800',
-                    isStockOut && 'bg-amber-50 dark:bg-amber-950/80 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800',
-                    !isStockIn && !isStockOut && 'bg-blue-50 dark:bg-blue-950/80 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
+                    isReturn && 'bg-purple-50 dark:bg-purple-950/80 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800',
+                    !isReturn && isPositive && 'bg-emerald-50 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800',
+                    !isReturn && !isPositive && 'bg-amber-50 dark:bg-amber-950/80 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
                   )}
                 >
                   {consignment.type.replace('_', ' ')}
@@ -192,10 +208,14 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
                 <span
                   className={cn(
                     'text-xs font-mono font-bold',
-                    isStockIn ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'
+                    isReturn
+                      ? 'text-purple-600 dark:text-purple-400'
+                      : isPositive
+                      ? 'text-emerald-600 dark:text-emerald-400'
+                      : 'text-amber-600 dark:text-amber-400'
                   )}
                 >
-                  ({isStockIn ? '+' : '-'}{totalQuantity.toLocaleString('en-IN')} units)
+                  ({isPositive ? '+' : '-'}{totalQuantity.toLocaleString('en-IN')} units)
                 </span>
               </div>
             </div>
@@ -233,42 +253,49 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {consignment.items.map((it, idx) => (
-                    <tr key={it.id || idx} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
-                      <td className="py-3 px-4 text-center text-slate-400 font-mono text-[11px]">{idx + 1}</td>
-                      <td className="py-3 px-4 font-mono font-bold text-slate-700 dark:text-slate-300">
-                        {it.sku}
-                      </td>
-                      <td className="py-3 px-4">
-                        <div
-                          onClick={() => onOpenProductDetail && onOpenProductDetail(it.id)}
+                  {consignment.items.map((it, idx) => {
+                    const itemIsPos = isPositiveMovement(consignment.type, it.notes || consignment.notes);
+                    return (
+                      <tr key={it.id || idx} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
+                        <td className="py-3 px-4 text-center text-slate-400 font-mono text-[11px]">{idx + 1}</td>
+                        <td className="py-3 px-4 font-mono font-bold text-slate-700 dark:text-slate-300">
+                          {it.sku}
+                        </td>
+                        <td className="py-3 px-4">
+                          <div
+                            onClick={() => onOpenProductDetail && onOpenProductDetail(it.id)}
+                            className={cn(
+                              'font-semibold text-slate-900 dark:text-white',
+                              onOpenProductDetail ? 'cursor-pointer hover:text-indigo-600 dark:hover:text-indigo-400' : ''
+                            )}
+                          >
+                            {it.productName}
+                          </div>
+                        </td>
+                        <td className="py-3 px-4 text-slate-500 dark:text-slate-400">
+                          {it.categoryName || 'General'}
+                        </td>
+                        <td className="py-3 px-4 text-right font-mono text-slate-500 dark:text-slate-400">
+                          {it.previousStock !== undefined && it.previousStock !== null ? `${it.previousStock} ${it.unit}` : '-'}
+                        </td>
+                        <td
                           className={cn(
-                            'font-semibold text-slate-900 dark:text-white',
-                            onOpenProductDetail ? 'cursor-pointer hover:text-indigo-600 dark:hover:text-indigo-400' : ''
+                            'py-3 px-4 text-right font-mono font-black text-xs',
+                            isReturn
+                              ? 'text-purple-600 dark:text-purple-400'
+                              : itemIsPos
+                              ? 'text-emerald-600 dark:text-emerald-400'
+                              : 'text-amber-600 dark:text-amber-400'
                           )}
                         >
-                          {it.productName}
-                        </div>
-                      </td>
-                      <td className="py-3 px-4 text-slate-500 dark:text-slate-400">
-                        {it.categoryName || 'General'}
-                      </td>
-                      <td className="py-3 px-4 text-right font-mono text-slate-500 dark:text-slate-400">
-                        {it.previousStock !== undefined ? `${it.previousStock} ${it.unit}` : '-'}
-                      </td>
-                      <td
-                        className={cn(
-                          'py-3 px-4 text-right font-mono font-black text-xs',
-                          isStockIn ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'
-                        )}
-                      >
-                        {isStockIn ? '+' : '-'}{it.quantity} {it.unit}
-                      </td>
-                      <td className="py-3 px-4 text-right font-mono font-bold text-slate-900 dark:text-white">
-                        {it.newStock !== undefined ? `${it.newStock} ${it.unit}` : '-'}
-                      </td>
-                    </tr>
-                  ))}
+                          {itemIsPos ? '+' : '-'}{it.quantity} {it.unit}
+                        </td>
+                        <td className="py-3 px-4 text-right font-mono font-bold text-slate-900 dark:text-white">
+                          {it.newStock !== undefined && it.newStock !== null ? `${it.newStock} ${it.unit}` : '-'}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

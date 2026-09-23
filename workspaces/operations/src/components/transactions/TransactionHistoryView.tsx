@@ -28,7 +28,7 @@ import { StockTransaction, Category, TransactionType } from '../../types';
 import { api } from '../../lib/api';
 import { formatDate, cn } from '../../lib/utils';
 import { TransactionDetailModal } from './TransactionDetailModal';
-import { ExportableConsignment } from '../../lib/transactionExport';
+import { ExportableConsignment, isPositiveMovement } from '../../lib/transactionExport';
 
 interface TransactionHistoryViewProps {
   categories: Category[];
@@ -365,6 +365,7 @@ export const TransactionHistoryView: React.FC<TransactionHistoryViewProps> = ({
                 <option value="STOCK_OUT">Stock Out (Issue)</option>
                 <option value="CUSTOMER_RETURN">Customer Returns</option>
                 <option value="INITIAL_STOCK">Initial Setup</option>
+                <option value="ADJUSTMENT">All Adjustments</option>
                 <option value="ADJUSTMENT_INCREASE">Adjustment (+)</option>
                 <option value="ADJUSTMENT_DECREASE">Adjustment (-)</option>
               </select>
@@ -513,6 +514,7 @@ export const TransactionHistoryView: React.FC<TransactionHistoryViewProps> = ({
             <div className="p-4 sm:p-5 space-y-3">
               {groupedConsignments.map((group, groupIdx) => {
                 const groupUniqueKey = group.groupId || `${group.type}_${group.referenceNumber}_${group.partyName}_${groupIdx}`;
+                const isGroupPositive = isPositiveMovement(group.type, group.notes || group.items[0]?.notes);
                 const isStockIn = group.type === 'STOCK_IN' || group.type === 'INWARD';
                 const isStockOut = group.type === 'STOCK_OUT' || group.type === 'SALE' || group.type === 'OUTWARD';
                 const isReturn = group.type === 'CUSTOMER_RETURN' || group.type === 'RETURN_IN';
@@ -531,16 +533,14 @@ export const TransactionHistoryView: React.FC<TransactionHistoryViewProps> = ({
                         <div
                           className={cn(
                             'w-10 h-10 rounded-xl flex items-center justify-center shadow-xs shrink-0',
-                            isStockIn && 'bg-emerald-50 dark:bg-emerald-950/80 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/80',
-                            isStockOut && 'bg-amber-50 dark:bg-amber-950/80 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800/80',
                             isReturn && 'bg-purple-50 dark:bg-purple-950/80 text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-800/80',
-                            !isStockIn && !isStockOut && !isReturn && 'bg-blue-50 dark:bg-blue-950/80 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800/80'
+                            !isReturn && isGroupPositive && 'bg-emerald-50 dark:bg-emerald-950/80 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/80',
+                            !isReturn && !isGroupPositive && 'bg-amber-50 dark:bg-amber-950/80 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800/80'
                           )}
                         >
-                          {isStockIn && <ArrowDownLeft className="w-5 h-5" />}
-                          {isStockOut && <ArrowUpRight className="w-5 h-5" />}
                           {isReturn && <RotateCcw className="w-5 h-5 -rotate-45" />}
-                          {!isStockIn && !isStockOut && !isReturn && <SlidersHorizontal className="w-5 h-5" />}
+                          {!isReturn && isGroupPositive && <ArrowDownLeft className="w-5 h-5" />}
+                          {!isReturn && !isGroupPositive && <ArrowUpRight className="w-5 h-5" />}
                         </div>
 
                         <div className="min-w-0 flex-1">
@@ -551,13 +551,26 @@ export const TransactionHistoryView: React.FC<TransactionHistoryViewProps> = ({
                             <span
                               className={cn(
                                 'text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider',
-                                isStockIn && 'bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800',
-                                isStockOut && 'bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800',
                                 isReturn && 'bg-purple-50 dark:bg-purple-950 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800',
-                                !isStockIn && !isStockOut && !isReturn && 'bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
+                                !isReturn && isGroupPositive && 'bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800',
+                                !isReturn && !isGroupPositive && 'bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
                               )}
                             >
-                              {isReturn ? 'Customer Return' : isStockIn ? 'Stock In (Consignment)' : isStockOut ? 'Outward Dispatch' : group.type.replace('_', ' ')}
+                              {isReturn
+                                ? 'Customer Return'
+                                : isStockIn
+                                ? 'Stock In (Consignment)'
+                                : isStockOut
+                                ? 'Outward Dispatch'
+                                : group.type === 'INITIAL_STOCK'
+                                ? 'Opening Stock'
+                                : group.type === 'ADJUSTMENT_INCREASE'
+                                ? 'Stock Adjustment (+)'
+                                : group.type === 'ADJUSTMENT_DECREASE'
+                                ? 'Stock Adjustment (-)'
+                                : isGroupPositive
+                                ? 'Stock Adjustment (+)'
+                                : 'Stock Adjustment (-)'}
                             </span>
                             <span className="text-xs text-slate-400 dark:text-slate-500">
                               {formatDate(group.date)}
@@ -593,12 +606,12 @@ export const TransactionHistoryView: React.FC<TransactionHistoryViewProps> = ({
                               'text-sm font-black font-mono block',
                               isReturn
                                 ? 'text-purple-600 dark:text-purple-400'
-                                : isStockIn
+                                : isGroupPositive
                                 ? 'text-emerald-600 dark:text-emerald-400'
                                 : 'text-amber-600 dark:text-amber-400'
                             )}
                           >
-                            {isStockOut ? '-' : '+'}{totalUnits.toLocaleString('en-IN')} units
+                            {isGroupPositive ? '+' : '-'}{totalUnits.toLocaleString('en-IN')} units
                           </span>
                           <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
                             across {group.items.length} {group.items.length === 1 ? 'item' : 'items'}
@@ -644,38 +657,45 @@ export const TransactionHistoryView: React.FC<TransactionHistoryViewProps> = ({
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                              {group.items.map((it) => (
-                                <tr key={it.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40">
-                                  <td className="py-2.5 px-3 font-mono text-slate-500 dark:text-slate-400">
-                                    {it.sku}
-                                  </td>
-                                  <td className="py-2.5 px-3">
-                                    <div
-                                      onClick={() => onOpenProductDetail(it.id)}
-                                      className="font-semibold text-slate-900 dark:text-white hover:text-indigo-600 dark:hover:text-indigo-400 cursor-pointer"
+                              {group.items.map((it) => {
+                                const isItemPositive = isPositiveMovement(group.type, it.notes || group.notes);
+                                return (
+                                  <tr key={it.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40">
+                                    <td className="py-2.5 px-3 font-mono text-slate-500 dark:text-slate-400">
+                                      {it.sku}
+                                    </td>
+                                    <td className="py-2.5 px-3">
+                                      <div
+                                        onClick={() => onOpenProductDetail(it.id)}
+                                        className="font-semibold text-slate-900 dark:text-white hover:text-indigo-600 dark:hover:text-indigo-400 cursor-pointer"
+                                      >
+                                        {it.productName}
+                                      </div>
+                                    </td>
+                                    <td className="py-2.5 px-3 text-slate-500 dark:text-slate-400">
+                                      {it.categoryName || 'General'}
+                                    </td>
+                                    <td className="py-2.5 px-3 text-right font-mono text-slate-500 dark:text-slate-400">
+                                      {it.previousStock !== undefined && it.previousStock !== null ? `${it.previousStock} ${it.unit}` : '-'}
+                                    </td>
+                                    <td
+                                      className={cn(
+                                        'py-2.5 px-3 text-right font-mono font-bold',
+                                        isReturn
+                                          ? 'text-purple-600 dark:text-purple-400'
+                                          : isItemPositive
+                                          ? 'text-emerald-600 dark:text-emerald-400'
+                                          : 'text-amber-600 dark:text-amber-400'
+                                      )}
                                     >
-                                      {it.productName}
-                                    </div>
-                                  </td>
-                                  <td className="py-2.5 px-3 text-slate-500 dark:text-slate-400">
-                                    {it.categoryName || 'General'}
-                                  </td>
-                                  <td className="py-2.5 px-3 text-right font-mono text-slate-500 dark:text-slate-400">
-                                    {it.previousStock !== undefined ? `${it.previousStock} ${it.unit}` : '-'}
-                                  </td>
-                                  <td
-                                    className={cn(
-                                      'py-2.5 px-3 text-right font-mono font-bold',
-                                      isStockIn ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'
-                                    )}
-                                  >
-                                    {isStockIn ? '+' : '-'}{it.quantity} {it.unit}
-                                  </td>
-                                  <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900 dark:text-white">
-                                    {it.newStock !== undefined ? `${it.newStock} ${it.unit}` : '-'}
-                                  </td>
-                                </tr>
-                              ))}
+                                      {isItemPositive ? '+' : '-'}{it.quantity} {it.unit}
+                                    </td>
+                                    <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900 dark:text-white">
+                                      {it.newStock !== undefined && it.newStock !== null ? `${it.newStock} ${it.unit}` : '-'}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
                             </tbody>
                           </table>
                         </div>
@@ -705,13 +725,7 @@ export const TransactionHistoryView: React.FC<TransactionHistoryViewProps> = ({
               <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50 text-sm">
                 {transactions.map((tx) => {
                   const txType = tx.transactionType || (tx as any).transaction_type;
-                  const isPositive =
-                    txType === 'STOCK_IN' ||
-                    txType === 'INWARD' ||
-                    txType === 'INITIAL_STOCK' ||
-                    txType === 'ADJUSTMENT_INCREASE' ||
-                    txType === 'CUSTOMER_RETURN' ||
-                    txType === 'RETURN_IN';
+                  const isPositive = isPositiveMovement(txType, tx.notes || tx.reason);
 
                   const singleConsignment: ExportableConsignment = {
                     referenceNumber: tx.referenceNumber || (tx as any).reference_number || tx.id,
@@ -769,8 +783,8 @@ export const TransactionHistoryView: React.FC<TransactionHistoryViewProps> = ({
                             (txType === 'STOCK_OUT' || txType === 'SALE' || txType === 'OUTWARD') && 'bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60',
                             (txType === 'CUSTOMER_RETURN' || txType === 'RETURN_IN') && 'bg-purple-100 dark:bg-purple-950/60 text-purple-800 dark:text-purple-300 border border-purple-200 dark:border-purple-800/60',
                             txType === 'INITIAL_STOCK' && 'bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-600',
-                            txType === 'ADJUSTMENT_INCREASE' && 'bg-blue-100 dark:bg-blue-950/60 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-800/60',
-                            txType === 'ADJUSTMENT_DECREASE' && 'bg-rose-100 dark:bg-rose-950/60 text-rose-800 dark:text-rose-300 border border-rose-200 dark:border-rose-800/60'
+                            (txType === 'ADJUSTMENT_INCREASE' || (txType === 'ADJUSTMENT' && isPositive)) && 'bg-blue-100 dark:bg-blue-950/60 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-800/60',
+                            (txType === 'ADJUSTMENT_DECREASE' || (txType === 'ADJUSTMENT' && !isPositive)) && 'bg-rose-100 dark:bg-rose-950/60 text-rose-800 dark:text-rose-300 border border-rose-200 dark:border-rose-800/60'
                           )}
                         >
                           {txType?.replace('_', ' ')}
@@ -780,7 +794,7 @@ export const TransactionHistoryView: React.FC<TransactionHistoryViewProps> = ({
                       <td
                         className={cn(
                           'py-3 px-4 text-right font-mono font-bold whitespace-nowrap text-xs',
-                          txType === 'CUSTOMER_RETURN'
+                          txType === 'CUSTOMER_RETURN' || txType === 'RETURN_IN'
                             ? 'text-purple-700 dark:text-purple-400'
                             : isPositive
                             ? 'text-emerald-700 dark:text-emerald-400'
@@ -792,11 +806,11 @@ export const TransactionHistoryView: React.FC<TransactionHistoryViewProps> = ({
                       </td>
 
                       <td className="py-3 px-4 text-right font-mono text-slate-500 dark:text-slate-400 whitespace-nowrap text-xs">
-                        {tx.previousStock ?? (tx as any).previous_stock}
+                        {tx.previousStock !== undefined && tx.previousStock !== null ? `${tx.previousStock} ${tx.unit}` : '-'}
                       </td>
 
                       <td className="py-3 px-4 text-right font-mono font-bold text-slate-900 dark:text-slate-100 whitespace-nowrap text-xs">
-                        {tx.newStock ?? (tx as any).new_stock}
+                        {tx.newStock !== undefined && tx.newStock !== null ? `${tx.newStock} ${tx.unit}` : '-'}
                       </td>
 
                       <td className="py-3 px-4 min-w-[220px] text-slate-700 dark:text-slate-300">
