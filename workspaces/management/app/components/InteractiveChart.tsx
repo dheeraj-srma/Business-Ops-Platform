@@ -31,6 +31,7 @@ import {
   filterItemsByDateRange,
   aggregateTimeSeriesData,
   formatCalendarDate,
+  parseCalendarDate,
   getReferenceDate,
   fillTimeSeriesGaps,
   formatDayMonth
@@ -195,8 +196,9 @@ export default function InteractiveChart({
 }: InteractiveChartProps) {
   const [chartType, setChartType] = useState<ChartTypeOption>(defaultChartType);
   const [timeRange, setTimeRange] = useState<DateRangeType>(defaultTimeRange || '30d');
-  const [startDate, setStartDate] = useState<string>('2026-09-01');
-  const [endDate, setEndDate] = useState<string>('2026-09-21');
+  const initialBounds = useMemo(() => getDateRangeBounds(defaultTimeRange || '30d'), [defaultTimeRange]);
+  const [startDate, setStartDate] = useState<string>(initialBounds.start);
+  const [endDate, setEndDate] = useState<string>(initialBounds.end);
   const [containerWidth, setContainerWidth] = useState<number>(0);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [activeHoverIndex, setActiveHoverIndex] = useState<number | null>(null);
@@ -232,11 +234,14 @@ export default function InteractiveChart({
     if (item?.date && typeof item.date === 'string') return item.date.slice(0, 10);
     const name = String(item?.name || '');
     if (/^\d{4}-\d{2}-\d{2}$/.test(name)) return name;
+    const currentYear = parseCalendarDate(getReferenceDate()).getFullYear();
     if (/^\d{2}\/\d{2}$/.test(name)) {
       const parts = name.split('/');
-      return `2026-${parts[1]}-${parts[0]}`;
+      return `${currentYear}-${parts[1]}-${parts[0]}`;
     }
-    if (/^\d{2}-\d{2}$/.test(name)) return `2026-${name}`;
+    if (/^\d{2}-\d{2}$/.test(name)) {
+      return `${currentYear}-${name}`;
+    }
     return '';
   };
 

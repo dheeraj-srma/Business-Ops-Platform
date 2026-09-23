@@ -301,6 +301,36 @@ class HistoricalSalesRepository:
             conn.close()
 
     @classmethod
+    def get_sources_freshness(cls) -> Dict[str, Any]:
+        """Returns per-source earliest, latest, and total record counts directly from the database."""
+        cls.init_db()
+        conn = cls.get_connection()
+        try:
+            sales_row = conn.execute("SELECT MIN(voucher_date) as min_d, MAX(voucher_date) as max_d, COUNT(*) as cnt FROM historical_sales;").fetchone()
+            pur_row = conn.execute("SELECT MIN(voucher_date) as min_d, MAX(voucher_date) as max_d, COUNT(*) as cnt FROM historical_purchases;").fetchone()
+            ret_row = conn.execute("SELECT MIN(voucher_date) as min_d, MAX(voucher_date) as max_d, COUNT(*) as cnt FROM historical_returns;").fetchone()
+
+            return {
+                "sales": {
+                    "data_as_of": sales_row["max_d"] if sales_row else None,
+                    "data_min_date": sales_row["min_d"] if sales_row else None,
+                    "count": sales_row["cnt"] if sales_row else 0
+                },
+                "purchases": {
+                    "data_as_of": pur_row["max_d"] if pur_row else None,
+                    "data_min_date": pur_row["min_d"] if pur_row else None,
+                    "count": pur_row["cnt"] if pur_row else 0
+                },
+                "returns": {
+                    "data_as_of": ret_row["max_d"] if ret_row else None,
+                    "data_min_date": ret_row["min_d"] if ret_row else None,
+                    "count": ret_row["cnt"] if ret_row else 0
+                }
+            }
+        finally:
+            conn.close()
+
+    @classmethod
     def get_daily_sales_timeline(
         cls,
         start_date: Optional[str] = None,

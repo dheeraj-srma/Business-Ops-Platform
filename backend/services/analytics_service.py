@@ -615,12 +615,28 @@ class AnalyticsService:
                 {"supplier": "Historical Inward Procurement", "value": round(purchase_val, 2)}
             ]
 
+            freshness_map = HistoricalSalesRepository.get_sources_freshness()
+            now_iso = datetime.now(timezone(timedelta(hours=5, minutes=30))).isoformat()
+            min_avail_date = hist_kpis.get("earliest_date") or freshness_map["sales"]["data_min_date"] or "2026-06-01"
+
             payload = {
                 "status": "LIVE",
                 "data_mode": "LIVE",
                 "data_as_of": latest_date_seen,
-                "data_min_date": hist_kpis.get("earliest_date") or "2026-06-01",
-                "generated_at": datetime.now(timezone(timedelta(hours=5, minutes=30))).isoformat(),
+                "data_min_date": min_avail_date,
+                "generated_at": now_iso,
+                "meta": {
+                    "date_range": {
+                        "start": start_date,
+                        "end": end_date,
+                    },
+                    "data_as_of": latest_date_seen,
+                    "data_min_date": min_avail_date,
+                    "generated_at": now_iso,
+                    "database_mode": "LIVE",
+                    "source": "historical_sales",
+                    "sources_freshness": freshness_map,
+                },
                 "applied_filters": {
                     "start_date": start_date,
                     "end_date": end_date,
