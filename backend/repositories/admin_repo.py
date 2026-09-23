@@ -18,12 +18,20 @@ class AdminRepository:
             query = client.table("users").select("id, email, full_name, username, role, is_active, phone, created_at, updated_at")
             if role_filter:
                 db_role = "stock_manager" if role_filter.lower() == "warehouse_manager" else role_filter.lower()
-                query = query.eq("role", db_role)
+                if db_role == "accountant":
+                    query = query.eq("role", "admin").eq("username", "accountant")
+                else:
+                    query = query.eq("role", db_role)
             if search:
                 # Search by email or full_name
                 query = query.or_(f"email.ilike.%{search}%,full_name.ilike.%{search}%")
             res = query.range(offset, offset + limit - 1).execute()
             users = res.data or []
+
+            # Map accountant and warehouse_manager role tags
+            for u in users:
+                if u.get("role") == "admin" and (u.get("username") == "accountant" or str(u.get("username", "")).lower().startswith("accountant")):
+                    u["role"] = "accountant"
 
             # Map linked salesman_code from salesmen table if available
             try:
@@ -76,6 +84,10 @@ class AdminRepository:
         role_raw = str(payload.get("role") or "").strip().lower()
         if role_raw in ("warehouse_manager", "warehouse manager", "stock_manager"):
             payload["role"] = "stock_manager"
+        elif role_raw == "accountant":
+            payload["role"] = "admin"
+            if not payload.get("username"):
+                payload["username"] = "accountant"
         elif role_raw:
             payload["role"] = role_raw
 
@@ -112,8 +124,13 @@ class AdminRepository:
             role_raw = str(payload["role"]).strip().lower()
             if role_raw in ("warehouse_manager", "warehouse manager", "stock_manager"):
                 payload["role"] = "stock_manager"
+            elif role_raw == "accountant":
+                payload["role"] = "admin"
+                payload["username"] = "accountant"
             else:
                 payload["role"] = role_raw
+                if payload.get("username") == "accountant":
+                    payload["username"] = None
 
         if "email" in payload and payload["email"]:
             payload["email"] = str(payload["email"]).strip().lower()

@@ -145,6 +145,8 @@ def login(credentials: LoginRequestSchema, response: Response):
 
         # Mint JWT access token
         canonical_role = user_data.get("role", "viewer").lower()
+        if canonical_role == "admin" and (user_data.get("username") == "accountant" or str(user_data.get("username", "")).lower().startswith("accountant")):
+            canonical_role = "accountant"
         token_payload = {
             "user_id": user_data["id"],
             "email": user_data["email"],
@@ -250,7 +252,10 @@ def get_auth_me(response: Response, current_user: dict = Depends(get_current_use
                 current_user["full_name"] = db_user.get("full_name") or current_user.get("full_name")
                 current_user["email"] = db_user.get("email") or current_user.get("email")
                 current_user["username"] = db_user.get("username")
-                current_user["role"] = db_user.get("role", "viewer").lower()
+                mapped_role = db_user.get("role", "viewer").lower()
+                if mapped_role == "admin" and (db_user.get("username") == "accountant" or str(db_user.get("username", "")).lower().startswith("accountant")):
+                    mapped_role = "accountant"
+                current_user["role"] = mapped_role
                 current_user["is_active"] = db_user.get("is_active", True)
                 
                 # Fetch salesman code if linked

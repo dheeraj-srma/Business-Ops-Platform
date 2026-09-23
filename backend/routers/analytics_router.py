@@ -244,3 +244,34 @@ def financial_analytics(
         logger.error(f"Error generating financial analytics: {exc}")
         raise HTTPException(status_code=500, detail="Failed to retrieve financial analytics.")
 
+@router.get("/explorer/entities")
+def explorer_available_entities(
+    entity_type: str = Query("Product", alias="type", description="Entity dimension type: Product, Category, Customer, Supplier, Salesman, Location")
+):
+    """Returns verified distinct entities with commercial transaction metadata for the 360 Explorer dropdown."""
+    try:
+        return analytics_service.get_explorer_available_entities(entity_type=entity_type)
+    except Exception as exc:
+        logger.error(f"Error fetching explorer entities for '{entity_type}': {exc}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve available explorer entities.")
+
+@router.get("/explorer")
+def explorer_entity_analytics(
+    entity_type: str = Query("Product", alias="type", description="Entity dimension type: Product, Category, Customer, Supplier, Salesman, Location"),
+    query: str = Query("", description="Entity search string, SKU, or name"),
+    start_date: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
+    end_date: Optional[str] = Query(None, description="End date (YYYY-MM-DD)")
+):
+    """Deep 360-degree cross-sectional analytics: summary KPIs, daily demand velocity, distribution breakdown, and ledger."""
+    try:
+        return analytics_service.get_explorer_entity_analytics(
+            entity_type=entity_type,
+            query=query,
+            start_date=start_date,
+            end_date=end_date
+        )
+    except Exception as exc:
+        logger.error(f"Error generating 360 explorer analytics for '{entity_type}' ('{query}'): {exc}")
+        raise HTTPException(status_code=500, detail="Failed to calculate 360 explorer analytics.")
+
+

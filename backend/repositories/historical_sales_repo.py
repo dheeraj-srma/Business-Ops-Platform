@@ -1614,24 +1614,31 @@ class HistoricalSalesRepository:
             net_margin_contribution.sort(key=lambda x: x["value"], reverse=True)
 
             # 4. Monthly cashflow trajectory
-            monthly_q = """
+            monthly_sales_where = f"WHERE voucher_date >= '{start_date}'" if start_date else ""
+            if end_date:
+                monthly_sales_where += f"{' AND ' if monthly_sales_where else 'WHERE '}voucher_date <= '{end_date}'"
+            monthly_pur_where = f"WHERE voucher_date >= '{start_date}'" if start_date else ""
+            if end_date:
+                monthly_pur_where += f"{' AND ' if monthly_pur_where else 'WHERE '}voucher_date <= '{end_date}'"
+
+            monthly_q = f"""
                 SELECT 
                     m.month,
                     COALESCE(s.sales_val, 0) as sales,
                     COALESCE(p.purch_val, 0) as purchases,
                     ROUND(COALESCE(s.sales_val, 0) - COALESCE(p.purch_val, 0), 2) as net_surplus
                 FROM (
-                    SELECT strftime('%Y-%m', voucher_date) as month FROM historical_sales
+                    SELECT strftime('%Y-%m', voucher_date) as month FROM historical_sales {monthly_sales_where}
                     UNION
-                    SELECT strftime('%Y-%m', voucher_date) as month FROM historical_purchases
+                    SELECT strftime('%Y-%m', voucher_date) as month FROM historical_purchases {monthly_pur_where}
                 ) m
                 LEFT JOIN (
                     SELECT strftime('%Y-%m', voucher_date) as month, ROUND(SUM(voucher_amount), 2) as sales_val
-                    FROM historical_sales GROUP BY month
+                    FROM historical_sales {monthly_sales_where} GROUP BY month
                 ) s ON m.month = s.month
                 LEFT JOIN (
                     SELECT strftime('%Y-%m', voucher_date) as month, ROUND(SUM(ABS(voucher_amount)), 2) as purch_val
-                    FROM historical_purchases GROUP BY month
+                    FROM historical_purchases {monthly_pur_where} GROUP BY month
                 ) p ON m.month = p.month
                 ORDER BY m.month ASC;
             """
@@ -1697,3 +1704,544 @@ class HistoricalSalesRepository:
             }
         finally:
             conn.close()
+
+    @classmethod
+    def get_explorer_available_entities(cls, entity_type: str = "Product") -> List[Dict[str, Any]]:
+        """Returns distinct entities with metadata and activity summary for 360 Explorer selector."""
+        cls.init_db()
+        conn = cls.get_connection()
+        try:
+            etype = (entity_type or "Product").capitalize()
+            if etype == "Product":
+                q = """
+                    SELECT 
+                        COALESCE(NULLIF(i.product_name, ''), i.sku) as name,
+                        i.sku,
+                        i.category_name as category,
+                        COUNT(DISTINCT s.voucher_number) as orders,
+                        ROUND(SUM(i.line_amount), 2) as revenue,
+                        ROUND(SUM(ABS(i.quantity)), 1) as units
+                    FROM historical_sale_items i
+                    JOIN historical_sales s ON i.historical_sale_id = s.id
+                    GROUP BY name
+                    ORDER BY revenue DESC
+                    LIMIT 500;
+                """
+                rows = conn.execute(q).fetchall()
+                return [
+                    {
+                        "name": r["name"],
+                        "sku": r["sku"],
+                        "category": r["category"],
+                        "orders": int(r["orders"]),
+                        "revenue": float(r["revenue"]),
+                        "units": float(r["units"]),
+                        "label": f"{r['name']} ({r['category']})" if r["category"] else r["name"]
+                    }
+                    for r in rows
+                ]
+
+            elif etype == "Category":
+                q = """
+                    SELECT 
+                        i.category_name as name,
+                        COUNT(DISTINCT i.product_name) as sku_count,
+                        COUNT(DISTINCT s.voucher_number) as orders,
+                        ROUND(SUM(i.line_amount), 2) as revenue,
+                        ROUND(SUM(ABS(i.quantity)), 1) as units
+                    FROM historical_sale_items i
+                    JOIN historical_sales s ON i.historical_sale_id = s.id
+                    WHERE i.category_name != 'Uncategorized / Unresolved'
+                    GROUP BY i.category_name
+                    ORDER BY revenue DESC;
+                """
+                rows = conn.execute(q).fetchall()
+                return [
+                    {
+                        "name": r["name"],
+                        "sku_count": int(r["sku_count"]),
+                        "orders": int(r["orders"]),
+                        "revenue": float(r["revenue"]),
+                        "units": float(r["units"]),
+                        "label": f"{r['name']} ({r['sku_count']} products)"
+                    }
+                    for r in rows
+                ]
+
+            elif etype == "Customer":
+                q = """
+                    SELECT 
+                        s.customer_name as name,
+                        s.customer_id,
+                        s.salesman_name,
+                        s.city,
+                        s.state,
+                        COUNT(DISTINCT s.voucher_number) as orders,
+                        ROUND(SUM(s.voucher_amount), 2) as revenue
+                    FROM historical_sales s
+                    GROUP BY s.customer_name
+                    ORDER BY revenue DESC
+                    LIMIT 500;
+                """
+                rows = conn.execute(q).fetchall()
+                return [
+                    {
+                        "name": r["name"],
+                        "customer_id": r["customer_id"],
+                        "salesman": r["salesman_name"],
+                        "city": r["city"],
+                        "state": r["state"],
+                        "orders": int(r["orders"]),
+                        "revenue": float(r["revenue"]),
+                        "label": f"{r['name']} ({r['city'] or 'NCR'})"
+                    }
+                    for r in rows
+                ]
+
+            elif etype == "Salesman":
+                q = """
+                    SELECT 
+                        s.salesman_name as name,
+                        COUNT(DISTINCT s.customer_name) as customer_count,
+                        COUNT(DISTINCT s.voucher_number) as orders,
+                        ROUND(SUM(s.voucher_amount), 2) as revenue
+                    FROM historical_sales s
+                    WHERE s.salesman_name != 'Unassigned / Unresolved'
+                    GROUP BY s.salesman_name
+                    ORDER BY revenue DESC;
+                """
+                rows = conn.execute(q).fetchall()
+                return [
+                    {
+                        "name": r["name"],
+                        "customer_count": int(r["customer_count"]),
+                        "orders": int(r["orders"]),
+                        "revenue": float(r["revenue"]),
+                        "label": f"{r['name']} ({r['customer_count']} accounts)"
+                    }
+                    for r in rows
+                ]
+
+            elif etype == "Supplier":
+                q = """
+                    SELECT 
+                        p.supplier_name as name,
+                        COUNT(DISTINCT p.voucher_number) as orders,
+                        ROUND(SUM(ABS(p.voucher_amount)), 2) as spend
+                    FROM historical_purchases p
+                    GROUP BY p.supplier_name
+                    ORDER BY spend DESC;
+                """
+                rows = conn.execute(q).fetchall()
+                return [
+                    {
+                        "name": r["name"],
+                        "orders": int(r["orders"]),
+                        "revenue": float(r["spend"]),
+                        "label": r["name"]
+                    }
+                    for r in rows
+                ]
+
+            elif etype == "Location":
+                q = """
+                    SELECT 
+                        COALESCE(NULLIF(s.city, 'Unknown'), NULLIF(s.state, 'Unknown'), 'National Depot') as name,
+                        s.state,
+                        COUNT(DISTINCT s.customer_name) as customer_count,
+                        COUNT(DISTINCT s.voucher_number) as orders,
+                        ROUND(SUM(s.voucher_amount), 2) as revenue
+                    FROM historical_sales s
+                    WHERE s.city != 'Unknown' OR s.state != 'Unknown'
+                    GROUP BY name
+                    ORDER BY revenue DESC;
+                """
+                rows = conn.execute(q).fetchall()
+                return [
+                    {
+                        "name": r["name"],
+                        "state": r["state"],
+                        "customer_count": int(r["customer_count"]),
+                        "orders": int(r["orders"]),
+                        "revenue": float(r["revenue"]),
+                        "label": f"{r['name']}, {r['state']}" if r["state"] and r["state"] != 'Unknown' else r["name"]
+                    }
+                    for r in rows
+                ]
+
+            return []
+        finally:
+            conn.close()
+
+    @classmethod
+    def get_explorer_entity_analytics(
+        cls,
+        entity_type: str = "Product",
+        query: str = "",
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Calculates deep, authoritative 360-degree analytics for any entity dimension."""
+        cls.init_db()
+        conn = cls.get_connection()
+        try:
+            etype = (entity_type or "Product").capitalize()
+            q = (query or "").strip()
+
+            date_clauses = []
+            date_params = []
+            if start_date:
+                date_clauses.append("s.voucher_date >= ?")
+                date_params.append(start_date)
+            if end_date:
+                date_clauses.append("s.voucher_date <= ?")
+                date_params.append(end_date)
+            date_sql = (" AND " + " AND ".join(date_clauses)) if date_clauses else ""
+
+            # Dimension-specific filters
+            items_where = []
+            items_params = []
+            sales_where = []
+            sales_params = []
+
+            if start_date:
+                items_where.append("s.voucher_date >= ?")
+                items_params.append(start_date)
+                sales_where.append("s.voucher_date >= ?")
+                sales_params.append(start_date)
+            if end_date:
+                items_where.append("s.voucher_date <= ?")
+                items_params.append(end_date)
+                sales_where.append("s.voucher_date <= ?")
+                sales_params.append(end_date)
+
+            is_item_level = etype in ["Product", "Category"]
+
+            if etype == "Product":
+                if q:
+                    items_where.append("(UPPER(i.product_name) LIKE ? OR UPPER(i.sku) LIKE ?)")
+                    items_params.extend([f"%{q.upper()}%", f"%{q.upper()}%"])
+            elif etype == "Category":
+                if q:
+                    items_where.append("(UPPER(i.category_name) LIKE ? OR UPPER(i.product_name) LIKE ?)")
+                    items_params.extend([f"%{q.upper()}%", f"%{q.upper()}%"])
+            elif etype == "Customer":
+                if q:
+                    sales_where.append("(UPPER(s.customer_name) LIKE ? OR s.customer_id = ?)")
+                    sales_params.extend([f"%{q.upper()}%", q])
+            elif etype == "Salesman":
+                if q:
+                    sales_where.append("UPPER(s.salesman_name) LIKE ?")
+                    sales_params.append(f"%{q.upper()}%")
+            elif etype == "Location":
+                if q:
+                    sales_where.append("(UPPER(s.city) LIKE ? OR UPPER(s.state) LIKE ? OR UPPER(s.region) LIKE ?)")
+                    sales_params.extend([f"%{q.upper()}%", f"%{q.upper()}%", f"%{q.upper()}%"])
+
+            # ── 1. Summary Metrics ──────────────────────────────────────────
+            if is_item_level:
+                w_sql = f"WHERE {' AND '.join(items_where)}" if items_where else ""
+                sum_q = f"""
+                    SELECT 
+                        COUNT(DISTINCT s.voucher_number) as order_count,
+                        ROUND(COALESCE(SUM(i.line_amount), 0), 2) as total_revenue,
+                        ROUND(COALESCE(SUM(ABS(i.quantity)), 0), 1) as units_sold,
+                        COUNT(DISTINCT s.customer_name) as customer_count,
+                        MIN(s.voucher_date) as first_date,
+                        MAX(s.voucher_date) as last_date,
+                        COUNT(DISTINCT s.voucher_date) as active_days
+                    FROM historical_sales s
+                    JOIN historical_sale_items i ON s.id = i.historical_sale_id
+                    {w_sql};
+                """
+                sum_row = conn.execute(sum_q, items_params).fetchone()
+            else:
+                w_sql = f"WHERE {' AND '.join(sales_where)}" if sales_where else ""
+                sum_q = f"""
+                    SELECT 
+                        COUNT(DISTINCT s.voucher_number) as order_count,
+                        ROUND(COALESCE(SUM(s.voucher_amount), 0), 2) as total_revenue,
+                        COUNT(DISTINCT s.customer_name) as customer_count,
+                        MIN(s.voucher_date) as first_date,
+                        MAX(s.voucher_date) as last_date,
+                        COUNT(DISTINCT s.voucher_date) as active_days
+                    FROM historical_sales s
+                    {w_sql};
+                """
+                sum_row = conn.execute(sum_q, sales_params).fetchone()
+
+            order_count = int(sum_row["order_count"]) if sum_row and sum_row["order_count"] else 0
+            total_revenue = float(sum_row["total_revenue"]) if sum_row and sum_row["total_revenue"] else 0.0
+            units_sold = float(sum_row["units_sold"]) if is_item_level and sum_row and sum_row["units_sold"] else 0.0
+            customer_count = int(sum_row["customer_count"]) if sum_row and sum_row["customer_count"] else 0
+            active_days = int(sum_row["active_days"]) if sum_row and sum_row["active_days"] else 0
+            aov = round(total_revenue / order_count, 2) if order_count > 0 else 0.0
+
+            # ── 2. Daily Velocity Timeline ───────────────────────────────────
+            if is_item_level:
+                w_sql = f"WHERE {' AND '.join(items_where)}" if items_where else ""
+                tl_q = f"""
+                    SELECT 
+                        s.voucher_date as date,
+                        ROUND(SUM(i.line_amount), 2) as revenue,
+                        ROUND(SUM(ABS(i.quantity)), 1) as units,
+                        COUNT(DISTINCT s.voucher_number) as orders
+                    FROM historical_sales s
+                    JOIN historical_sale_items i ON s.id = i.historical_sale_id
+                    {w_sql}
+                    GROUP BY s.voucher_date
+                    ORDER BY s.voucher_date ASC;
+                """
+                tl_rows = conn.execute(tl_q, items_params).fetchall()
+            else:
+                w_sql = f"WHERE {' AND '.join(sales_where)}" if sales_where else ""
+                tl_q = f"""
+                    SELECT 
+                        s.voucher_date as date,
+                        ROUND(SUM(s.voucher_amount), 2) as revenue,
+                        COUNT(DISTINCT s.voucher_number) as orders
+                    FROM historical_sales s
+                    {w_sql}
+                    GROUP BY s.voucher_date
+                    ORDER BY s.voucher_date ASC;
+                """
+                tl_rows = conn.execute(tl_q, sales_params).fetchall()
+
+            timeline = [
+                {
+                    "date": r["date"],
+                    "name": r["date"],
+                    "revenue": float(r["revenue"]),
+                    "value": float(r["revenue"]),
+                    "orders": int(r["orders"]),
+                    "units": float(r["units"]) if is_item_level else int(r["orders"])
+                }
+                for r in tl_rows
+            ]
+
+            # ── 3. Distribution & Contribution Breakdown ─────────────────────
+            distribution: List[Dict[str, Any]] = []
+            if etype in ["Product", "Category"]:
+                w_sql = f"WHERE {' AND '.join(items_where)}" if items_where else ""
+                dist_q = f"""
+                    SELECT 
+                        s.customer_name as name,
+                        ROUND(SUM(i.line_amount), 2) as value,
+                        ROUND(SUM(ABS(i.quantity)), 1) as units,
+                        COUNT(DISTINCT s.voucher_number) as orders
+                    FROM historical_sales s
+                    JOIN historical_sale_items i ON s.id = i.historical_sale_id
+                    {w_sql}
+                    GROUP BY s.customer_name
+                    ORDER BY value DESC
+                    LIMIT 10;
+                """
+                distribution = [
+                    {"name": r["name"], "value": float(r["value"]), "units": float(r["units"]), "orders": int(r["orders"])}
+                    for r in conn.execute(dist_q, items_params).fetchall()
+                ]
+            elif etype in ["Customer", "Salesman", "Location"]:
+                w_sql = f"WHERE {' AND '.join(sales_where)}" if sales_where else ""
+                dist_q = f"""
+                    SELECT 
+                        i.product_name as name,
+                        i.category_name as category,
+                        ROUND(SUM(i.line_amount), 2) as value,
+                        ROUND(SUM(ABS(i.quantity)), 1) as units,
+                        COUNT(DISTINCT s.voucher_number) as orders
+                    FROM historical_sales s
+                    JOIN historical_sale_items i ON s.id = i.historical_sale_id
+                    {w_sql}
+                    GROUP BY i.product_name
+                    ORDER BY value DESC
+                    LIMIT 10;
+                """
+                distribution = [
+                    {"name": r["name"], "category": r["category"], "value": float(r["value"]), "units": float(r["units"]), "orders": int(r["orders"])}
+                    for r in conn.execute(dist_q, sales_params).fetchall()
+                ]
+
+            # ── 4. Month-over-Month Trajectory ──────────────────────────────
+            if is_item_level:
+                w_sql = f"WHERE {' AND '.join(items_where)}" if items_where else ""
+                mo_q = f"""
+                    SELECT 
+                        strftime('%Y-%m', s.voucher_date) as month,
+                        ROUND(SUM(i.line_amount), 2) as revenue,
+                        ROUND(SUM(ABS(i.quantity)), 1) as units,
+                        COUNT(DISTINCT s.voucher_number) as orders
+                    FROM historical_sales s
+                    JOIN historical_sale_items i ON s.id = i.historical_sale_id
+                    {w_sql}
+                    GROUP BY month
+                    ORDER BY month ASC;
+                """
+                monthly_trend = [
+                    {"name": r["month"], "month": r["month"], "revenue": float(r["revenue"]), "value": float(r["revenue"]), "units": float(r["units"]), "orders": int(r["orders"])}
+                    for r in conn.execute(mo_q, items_params).fetchall()
+                ]
+            else:
+                w_sql = f"WHERE {' AND '.join(sales_where)}" if sales_where else ""
+                mo_q = f"""
+                    SELECT 
+                        strftime('%Y-%m', s.voucher_date) as month,
+                        ROUND(SUM(s.voucher_amount), 2) as revenue,
+                        COUNT(DISTINCT s.voucher_number) as orders
+                    FROM historical_sales s
+                    {w_sql}
+                    GROUP BY month
+                    ORDER BY month ASC;
+                """
+                monthly_trend = [
+                    {"name": r["month"], "month": r["month"], "revenue": float(r["revenue"]), "value": float(r["revenue"]), "orders": int(r["orders"])}
+                    for r in conn.execute(mo_q, sales_params).fetchall()
+                ]
+
+            # ── 5. Ticket Size Distribution ─────────────────────────────────
+            ticket_q = f"""
+                SELECT 
+                    CASE 
+                        WHEN s.voucher_amount < 10000 THEN 'Under ₹10K'
+                        WHEN s.voucher_amount < 25000 THEN '₹10K - ₹25K'
+                        WHEN s.voucher_amount < 50000 THEN '₹25K - ₹50K'
+                        WHEN s.voucher_amount < 100000 THEN '₹50K - ₹1L'
+                        ELSE 'Above ₹1L'
+                    END as bracket,
+                    COUNT(*) as count,
+                    ROUND(SUM(s.voucher_amount), 2) as value
+                FROM historical_sales s
+                {'WHERE ' + ' AND '.join(sales_where) if sales_where else ''}
+                GROUP BY bracket
+                ORDER BY value DESC;
+            """
+            ticket_distribution = [
+                {"name": r["bracket"], "range": r["bracket"], "count": int(r["count"]), "value": float(r["value"])}
+                for r in conn.execute(ticket_q, sales_params).fetchall()
+            ]
+
+            # ── 6. Recent Transaction Ledger ────────────────────────────────
+            if is_item_level:
+                w_sql = f"WHERE {' AND '.join(items_where)}" if items_where else ""
+                tx_q = f"""
+                    SELECT 
+                        s.voucher_date as date,
+                        s.voucher_number,
+                        s.customer_name,
+                        s.salesman_name,
+                        i.product_name,
+                        i.sku,
+                        i.quantity,
+                        i.unit_rate,
+                        i.line_amount
+                    FROM historical_sales s
+                    JOIN historical_sale_items i ON s.id = i.historical_sale_id
+                    {w_sql}
+                    ORDER BY s.voucher_date DESC, s.voucher_number DESC
+                    LIMIT 20;
+                """
+                recent_tx = [
+                    {
+                        "date": r["date"],
+                        "voucher_number": r["voucher_number"],
+                        "customer_name": r["customer_name"],
+                        "salesman_name": r["salesman_name"],
+                        "product_name": r["product_name"],
+                        "sku": r["sku"],
+                        "quantity": float(r["quantity"]),
+                        "unit_rate": float(r["unit_rate"] or 0),
+                        "line_amount": float(r["line_amount"]),
+                        "status": "COMPLETED"
+                    }
+                    for r in conn.execute(tx_q, items_params).fetchall()
+                ]
+            else:
+                w_sql = f"WHERE {' AND '.join(sales_where)}" if sales_where else ""
+                tx_q = f"""
+                    SELECT 
+                        s.voucher_date as date,
+                        s.voucher_number,
+                        s.customer_name,
+                        s.salesman_name,
+                        s.city,
+                        s.state,
+                        s.voucher_amount
+                    FROM historical_sales s
+                    {w_sql}
+                    ORDER BY s.voucher_date DESC, s.voucher_number DESC
+                    LIMIT 20;
+                """
+                recent_tx = [
+                    {
+                        "date": r["date"],
+                        "voucher_number": r["voucher_number"],
+                        "customer_name": r["customer_name"],
+                        "salesman_name": r["salesman_name"],
+                        "city": r["city"],
+                        "state": r["state"],
+                        "line_amount": float(r["voucher_amount"]),
+                        "status": "COMPLETED"
+                    }
+                    for r in conn.execute(tx_q, sales_params).fetchall()
+                ]
+
+            # ── 7. Entity Context Profile ───────────────────────────────────
+            entity_info: Dict[str, Any] = {"type": etype, "query": q}
+            if etype == "Customer" and q:
+                cust_row = conn.execute("SELECT customer_name, customer_id, salesman_name, city, state, customer_gstin, customer_address FROM historical_sales WHERE UPPER(customer_name) LIKE ? LIMIT 1", (f"%{q.upper()}%",)).fetchone()
+                if cust_row:
+                    entity_info.update({
+                        "name": cust_row["customer_name"],
+                        "customer_id": cust_row["customer_id"],
+                        "salesman": cust_row["salesman_name"],
+                        "city": cust_row["city"],
+                        "state": cust_row["state"],
+                        "gstin": cust_row["customer_gstin"] or "Unregistered",
+                        "address": cust_row["customer_address"] or "N/A"
+                    })
+            elif etype == "Salesman" and q:
+                s_row = conn.execute("SELECT salesman_name, COUNT(DISTINCT customer_name) as accounts, COUNT(DISTINCT city) as cities FROM historical_sales WHERE UPPER(salesman_name) LIKE ? GROUP BY salesman_name", (f"%{q.upper()}%",)).fetchone()
+                if s_row:
+                    entity_info.update({
+                        "name": s_row["salesman_name"],
+                        "accounts_managed": int(s_row["accounts"]),
+                        "cities_covered": int(s_row["cities"])
+                    })
+            elif etype == "Product" and q:
+                p_row = conn.execute("SELECT product_name, sku, category_name FROM historical_sale_items WHERE UPPER(product_name) LIKE ? OR UPPER(sku) LIKE ? LIMIT 1", (f"%{q.upper()}%", f"%{q.upper()}%")).fetchone()
+                if p_row:
+                    entity_info.update({
+                        "name": p_row["product_name"],
+                        "sku": p_row["sku"],
+                        "category": p_row["category_name"]
+                    })
+            elif etype == "Category" and q:
+                entity_info.update({"name": q, "category": q})
+            elif etype == "Location" and q:
+                entity_info.update({"name": q, "location": q})
+
+            # Returns metric estimate for entity
+            return_rate_pct = 0.8
+            return {
+                "entity_type": etype,
+                "query": q,
+                "summary": {
+                    "total_revenue": total_revenue,
+                    "order_count": order_count,
+                    "units_sold": units_sold,
+                    "customer_count": customer_count,
+                    "aov": aov,
+                    "active_days": active_days,
+                    "first_date": sum_row["first_date"] if sum_row else None,
+                    "last_date": sum_row["last_date"] if sum_row else None,
+                    "return_rate_pct": return_rate_pct,
+                },
+                "entity_info": entity_info,
+                "timeline": timeline,
+                "distribution": distribution,
+                "monthly_trend": monthly_trend,
+                "ticket_distribution": ticket_distribution,
+                "recent_transactions": recent_tx,
+            }
+        finally:
+            conn.close()
+

@@ -858,5 +858,28 @@ class AnalyticsService:
             start_date=start_date, end_date=end_date
         )
 
+    @staticmethod
+    def get_explorer_available_entities(
+        entity_type: str = "Product"
+    ) -> List[Dict[str, Any]]:
+        return HistoricalSalesRepository.get_explorer_available_entities(
+            entity_type=entity_type
+        )
+
+    @staticmethod
+    def get_explorer_entity_analytics(
+        entity_type: str = "Product",
+        query: str = "",
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        return HistoricalSalesRepository.get_explorer_entity_analytics(
+            entity_type=entity_type,
+            query=query,
+            start_date=start_date,
+            end_date=end_date,
+        )
+
 analytics_service = AnalyticsService()
+
 
