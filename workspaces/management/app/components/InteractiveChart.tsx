@@ -232,19 +232,57 @@ export default function InteractiveChart({
     return () => observer.disconnect();
   }, []);
 
+  const isInitialMount = useRef(true);
+
+  // Synchronize with external defaultTimeRange changes (e.g. when global page time range changes)
+  useEffect(() => {
+    if (defaultTimeRange) {
+      setTimeRange(defaultTimeRange);
+      const refDate = getReferenceDate();
+      const b = getDateRangeBounds(defaultTimeRange, refDate);
+      if (defaultTimeRange !== 'custom') {
+        setStartDate(b.start);
+        setEndDate(b.end);
+      }
+      setFetchedData(null);
+    }
+  }, [defaultTimeRange]);
+
+  // When data prop changes from parent, reset fetchedData override so parent data updates render smoothly
+  useEffect(() => {
+    setFetchedData(null);
+  }, [data]);
+
+  const fetchDataRef = useRef(fetchData);
+  useEffect(() => {
+    fetchDataRef.current = fetchData;
+  }, [fetchData]);
+
   // When timeRange or custom date changes and fetchData is provided, fetch dynamically for this graph
   useEffect(() => {
-    if (!fetchData) return;
+    if (!fetchDataRef.current) return;
+    
+    // If data prop is already provided and this is the initial mount, skip redundant fetch to avoid race condition
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      if (data && data.length > 0) {
+        return;
+      }
+    }
+
     const refDate = getReferenceDate();
     const bounds = getDateRangeBounds(timeRange, refDate, startDate, endDate);
     if (!bounds.isValid) return;
 
     let active = true;
     setIsFetching(true);
-    fetchData(bounds, timeRange)
+    fetchDataRef.current(bounds, timeRange)
       .then(res => {
         if (active) {
-          setFetchedData(Array.isArray(res) ? res : []);
+          const list = Array.isArray(res) ? res : [];
+          if (list.length > 0 || !data || data.length === 0) {
+            setFetchedData(list);
+          }
           setIsFetching(false);
           setCurrentPage(1);
         }
@@ -257,7 +295,7 @@ export default function InteractiveChart({
     return () => {
       active = false;
     };
-  }, [fetchData, timeRange, startDate, endDate]);
+  }, [timeRange, startDate, endDate, data]);
 
   const isWide = useMemo(() => {
     if (isHero !== undefined) return isHero;
@@ -286,20 +324,17 @@ export default function InteractiveChart({
   };
 
   const activeRawData = useMemo(() => {
+    if (fetchedData !== null && fetchedData.length > 0) return fetchedData;
+    if (data && data.length > 0) return data;
     if (fetchedData !== null) return fetchedData;
-    return data || [];
+    return [];
   }, [fetchedData, data]);
 
   // Determine whether data represents a chronological time-series
   const isTimeSeries = useMemo(() => {
     if (!activeRawData || activeRawData.length === 0) return false;
-    const hasDates = activeRawData.some(d => Boolean(getItemDate(d)));
-    if (!hasDates) return false;
-    if (groupBy && groupBy !== 'date' && groupBy !== 'name' && activeRawData.some(d => d[groupBy])) {
-      return false;
-    }
-    return true;
-  }, [activeRawData, groupBy]);
+    return activeRawData.some(d => Boolean(getItemDate(d))) && (chartType === 'area' || chartType === 'line' || isHero === true || (!groupBy && !activeRawData.some(d => d.category || d.product || d.dealer || d.salesman)));
+  }, [activeRawData, chartType, isHero, groupBy]);
 
   // Automatically suppress horizontal axis data labels when color legends and hover tooltips identify items
   const shouldHideXAxisLabels = hideXAxisLabels !== undefined ? hideXAxisLabels : !isTimeSeries;
@@ -680,96 +715,9 @@ export default function InteractiveChart({
     return `${val}`;
   };
 
-  const chartId = useMemo(() => title.replace(/[^a-z0-9]/gi, '_'), [title]);
-
-  // For time-series with a single metric, do NOT render individual date points as legend entries
-  const shouldShowBottomLegend = useMemo(() => {
-    if (showLegend === false) return false;
-    if (multiSeries && multiSeries.length > 0) return true;
-    if (isTimeSeries) return false;
-    return true;
-  }, [showLegend, multiSeries, isTimeSeries]);
-
-  const lineGradientStops = useMemo(() => {
-    if (isTimeSeries || normalizedVisibleData.length <= 1) {
-      const primaryColor = '#6366f1';
-      return [
-        { offset: '0%', color: primaryColor },
-        { offset: '100%', color: primaryColor },
-      ];
-    }
-    const count = normalizedVisibleData.length;
-    return normalizedVisibleData.map((d, i) => ({
-      offset: `${Math.round((i / (count - 1)) * 100)}%`,
-      color: d.color || COLORS[(startIndex + i) % COLORS.length],
-    }));
-  }, [isTimeSeries, normalizedVisibleData, startIndex]);
-
-  const renderCustomLineDot = (props: any) => {
-    const { cx, cy, index, payload } = props;
-    if (cx === undefined || cy === undefined) return null;
-    const isHovered = activeHoverIndex === index;
-
-    // Clean, subtle markers for temporal time-series
-    if (isTimeSeries) {
-      return (
-        <g key={`dot-${index}`}>
-          <circle
-            cx={cx}
-            cy={cy}
-            r={isHovered ? 5 : (normalizedVisibleData.length > 20 ? 1.5 : 2.5)}
-            fill="#6366f1"
-            stroke="#0f172a"
-            strokeWidth={isHovered ? 2 : 1}
-            style={{ transition: 'all 0.15s ease', cursor: 'pointer' }}
-          />
-          {isHovered && (
-            <circle
-              cx={cx}
-              cy={cy}
-              r={8}
-              fill="none"
-              stroke="#6366f1"
-              strokeWidth={1.5}
-              opacity={0.6}
-            />
-          )}
-        </g>
-      );
-    }
-
-    // Categorical multi-series point markers matching legend colors
-    const color = payload?.color || COLORS[(startIndex + index) % COLORS.length];
-    return (
-      <g key={`dot-${index}`}>
-        <circle
-          cx={cx}
-          cy={cy}
-          r={isHovered ? 6 : 4}
-          fill={color}
-          stroke="#0f172a"
-          strokeWidth={1.5}
-          style={{ transition: 'all 0.2s ease', cursor: 'pointer' }}
-        />
-        {isHovered && (
-          <circle
-            cx={cx}
-            cy={cy}
-            r={8.5}
-            fill="none"
-            stroke={color}
-            strokeWidth={1.5}
-            opacity={0.7}
-          />
-        )}
-      </g>
-    );
-  };
-
   const renderCustomTooltip = (props: any) => {
     const { active, payload, label } = props;
     if (active && payload && payload.length) {
-      const itemIndex = normalizedVisibleData.findIndex(d => d.name === label);
       return (
         <div
           className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-3 rounded-xl shadow-xl text-xs space-y-1 backdrop-blur-md"
@@ -786,14 +734,9 @@ export default function InteractiveChart({
             const formattedVal = typeof val === 'number'
               ? (unit === '₹' ? `₹${val.toLocaleString('en-IN')}` : `${val.toLocaleString('en-IN')} ${unit}`)
               : val;
-            const entryColor = multiSeries
-              ? (p.color || COLORS[(startIndex + idx) % COLORS.length])
-              : isTimeSeries
-              ? '#6366f1'
-              : (itemIndex >= 0 ? (normalizedVisibleData[itemIndex]?.color || COLORS[(startIndex + itemIndex) % COLORS.length]) : (p.color || COLORS[0]));
             return (
-              <div key={idx} style={{ color: entryColor, fontWeight: 700, fontSize: '0.88rem' }}>
-                {p.name && (multiSeries || isTimeSeries) ? `${p.name}: ` : ''}{formattedVal}
+              <div key={idx} style={{ color: p.color || COLORS[(startIndex + idx) % COLORS.length], fontWeight: 700, fontSize: '0.88rem' }}>
+                {p.name ? `${p.name}: ` : ''}{formattedVal}
               </div>
             );
           })}
@@ -1029,7 +972,7 @@ export default function InteractiveChart({
                     ) : (
                       <Bar dataKey="value" radius={[0, 4, 4, 0]}>
                         {normalizedVisibleData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color || (isTimeSeries ? '#6366f1' : COLORS[(startIndex + index) % COLORS.length])} />
+                          <Cell key={`cell-${index}`} fill={entry.color || COLORS[(startIndex + index) % COLORS.length]} />
                         ))}
                       </Bar>
                     )}
@@ -1040,7 +983,7 @@ export default function InteractiveChart({
               )}
             </div>
             {/* Bottom Legend */}
-            {shouldShowBottomLegend && (
+            {showLegend && (
               <div className="shrink-0 flex flex-wrap gap-x-3 gap-y-1 justify-center items-center pt-2 pb-0.5 border-t border-slate-800/60 mt-auto select-none">
                 {multiSeries ? (
                   multiSeries.map((s, idx) => (
@@ -1231,23 +1174,16 @@ export default function InteractiveChart({
                     <defs>
                       {multiSeries ? (
                         multiSeries.map((s, idx) => (
-                          <linearGradient key={idx} id={`colorGrad_${chartId}_${s.key}`} x1="0" y1="0" x2="0" y2="1">
+                          <linearGradient key={idx} id={`colorGrad_${title.replace(/[^a-z0-9]/gi, '')}_${s.key}`} x1="0" y1="0" x2="0" y2="1">
                             <stop offset="5%" stopColor={s.color} stopOpacity={0.4} />
                             <stop offset="95%" stopColor={s.color} stopOpacity={0.0} />
                           </linearGradient>
                         ))
                       ) : (
-                        <>
-                          <linearGradient id={`lineGrad_${chartId}`} x1="0%" y1="0%" x2="100%" y2="0%">
-                            {lineGradientStops.map((stop, sIdx) => (
-                              <stop key={sIdx} offset={stop.offset} stopColor={stop.color} />
-                            ))}
-                          </linearGradient>
-                          <linearGradient id={`areaGrad_${chartId}`} x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor={lineGradientStops[0]?.color || '#6366f1'} stopOpacity={0.35} />
-                            <stop offset="95%" stopColor={lineGradientStops[lineGradientStops.length - 1]?.color || '#6366f1'} stopOpacity={0.02} />
-                          </linearGradient>
-                        </>
+                        <linearGradient id={`colorGrad_${title.replace(/[^a-z0-9]/gi, '')}`} x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#6366f1" stopOpacity={0.45} />
+                          <stop offset="95%" stopColor="#6366f1" stopOpacity={0.0} />
+                        </linearGradient>
                       )}
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.4} />
@@ -1275,10 +1211,10 @@ export default function InteractiveChart({
                     <Tooltip content={renderCustomTooltip} />
                     {multiSeries ? (
                       multiSeries.map((s, idx) => (
-                        <Area key={idx} yAxisId={hasSecondaryYAxis ? (s.yAxisId || 'left') : undefined} type="monotone" dataKey={s.key} name={s.label} stroke={s.color} strokeWidth={2} fillOpacity={1} fill={`url(#colorGrad_${chartId}_${s.key})`} />
+                        <Area key={idx} yAxisId={hasSecondaryYAxis ? (s.yAxisId || 'left') : undefined} type="monotone" dataKey={s.key} name={s.label} stroke={s.color} strokeWidth={2} fillOpacity={1} fill={`url(#colorGrad_${title.replace(/[^a-z0-9]/gi, '')}_${s.key})`} />
                       ))
                     ) : (
-                      <Area type="monotone" dataKey="value" stroke={`url(#lineGrad_${chartId})`} strokeWidth={2.5} fillOpacity={1} fill={`url(#areaGrad_${chartId})`} dot={renderCustomLineDot} />
+                      <Area type="monotone" dataKey="value" stroke="#6366f1" strokeWidth={2.5} fillOpacity={1} fill={`url(#colorGrad_${title.replace(/[^a-z0-9]/gi, '')})`} />
                     )}
                   </AreaChart>
                 </ResponsiveContainer>
@@ -1287,7 +1223,7 @@ export default function InteractiveChart({
               )}
             </div>
             {/* Bottom Legend */}
-            {shouldShowBottomLegend && (
+            {showLegend && (
               <div className="shrink-0 flex flex-wrap gap-x-3 gap-y-1 justify-center items-center pt-2 pb-0.5 border-t border-slate-800/60 mt-auto select-none">
                 {multiSeries ? (
                   multiSeries.map((s, idx) => (
@@ -1349,7 +1285,7 @@ export default function InteractiveChart({
                     ) : (
                       <Bar dataKey="value" radius={[4, 4, 0, 0]}>
                         {normalizedVisibleData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color || (isTimeSeries ? '#6366f1' : COLORS[(startIndex + index) % COLORS.length])} />
+                          <Cell key={`cell-${index}`} fill={entry.color || COLORS[(startIndex + index) % COLORS.length]} />
                         ))}
                       </Bar>
                     )}
@@ -1360,7 +1296,7 @@ export default function InteractiveChart({
               )}
             </div>
             {/* Bottom Legend */}
-            {shouldShowBottomLegend && (
+            {showLegend && (
               <div className="shrink-0 flex flex-wrap gap-x-3 gap-y-1 justify-center items-center pt-2 pb-0.5 border-t border-slate-800/60 mt-auto select-none">
                 {multiSeries ? (
                   multiSeries.map((s, idx) => (
@@ -1392,22 +1328,6 @@ export default function InteractiveChart({
               {isMounted ? (
                 <ResponsiveContainer width="100%" height="100%" minHeight={isEffectiveHero ? 340 : 250}>
                   <LineChart data={normalizedVisibleData} margin={{ top: 10, right: hasSecondaryYAxis ? 35 : 15, left: -5, bottom: xAxisConfig.bottomMargin }}>
-                    <defs>
-                      {multiSeries ? (
-                        multiSeries.map((s, idx) => (
-                          <linearGradient key={idx} id={`lineGrad_${chartId}_${s.key}`} x1="0" y1="0" x2="1" y2="0">
-                            <stop offset="0%" stopColor={s.color} />
-                            <stop offset="100%" stopColor={s.color} />
-                          </linearGradient>
-                        ))
-                      ) : (
-                        <linearGradient id={`lineGrad_${chartId}`} x1="0%" y1="0%" x2="100%" y2="0%">
-                          {lineGradientStops.map((stop, sIdx) => (
-                            <stop key={sIdx} offset={stop.offset} stopColor={stop.color} />
-                          ))}
-                        </linearGradient>
-                      )}
-                    </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.4} />
                     <XAxis
                       dataKey="name"
@@ -1433,10 +1353,10 @@ export default function InteractiveChart({
                     <Tooltip content={renderCustomTooltip} />
                     {multiSeries ? (
                       multiSeries.map((s, idx) => (
-                        <Line key={idx} yAxisId={hasSecondaryYAxis ? (s.yAxisId || 'left') : undefined} type="monotone" dataKey={s.key} name={s.label} stroke={s.color} strokeWidth={2.5} dot={{ r: 3, fill: s.color, stroke: '#0f172a', strokeWidth: 1.5 }} activeDot={{ r: 5, fill: s.color }} />
+                        <Line key={idx} yAxisId={hasSecondaryYAxis ? (s.yAxisId || 'left') : undefined} type="monotone" dataKey={s.key} name={s.label} stroke={s.color} strokeWidth={2} dot={{ r: 2 }} activeDot={{ r: 4 }} />
                       ))
                     ) : (
-                      <Line type="monotone" dataKey="value" stroke={`url(#lineGrad_${chartId})`} strokeWidth={2.5} dot={renderCustomLineDot} activeDot={{ r: 6 }} />
+                      <Line type="monotone" dataKey="value" stroke="#10b981" strokeWidth={2.5} dot={{ r: 3, fill: '#10b981' }} activeDot={{ r: 5 }} />
                     )}
                   </LineChart>
                 </ResponsiveContainer>
@@ -1445,7 +1365,7 @@ export default function InteractiveChart({
               )}
             </div>
             {/* Bottom Legend */}
-            {shouldShowBottomLegend && (
+            {showLegend && (
               <div className="shrink-0 flex flex-wrap gap-x-3 gap-y-1 justify-center items-center pt-2 pb-0.5 border-t border-slate-800/60 mt-auto select-none">
                 {multiSeries ? (
                   multiSeries.map((s, idx) => (

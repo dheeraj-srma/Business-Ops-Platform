@@ -6,7 +6,7 @@ import { Header } from './Header';
 import { useApp } from '../../context/AppContext';
 import { ScrollToTopButton } from '../common/ScrollToTopButton';
 import { ProductDetailModal } from '../inventory/ProductDetailModal';
-import { GlassmorphicModuleLoader } from '../common/GlassmorphicModuleLoader';
+import { InScreenLoader } from '../common/InScreenLoader';
 
 const TAB_MODULE_TITLES: Record<string, string> = {
   dashboard: 'Executive Business Insights Dashboard',
@@ -245,7 +245,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 bg-slate-950 text-slate-100 custom-scrollbar relative"
         >
           <div className="w-full max-w-[1760px] 2xl:max-w-[1880px] mx-auto">
-            {children}
+            {isModuleLoading ? (
+              <InScreenLoader message={`Loading ${loadingModuleName || 'Module'}...`} />
+            ) : (
+              children
+            )}
           </div>
 
           <ScrollToTopButton containerRef={mainScrollRef} />
@@ -270,9 +274,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           handleOpenStockAdjustment(id);
         }}
       />
-
-      {/* Glassmorphic Interactive Module Loader */}
-      <GlassmorphicModuleLoader isLoading={isModuleLoading} moduleName={loadingModuleName} />
     </div>
   );
 }
