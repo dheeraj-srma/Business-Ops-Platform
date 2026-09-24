@@ -21,6 +21,17 @@ SORT_ALLOWLIST = {"created_at", "order_id", "status", "total_amount", "shop_name
 
 _IN_MEMORY_ORDERS: List[Dict[str, Any]] = []
 
+def is_test_order(o: Dict[str, Any]) -> bool:
+    shop = str(o.get("shop_name") or o.get("Shop Name") or o.get("customer_name") or "").lower()
+    oid = str(o.get("order_id") or o.get("order_code") or o.get("id") or "").lower()
+    salesman = str(o.get("salesman_name") or o.get("Salesman Name") or "").lower()
+    notes = str(o.get("notes") or "").lower()
+    if "test" in shop or "test" in oid or "test" in salesman or "test" in notes:
+        return True
+    if oid.startswith(("ord-20260922-", "ord-20260923-", "ord-grace-test-")):
+        return True
+    return False
+
 class OrderRepository:
 
     @staticmethod
@@ -29,10 +40,11 @@ class OrderRepository:
         orders = []
         if client:
             try:
-                res = client.table("orders").select("*").order("created_at", desc=True).limit(limit).execute()
+                res = client.table("pending_orders").select("*").order("created_at", desc=True).limit(limit).execute()
                 if res.data:
-                    orders.extend(res.data)
-                    SnapshotService.record_successful_read("orders", res.data)
+                    clean_data = [o for o in res.data if not is_test_order(o)]
+                    orders.extend(clean_data)
+                    SnapshotService.record_successful_read("orders", clean_data)
             except Exception as err:
                 SnapshotService.record_db_failure("orders", err)
 
@@ -40,11 +52,13 @@ class OrderRepository:
         if not orders:
             snap = SnapshotService.get_last_known_snapshot("orders")
             if snap and snap.get("data"):
-                orders = list(snap["data"])
+                orders = [o for o in snap["data"] if not is_test_order(o)]
 
         # Add in-memory orders avoiding duplicates
         existing_ids = {o.get("id") or o.get("order_code") or o.get("order_id") for o in orders}
         for memo in _IN_MEMORY_ORDERS:
+            if is_test_order(memo):
+                continue
             m_id = memo.get("id") or memo.get("order_code") or memo.get("order_id")
             if m_id not in existing_ids:
                 orders.append(memo)

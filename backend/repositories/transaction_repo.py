@@ -19,6 +19,33 @@ def is_valid_uuid(val: Any) -> bool:
     except (ValueError, AttributeError):
         return False
 
+def is_test_transaction(row: Dict[str, Any]) -> bool:
+    p = row.get("products") or {}
+    if p.get("is_active") is False:
+        return True
+    sku = str(p.get("sku") or "").lower()
+    name = str(p.get("name") or "").lower()
+    notes = str(row.get("notes") or "").lower()
+    ref = str(row.get("client_reference") or row.get("reference_id") or "").lower()
+    actor = str(row.get("performed_by") or "").lower()
+
+    if any(k in sku for k in ["nlk-", "tst-", "rec-sku", "test-", "trigger-", "tx-probe", "sd-cr-1"]):
+        return True
+    if any(k in name for k in ["test", "debug product"]):
+        return True
+    if any(k in notes for k in [
+        "test dealer", "test client shop", "test supplier", "automated enum test",
+        "po-test", "ord-grace-test", "ord-20260922-", "ord-20260923-",
+        "initial sku stock setup for test", "initial sku stock setup for rec",
+        "initial sku stock setup for nlk", "test-ref-", "testing quantity", "sale test"
+    ]):
+        return True
+    if any(k in ref for k in ["test", "ord-20260922-", "ord-20260923-", "ord-grace-test-"]):
+        return True
+    if "test admin" in actor or "test" in actor:
+        return True
+    return False
+
 class TransactionRepository:
 
     @staticmethod
@@ -34,7 +61,7 @@ class TransactionRepository:
             try:
                 query = (
                     client.table("inventory_transactions")
-                    .select("id, transaction_type, product_id, location_id, quantity, unit_cost, reference_type, reference_id, client_reference, performed_by, transaction_date, notes, created_at, products(id, sku, name, brand, unit_of_measure)")
+                    .select("id, transaction_type, product_id, location_id, quantity, unit_cost, reference_type, reference_id, client_reference, performed_by, transaction_date, notes, created_at, products(id, sku, name, brand, unit_of_measure, is_active)")
                 )
                 if start_date:
                     sd = start_date if "T" in start_date else f"{start_date}T00:00:00+00:00"
@@ -57,7 +84,7 @@ class TransactionRepository:
 
                 res = query.order("transaction_date", desc=True).limit(limit).execute()
                 if res.data is not None:
-                    data = res.data
+                    data = [r for r in res.data if not is_test_transaction(r)]
                     if search and search.strip():
                         s_term = search.strip().lower()
                         filtered = []
