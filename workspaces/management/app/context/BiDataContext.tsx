@@ -8,6 +8,7 @@ import {
   BUSINESS_TIMEZONE,
   EARLIEST_DATA_DATE,
 } from '../utils/dateRange';
+import { useAnalyticsEvents } from '../hooks/useAnalyticsEvents';
 
 export type DataQualityStatus = 'LIVE' | 'SNAPSHOT' | 'UNAVAILABLE';
 
@@ -435,6 +436,18 @@ export const BiDataProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const invalidateAnalytics = useCallback(async (scope?: string) => {
     await fetchAllData(false);
   }, [fetchAllData]);
+
+  // ─── SSE Realtime Signal ────────────────────────────────────────────────────
+  // Subscribe to backend change events.  When the server fires `data-changed`,
+  // we trigger an authoritative re-fetch via invalidateAnalytics.  The hook
+  // handles debouncing and reconnect back-off internally.
+  useAnalyticsEvents({
+    onInvalidate: useCallback((_scope) => {
+      invalidateAnalytics();
+    }, [invalidateAnalytics]),
+    enabled: typeof document !== 'undefined',
+  });
+  // ────────────────────────────────────────────────────────────────────────────
 
   // Strict Authoritative Metrics
   const kpis: CoreKPIs = useMemo(() => biData.core_kpis || {}, [biData.core_kpis]);

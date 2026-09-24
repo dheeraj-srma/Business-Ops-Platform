@@ -16,6 +16,7 @@ from schemas.inventory_schemas import (
 )
 from services.inventory_service import InventoryService
 from services.snapshot_service import SnapshotService
+from services import realtime_bus
 from auth import require_role, require_permission
 
 logger = logging.getLogger("inventory_router")
@@ -47,7 +48,9 @@ def get_restock_plan(
 def bulk_restock(payload: dict):
     SnapshotService.assert_writable("bulk restock")
     try:
-        return InventoryService.bulk_restock(payload)
+        result = InventoryService.bulk_restock(payload)
+        realtime_bus.notify("inventory")
+        return result
     except Exception as exc:
         logger.error(f"Error processing bulk restock: {exc}")
         raise HTTPException(status_code=400, detail=str(exc))
@@ -201,7 +204,9 @@ def add_product(
 ):
     SnapshotService.assert_writable("add product")
     try:
-        return InventoryService.add_product(product)
+        result = InventoryService.add_product(product)
+        realtime_bus.notify("inventory")
+        return result
     except Exception as exc:
         logger.error(f"Error adding product: {exc}")
         raise HTTPException(status_code=400, detail=str(exc))
@@ -272,7 +277,7 @@ def adjust_inventory_stock(
             actor=current_user,
             location_id=payload.location_id
         )
-        return StockMutationResponse(
+        result = StockMutationResponse(
             status="success",
             product_id=res["product_id"],
             previous_quantity=res["previous_quantity"],
@@ -280,6 +285,8 @@ def adjust_inventory_stock(
             available_quantity=res["available_quantity"],
             timestamp=res["timestamp"]
         )
+        realtime_bus.notify("inventory")
+        return result
     except ValueError as ve:
         raise HTTPException(status_code=404, detail=str(ve))
     except Exception as exc:
@@ -326,6 +333,7 @@ def record_stock_inward(
             notes=payload.notes,
             actor=current_user
         )
+        realtime_bus.notify("inventory")
         return res
     except ValueError as ve:
         raise HTTPException(status_code=400, detail=str(ve))
@@ -368,6 +376,7 @@ def record_stock_outward(
             notes=payload.notes,
             actor=current_user
         )
+        realtime_bus.notify("inventory")
         return res
     except ValueError as ve:
         err_msg = str(ve)

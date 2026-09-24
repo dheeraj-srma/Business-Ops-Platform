@@ -1,8 +1,11 @@
 # backend/routers/analytics_router.py
+import asyncio
 import logging
 from typing import Dict, Any, Optional
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi.responses import StreamingResponse
 from services.analytics_service import analytics_service
+from services import realtime_bus
 
 logger = logging.getLogger("analytics_router")
 router = APIRouter(prefix="/api/analytics", tags=["Analytics & BI"])
@@ -310,5 +313,55 @@ def ai_insights_summary(
         logger.error(f"Error generating AI insights summary: {exc}")
         raise HTTPException(status_code=500, detail="Failed to generate AI insights summary.")
 
+# ─── Server-Sent Events: Analytics Invalidation Signal ──────────────────────
 
+@router.get(
+    "/events",
+    summary="Analytics realtime invalidation stream (SSE)",
+    description=(
+        "Long-lived Server-Sent Events endpoint.  The Management frontend "
+        "subscribes here and receives a `data-changed` event whenever an "
+        "operational mutation (order, inventory, returns) completes on the "
+        "backend.  The frontend then re-fetches authoritative analytics data "
+        "via GET /api/analytics/bi."
+    ),
+    tags=["Realtime"],
+)
+async def analytics_events(request: Request):
+    """
+    SSE stream that pushes analytics invalidation signals.
+
+    Protocol
+    --------
+    * Keepalive comment (': ka') every 25 s.
+    * `event: data-changed` with JSON `{scope, ts}` on mutation.
+    * Closes cleanly when the client disconnects.
+    """
+    q = realtime_bus.subscribe()
+
+    async def event_generator():
+        try:
+            # Initial connection acknowledgement
+            yield ": connected\n\n"
+            while True:
+                if await request.is_disconnected():
+                    break
+                try:
+                    # Wait up to 25 s for a payload; send keepalive if nothing arrives
+                    payload = await asyncio.wait_for(q.get(), timeout=25.0)
+                    yield f"event: data-changed\ndata: {payload}\n\n"
+                except asyncio.TimeoutError:
+                    # SSE keepalive comment – prevents proxy/Vercel from closing idle connection
+                    yield ": ka\n\n"
+        finally:
+            realtime_bus.unsubscribe(q)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",   # disable nginx/Render proxy buffering
+        },
+    )
 

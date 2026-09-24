@@ -28,6 +28,7 @@ from schemas.order_workflow_schemas import (
 from services.order_service import OrderService
 from services.order_read_service import OrderReadService
 from services.snapshot_service import SnapshotService
+from services import realtime_bus
 from auth import require_role, require_permission
 
 logger = logging.getLogger("order_router")
@@ -46,7 +47,7 @@ def reserve_order(
     SnapshotService.assert_writable("order reservation")
     try:
         res = OrderService.reserve_order(payload, current_user)
-        return OrderReservationResponse(
+        result = OrderReservationResponse(
             status=res["status"],
             order_id=res["order_id"],
             client_reference=res.get("client_reference"),
@@ -55,6 +56,8 @@ def reserve_order(
             idempotent=res.get("idempotent", False),
             timestamp=res["timestamp"]
         )
+        realtime_bus.notify("orders")
+        return result
     except ValueError as val_err:
         err_msg = str(val_err)
         if "INSUFFICIENT_STOCK" in err_msg:
@@ -147,7 +150,9 @@ def confirm_order_preview(payload: dict):
     if not order_id:
         raise HTTPException(status_code=400, detail="Missing orderId")
     try:
-        return OrderService.confirm_order_preview(order_id, resolved_items, metadata)
+        result = OrderService.confirm_order_preview(order_id, resolved_items, metadata)
+        realtime_bus.notify("orders")
+        return result
     except Exception as exc:
         logger.error(f"Error confirming order '{order_id}': {exc}")
         raise HTTPException(status_code=500, detail=str(exc))
@@ -160,7 +165,9 @@ def reject_order_preview(payload: dict):
     if not order_id:
         raise HTTPException(status_code=400, detail="Missing orderId")
     try:
-        return OrderService.reject_order_preview(order_id, reason)
+        result = OrderService.reject_order_preview(order_id, reason)
+        realtime_bus.notify("orders")
+        return result
     except Exception as exc:
         logger.error(f"Error rejecting order '{order_id}': {exc}")
         raise HTTPException(status_code=500, detail=str(exc))
@@ -172,7 +179,9 @@ def reopen_order_preview(payload: dict):
     if not order_id:
         raise HTTPException(status_code=400, detail="Missing orderId")
     try:
-        return OrderService.reopen_order_preview(order_id)
+        result = OrderService.reopen_order_preview(order_id)
+        realtime_bus.notify("orders")
+        return result
     except Exception as exc:
         logger.error(f"Error reopening order '{order_id}': {exc}")
         raise HTTPException(status_code=500, detail=str(exc))
@@ -185,7 +194,9 @@ def rollback_reject_preview(payload: dict):
     if not order_id:
         raise HTTPException(status_code=400, detail="Missing orderId")
     try:
-        return OrderService.rollback_reject_preview(order_id, reason)
+        result = OrderService.rollback_reject_preview(order_id, reason)
+        realtime_bus.notify("orders")
+        return result
     except Exception as exc:
         logger.error(f"Error rolling back order '{order_id}': {exc}")
         raise HTTPException(status_code=500, detail=str(exc))
@@ -200,6 +211,7 @@ def update_pending_preview(payload: dict):
         raise HTTPException(status_code=400, detail="Missing orderId")
     try:
         res = OrderService.update_order(order_id, payload, current_user={"role": "admin"})
+        realtime_bus.notify("orders")
         return {"success": True, "updatedOrder": res}
     except Exception as exc:
         logger.error(f"Error updating order '{order_id}': {exc}")
@@ -334,7 +346,9 @@ def create_order(
 ):
     SnapshotService.assert_writable("order creation")
     try:
-        return OrderService.create_single_order(order, current_user)
+        result = OrderService.create_single_order(order, current_user)
+        realtime_bus.notify("orders")
+        return result
     except Exception as exc:
         logger.error(f"Error creating order: {exc}")
         raise HTTPException(status_code=400, detail=str(exc))
@@ -346,7 +360,9 @@ def create_bulk_order(
 ):
     SnapshotService.assert_writable("bulk order creation")
     try:
-        return OrderService.create_bulk_order(payload, current_user)
+        result = OrderService.create_bulk_order(payload, current_user)
+        realtime_bus.notify("orders")
+        return result
     except Exception as exc:
         logger.error(f"Error creating bulk order: {exc}")
         raise HTTPException(status_code=400, detail=str(exc))
@@ -358,7 +374,9 @@ def approve_order(
 ):
     SnapshotService.assert_writable("order approval")
     try:
-        return OrderService.approve_order(order_id)
+        result = OrderService.approve_order(order_id)
+        realtime_bus.notify("orders")
+        return result
     except Exception as exc:
         logger.error(f"Error approving order: {exc}")
         raise HTTPException(status_code=400, detail=str(exc))
@@ -377,7 +395,7 @@ def process_order(
     SnapshotService.assert_writable("order processing")
     try:
         res = OrderService.process_order(order_id, payload, current_user)
-        return OrderProcessResponse(
+        result = OrderProcessResponse(
             status=res["status"],
             order_id=res["order_id"],
             previous_status=res["previous_status"],
@@ -387,6 +405,8 @@ def process_order(
             idempotent=res.get("idempotent", False),
             timestamp=res["timestamp"]
         )
+        realtime_bus.notify("orders")
+        return result
     except ValueError as val_err:
         err_msg = str(val_err)
         if "INSUFFICIENT_PHYSICAL_STOCK" in err_msg or "Cannot process" in err_msg:
@@ -406,7 +426,7 @@ def dispatch_order(
     SnapshotService.assert_writable("order dispatch")
     try:
         res = OrderService.process_order(order_id, current_user=current_user)
-        return OrderProcessResponse(
+        result = OrderProcessResponse(
             status=res["status"],
             order_id=res["order_id"],
             previous_status=res["previous_status"],
@@ -416,6 +436,8 @@ def dispatch_order(
             idempotent=res.get("idempotent", False),
             timestamp=res["timestamp"]
         )
+        realtime_bus.notify("orders")
+        return result
     except ValueError as val_err:
         err_msg = str(val_err)
         if "INSUFFICIENT_PHYSICAL_STOCK" in err_msg or "Cannot process" in err_msg:
@@ -439,7 +461,9 @@ def transition_order_status(
     if not target_status:
         raise HTTPException(status_code=400, detail="Missing required field 'target_status'")
     try:
-        return OrderService.transition_order_status(order_id, target_status, actor=current_user, reason=reason)
+        result = OrderService.transition_order_status(order_id, target_status, actor=current_user, reason=reason)
+        realtime_bus.notify("orders")
+        return result
     except ValueError as val_err:
         raise HTTPException(status_code=400, detail=str(val_err))
     except Exception as exc:

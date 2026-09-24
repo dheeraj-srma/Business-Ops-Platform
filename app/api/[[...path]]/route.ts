@@ -53,10 +53,38 @@ async function handler(
     }
 
     const res = await fetch(targetUrl, init);
+
+    const contentType = res.headers.get('content-type') || '';
+
+    // ── SSE / streaming passthrough ──────────────────────────────────────────
+    // For Server-Sent Events we MUST NOT buffer with res.text(); instead pipe
+    // the ReadableStream body directly so the client receives events as they
+    // arrive.
+    if (contentType.includes('text/event-stream') && res.body) {
+      const streamHeaders: Record<string, string> = {
+        'content-type': 'text/event-stream',
+        'cache-control': 'no-cache, no-transform',
+        'x-accel-buffering': 'no',
+        'connection': 'keep-alive',
+      };
+
+      // Forward tracing headers
+      for (const h of ['x-database-mode', 'x-correlation-id']) {
+        const val = res.headers.get(h);
+        if (val) streamHeaders[h] = val;
+      }
+
+      return new NextResponse(res.body as unknown as ReadableStream, {
+        status: res.status,
+        headers: streamHeaders,
+      });
+    }
+    // ── Normal buffered response ──────────────────────────────────────────────
+
     const data = await res.text();
 
     const responseHeaders: Record<string, string> = {
-      'content-type': res.headers.get('content-type') || 'application/json',
+      'content-type': contentType || 'application/json',
       'cache-control': 'no-store',
     };
 
