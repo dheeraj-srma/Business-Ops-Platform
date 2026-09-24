@@ -235,18 +235,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     onClick={() => handleItemClick(item.id)}
                     title={collapsed ? item.label : undefined}
                     className={cn(
-                      'w-full flex items-center rounded-lg text-xs font-medium transition-all duration-150 text-left cursor-pointer group relative border overflow-hidden whitespace-nowrap',
-                      collapsed ? 'justify-center p-2.5' : 'justify-between px-3 py-2.5',
+                      'w-full flex items-center rounded-xl text-xs font-medium transition-colors duration-150 text-left cursor-pointer group relative overflow-hidden whitespace-nowrap',
+                      collapsed ? 'justify-center p-2.5 my-0.5' : 'justify-between px-3 py-2 my-0.5',
                       isActive
-                        ? 'bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 font-semibold border-indigo-200 dark:border-indigo-800/60 shadow-xs'
-                        : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/70 hover:text-slate-900 dark:hover:text-slate-200 border-transparent'
+                        ? 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-semibold'
+                        : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100/80 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-slate-100'
                     )}
                   >
-                    <div className={cn('flex items-center min-w-0 overflow-hidden whitespace-nowrap', collapsed ? 'justify-center' : 'gap-3')}>
+                    <div className={cn('flex items-center min-w-0 overflow-hidden whitespace-nowrap', collapsed ? 'justify-center' : 'gap-2.5')}>
                       <Icon
                         className={cn(
-                          'w-4 h-4 shrink-0 transition-transform duration-150 group-hover:scale-110',
-                          isActive ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400 dark:text-slate-500 group-hover:text-slate-700 dark:group-hover:text-slate-300'
+                          'w-4 h-4 shrink-0 transition-transform duration-150 group-hover:scale-105',
+                          isActive ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-500 dark:text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-200'
                         )}
                       />
                       {!collapsed && <span className="truncate whitespace-nowrap">{item.label}</span>}
@@ -255,8 +255,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     {!collapsed && item.badge && (
                       <span
                         className={cn(
-                          'px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase tracking-wider shrink-0 ml-1.5 whitespace-nowrap',
-                          item.badgeColor || 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300'
+                          'px-1.5 py-0.5 rounded-md text-[9px] font-extrabold uppercase tracking-wider shrink-0 ml-1.5 whitespace-nowrap',
+                          isActive
+                            ? 'bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300'
+                            : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
                         )}
                       >
                         {item.badge}

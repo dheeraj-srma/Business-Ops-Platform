@@ -25,7 +25,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         return saved;
       }
     } catch {}
-    return 'light'; // Default to polished light theme
+    return 'dark'; // Dark theme is authoritative default for management BI platform
   });
 
   const [isDark, setIsDark] = useState<boolean>(true);

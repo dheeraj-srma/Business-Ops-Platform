@@ -462,39 +462,39 @@ export default function AIDecisionIntelligence({
       
       {/* ─── AI EXECUTIVE BRIEF ──────────────────────────────────────────────── */}
       <div className="panel" style={{ 
-        background: 'linear-gradient(135deg, rgba(19,27,46,0.85) 0%, rgba(15,23,42,0.95) 100%)',
-        border: '1px solid rgba(59, 130, 246, 0.25)', 
-        borderLeft: '5px solid #3b82f6',
+        background: 'var(--surface-executive, var(--surface))',
+        border: '1px solid var(--border)', 
+        borderLeft: '5px solid #4f46e5',
         padding: '1.5rem',
         boxSizing: 'border-box'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '0.75rem' }}>
-          <Sparkles className="text-accent" size={22} style={{ filter: 'drop-shadow(0 0 8px rgba(59,130,246,0.6))' }} />
-          <h2 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#f8fafc', letterSpacing: '-0.01em' }}>
+          <Sparkles className="text-accent" size={22} />
+          <h2 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.01em', margin: 0 }}>
             Nalka Metals Operations Brief
           </h2>
-          <span style={{ fontSize: '0.72rem', background: 'rgba(59,130,246,0.15)', color: '#6366f1', padding: '2px 8px', borderRadius: '4px', marginLeft: 'auto', fontWeight: 700 }}>
+          <span style={{ fontSize: '0.72rem', background: 'rgba(79, 70, 229, 0.12)', color: '#6366f1', padding: '3px 10px', borderRadius: '6px', marginLeft: 'auto', fontWeight: 700, border: '1px solid rgba(79, 70, 229, 0.25)' }}>
             STATSFORECAST ACTIVE
           </span>
         </div>
         
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem', marginTop: '0.75rem' }}>
           <div>
-            <h4 style={{ fontSize: '0.82rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            <h4 style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
               Risk Assessment Summary
             </h4>
             <ul style={{ listStyle: 'none', padding: 0, margin: '8px 0 0 0', display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.8rem' }}>
               <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: simulatedMetrics.criticalAlerts > 0 ? '#ef4444' : '#10b981' }} />
                 <span style={{ color: 'var(--text-muted)' }}>Depletion Horizon:</span>
-                <strong style={{ color: simulatedMetrics.criticalAlerts > 0 ? '#f87171' : '#f8fafc' }}>
+                <strong style={{ color: simulatedMetrics.criticalAlerts > 0 ? '#ef4444' : 'var(--text-primary)' }}>
                   {simulatedMetrics.criticalAlerts} critical stockout risks detected
                 </strong>
               </li>
               <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: simulatedMetrics.safetyViolations > 0 ? '#f59e0b' : '#10b981' }} />
                 <span style={{ color: 'var(--text-muted)' }}>Safety Margins:</span>
-                <strong style={{ color: '#f8fafc' }}>
+                <strong style={{ color: 'var(--text-primary)' }}>
                   {simulatedMetrics.safetyViolations} SKUs running below safety buffers
                 </strong>
               </li>
@@ -502,7 +502,7 @@ export default function AIDecisionIntelligence({
           </div>
 
           <div>
-            <h4 style={{ fontSize: '0.82rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            <h4 style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
               Actionable Priorities
             </h4>
             <ol style={{ padding: '0 0 0 16px', margin: '8px 0 0 0', display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
@@ -601,7 +601,7 @@ export default function AIDecisionIntelligence({
 
         {/* Dynamic Simulation Metrics KPI card */}
         <div className="panel" style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', padding: '1.25rem', boxSizing: 'border-box' }}>
-          <div className="panel-title" style={{ color: 'var(--text)', fontSize: '0.96rem', fontWeight: 700 }}>
+          <div className="panel-title" style={{ color: 'var(--text-primary)', fontSize: '0.96rem', fontWeight: 700 }}>
             <span>Simulated System Health Summary</span>
           </div>
           <p style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>
@@ -609,28 +609,28 @@ export default function AIDecisionIntelligence({
           </p>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginTop: '0.5rem' }}>
-            <div style={{ padding: '0.85rem', background: 'rgba(15,23,42,0.4)', borderRadius: '8px', border: '1px solid var(--border)' }}>
-              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Depleted Stockouts</div>
+            <div className="bg-slate-50 dark:bg-slate-950/40 p-3.5 rounded-lg border border-slate-200 dark:border-slate-800">
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>Depleted Stockouts</div>
               <div style={{ fontSize: '1.5rem', fontWeight: 800, color: simulatedMetrics.criticalAlerts > 0 ? '#ef4444' : '#10b981', marginTop: '2px' }}>
                 {simulatedMetrics.criticalAlerts} SKUs
               </div>
-              <div style={{ fontSize: '0.68rem', color: 'var(--text-subtle)', marginTop: '4px' }}>
+              <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '4px' }}>
                 At critical stock risk
               </div>
             </div>
 
-            <div style={{ padding: '0.85rem', background: 'rgba(15,23,42,0.4)', borderRadius: '8px', border: '1px solid var(--border)' }}>
-              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Buffer Violations</div>
+            <div className="bg-slate-50 dark:bg-slate-950/40 p-3.5 rounded-lg border border-slate-200 dark:border-slate-800">
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>Buffer Violations</div>
               <div style={{ fontSize: '1.5rem', fontWeight: 800, color: simulatedMetrics.safetyViolations > 0 ? '#f59e0b' : '#10b981', marginTop: '2px' }}>
                 {simulatedMetrics.safetyViolations} SKUs
               </div>
-              <div style={{ fontSize: '0.68rem', color: 'var(--text-subtle)', marginTop: '4px' }}>
+              <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '4px' }}>
                 Below safety margins
               </div>
             </div>
           </div>
 
-          <div style={{ padding: '10px 14px', borderRadius: '6px', background: 'rgba(99, 102, 241, 0.06)', border: '1px solid rgba(99, 102, 241, 0.15)', fontSize: '0.75rem', color: '#60a5fa', marginTop: 'auto' }}>
+          <div className="p-2.5 rounded-md bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-800/40 text-xs text-indigo-700 dark:text-indigo-400 mt-auto">
             {simulatedMetrics.criticalAlerts > 0 ? (
               <strong>Caution: Simulated variables create replenishment gaps. Consider safety buffer increase.</strong>
             ) : (
@@ -657,18 +657,18 @@ export default function AIDecisionIntelligence({
             
             // Severity Styles
             let headerStyle = { borderLeft: '4px solid #ef4444', background: 'rgba(239, 68, 68, 0.04)' };
-            let badgeStyle = { color: '#f87171', background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.2)' };
-            const titleColor = '#f8fafc';
+            let badgeStyle = { color: '#dc2626', background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.2)' };
+            const titleColor = 'var(--text-primary)';
             
             if (insight.severity === 'WARNING') {
               headerStyle = { borderLeft: '4px solid #f59e0b', background: 'rgba(245, 158, 11, 0.04)' };
-              badgeStyle = { color: '#fbbf24', background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.2)' };
+              badgeStyle = { color: '#d97706', background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.2)' };
             } else if (insight.severity === 'OPPORTUNITY') {
               headerStyle = { borderLeft: '4px solid #6366f1', background: 'rgba(99, 102, 241, 0.04)' };
-              badgeStyle = { color: '#6366f1', background: 'rgba(99, 102, 241, 0.12)', border: '1px solid rgba(99, 102, 241, 0.2)' };
+              badgeStyle = { color: '#4f46e5', background: 'rgba(99, 102, 241, 0.12)', border: '1px solid rgba(99, 102, 241, 0.2)' };
             } else if (insight.severity === 'POSITIVE') {
               headerStyle = { borderLeft: '4px solid #10b981', background: 'rgba(16, 185, 129, 0.04)' };
-              badgeStyle = { color: '#34d399', background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.2)' };
+              badgeStyle = { color: '#059669', background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.2)' };
             }
 
             return (
@@ -711,7 +711,7 @@ export default function AIDecisionIntelligence({
                   </div>
                   
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginLeft: 'auto' }}>
-                    <span className="mono" style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text)' }}>
+                    <span className="mono" style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-primary)' }}>
                       {insight.metric}
                     </span>
                     <span style={{ color: 'var(--text-muted)', transform: isExpanded ? 'rotate(90deg)' : 'none', transition: 'transform 0.2s', fontSize: '10px' }}>
@@ -722,9 +722,8 @@ export default function AIDecisionIntelligence({
 
                 {/* Collapsible Details Body */}
                 {isExpanded && (
-                  <div style={{ 
+                  <div className="bg-slate-50 dark:bg-slate-950/90" style={{ 
                     padding: '1.25rem',
-                    background: 'rgba(15,23,42,0.9)',
                     borderTop: '1px solid var(--border)',
                     fontSize: '0.8rem',
                     lineHeight: '1.5',
@@ -735,13 +734,13 @@ export default function AIDecisionIntelligence({
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.25rem' }}>
                       
                       <div>
-                        <strong style={{ color: '#94a3b8', fontSize: '0.74rem', textTransform: 'uppercase' }}>Observation</strong>
-                        <p style={{ marginTop: '2px', color: '#f1f5f9' }}>{insight.observation}</p>
+                        <strong style={{ color: 'var(--text-muted)', fontSize: '0.74rem', textTransform: 'uppercase' }}>Observation</strong>
+                        <p style={{ marginTop: '2px', color: 'var(--text-primary)' }}>{insight.observation}</p>
                       </div>
 
                       <div>
-                        <strong style={{ color: '#94a3b8', fontSize: '0.74rem', textTransform: 'uppercase' }}>Supporting Evidence</strong>
-                        <p style={{ marginTop: '2px', color: '#f1f5f9' }}>{insight.evidence}</p>
+                        <strong style={{ color: 'var(--text-muted)', fontSize: '0.74rem', textTransform: 'uppercase' }}>Supporting Evidence</strong>
+                        <p style={{ marginTop: '2px', color: 'var(--text-primary)' }}>{insight.evidence}</p>
                       </div>
 
                     </div>
@@ -749,12 +748,12 @@ export default function AIDecisionIntelligence({
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.25rem' }}>
                       
                       <div>
-                        <strong style={{ color: '#94a3b8', fontSize: '0.74rem', textTransform: 'uppercase' }}>Financial/Operational Impact</strong>
-                        <p style={{ marginTop: '2px', color: '#f1f5f9' }}>{insight.impact}</p>
+                        <strong style={{ color: 'var(--text-muted)', fontSize: '0.74rem', textTransform: 'uppercase' }}>Financial/Operational Impact</strong>
+                        <p style={{ marginTop: '2px', color: 'var(--text-primary)' }}>{insight.impact}</p>
                       </div>
 
                       <div>
-                        <strong style={{ color: '#94a3b8', fontSize: '0.74rem', textTransform: 'uppercase' }}>AI Recommendation</strong>
+                        <strong style={{ color: 'var(--text-muted)', fontSize: '0.74rem', textTransform: 'uppercase' }}>AI Recommendation</strong>
                         <p style={{ marginTop: '2px', color: '#10b981', fontWeight: 600 }}>{insight.recommendation}</p>
                       </div>
 
@@ -764,7 +763,7 @@ export default function AIDecisionIntelligence({
                       display: 'flex', 
                       justifyContent: 'flex-end', 
                       gap: '8px', 
-                      borderTop: '1px solid rgba(255,255,255,0.05)', 
+                      borderTop: '1px solid var(--border)', 
                       paddingTop: '0.85rem',
                       marginTop: '0.5rem'
                     }}>
@@ -793,7 +792,7 @@ export default function AIDecisionIntelligence({
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Timer size={22} className="text-accent" />
             <div>
-              <h2 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#f8fafc', letterSpacing: '-0.01em', margin: 0 }}>
+              <h2 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.01em', margin: 0 }}>
                 Forecasting & Operations Planning Center
               </h2>
               <p style={{ fontSize: '0.76rem', color: 'var(--text-muted)', margin: '2px 0 0 0' }}>
@@ -801,7 +800,7 @@ export default function AIDecisionIntelligence({
               </p>
             </div>
           </div>
-          <span style={{ fontSize: '0.72rem', background: 'rgba(99,102,241,0.12)', color: '#818cf8', padding: '3px 10px', borderRadius: '6px', fontWeight: 700, border: '1px solid rgba(99,102,241,0.25)' }}>
+          <span style={{ fontSize: '0.72rem', background: 'rgba(99,102,241,0.12)', color: 'var(--accent, #6366f1)', padding: '3px 10px', borderRadius: '6px', fontWeight: 700, border: '1px solid rgba(99,102,241,0.25)' }}>
             4 FULL-WIDTH PLANNING FORECASTS
           </span>
         </div>
@@ -1044,33 +1043,14 @@ export default function AIDecisionIntelligence({
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
             {seasonalList.map((q: any, idx: number) => (
-              <div key={idx} style={{ 
-                padding: '0.85rem', 
-                background: 'rgba(15,23,42,0.4)', 
-                borderRadius: '8px', 
-                border: '1px solid var(--border)',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px'
-              }}>
-                <div style={{ 
-                  width: '38px', 
-                  height: '38px', 
-                  borderRadius: '6px', 
-                  background: 'rgba(255,255,255,0.03)', 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'center',
-                  fontWeight: 800,
-                  fontSize: '0.8rem',
-                  color: q.color || '#6366f1'
-                }}>
+              <div key={idx} className="p-3.5 bg-slate-50 dark:bg-slate-950/40 rounded-lg border border-slate-200 dark:border-slate-800 flex items-center gap-3">
+                <div className="w-9.5 h-9.5 rounded-md bg-slate-200/60 dark:bg-white/5 flex items-center justify-center font-extrabold text-xs" style={{ color: q.color || '#6366f1' }}>
                   {q.multiplier}
                 </div>
                 
                 <div style={{ flex: 1 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <h4 style={{ fontSize: '0.8rem', fontWeight: 700 }}>{q.title}</h4>
+                    <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100 m-0">{q.title}</h4>
                     <span style={{ fontSize: '0.64rem', color: q.color || '#6366f1', fontWeight: 700 }}>{q.status}</span>
                   </div>
                   <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>{q.desc}</p>
@@ -1091,29 +1071,29 @@ export default function AIDecisionIntelligence({
           </p>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem', marginBottom: '1rem' }}>
-            <div style={{ padding: '0.85rem', background: 'rgba(15,23,42,0.4)', borderRadius: '6px', border: '1px solid var(--border)' }}>
-              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Holdout MAPE</div>
+            <div className="p-3.5 bg-slate-50 dark:bg-slate-950/40 rounded-lg border border-slate-200 dark:border-slate-800">
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>Holdout MAPE</div>
               <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#10b981', marginTop: '2px' }}>
                 {aiInsightsResponse?.backtest?.mape != null ? `${aiInsightsResponse.backtest.mape.toFixed(1)}%` : '55.9%'}
               </div>
-              <div style={{ fontSize: '0.68rem', color: 'var(--text-subtle)', marginTop: '4px' }}>
+              <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '4px' }}>
                 Mean Absolute Percentage Error
               </div>
             </div>
             
-            <div style={{ padding: '0.85rem', background: 'rgba(15,23,42,0.4)', borderRadius: '6px', border: '1px solid var(--border)' }}>
-              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Forecast Bias</div>
-              <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#6366f1', marginTop: '2px' }}>
+            <div className="p-3.5 bg-slate-50 dark:bg-slate-950/40 rounded-lg border border-slate-200 dark:border-slate-800">
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>Forecast Bias</div>
+              <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--accent, #6366f1)', marginTop: '2px' }}>
                 {aiInsightsResponse?.backtest?.bias != null ? `${aiInsightsResponse.backtest.bias > 0 ? '+' : ''}${aiInsightsResponse.backtest.bias.toFixed(1)}%` : '+12.2%'}
               </div>
-              <div style={{ fontSize: '0.68rem', color: 'var(--text-subtle)', marginTop: '4px' }}>
+              <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '4px' }}>
                 Holdout Prediction Direction
               </div>
             </div>
           </div>
 
-          <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', lineHeight: '1.4', background: 'rgba(255,255,255,0.02)', padding: '10px 14px', borderRadius: '6px', border: '1px solid var(--border-glass)', marginTop: 'auto' }}>
-            <div style={{ fontWeight: 700, color: 'var(--text)', marginBottom: '2px' }}>Validation Note:</div>
+          <div className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed bg-slate-50 dark:bg-white/5 p-3 rounded-md border border-slate-200 dark:border-slate-800 mt-auto">
+            <div style={{ fontWeight: 700, color: 'var(--text-primary)', marginBottom: '2px' }}>Validation Note:</div>
             Empirical 14-day holdout backtest evaluates StatsForecast AutoETS against actual transaction invoice totals on historical validation data.
           </div>
         </div>

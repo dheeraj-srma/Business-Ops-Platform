@@ -39,64 +39,64 @@ export default function DataFreshnessBadge({ className = '', showSelector = true
     <div className={`flex items-center gap-2.5 flex-wrap ${className}`}>
       {/* ── Status Pill ────────────────────────────────────────────── */}
       {loading ? (
-        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-slate-800 text-slate-400 border border-slate-700 animate-pulse">
-          <Clock size={12} className="animate-spin text-indigo-400" />
+        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 animate-pulse">
+          <Clock size={12} className="animate-spin text-indigo-600 dark:text-indigo-400" />
           <span>Synchronizing...</span>
         </div>
       ) : dataStatus === 'SNAPSHOT' ? (
-        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/30">
-          <Database size={12} className="text-amber-400" />
+        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-500/30">
+          <Database size={12} className="text-amber-600 dark:text-amber-400" />
           <span>READ-ONLY SNAPSHOT</span>
           {dataAsOf && (
-            <span className="text-[11px] text-amber-300">· Data through {formatDate(dataAsOf)}</span>
+            <span className="text-[11px] text-amber-800 dark:text-amber-300">· Data through {formatDate(dataAsOf)}</span>
           )}
           {snapshotUpdatedAt && (
-            <span className="text-[10px] text-amber-400/80">· Captured {snapshotUpdatedAt.slice(11, 19)}</span>
+            <span className="text-[10px] text-amber-700 dark:text-amber-400/80">· Captured {snapshotUpdatedAt.slice(11, 19)}</span>
           )}
         </div>
       ) : dataStatus === 'UNAVAILABLE' ? (
-        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/30">
-          <AlertTriangle size={12} className="text-rose-400" />
+        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-500/30">
+          <AlertTriangle size={12} className="text-rose-600 dark:text-rose-400" />
           <span>DATA UNAVAILABLE</span>
         </div>
       ) : (
-        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-          <CheckCircle2 size={12} className="text-emerald-400" />
+        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/30">
+          <CheckCircle2 size={12} className="text-emerald-600 dark:text-emerald-400" />
           <span>LIVE DATA</span>
           {isDataHistorical ? (
-            <span className="text-[11px] text-emerald-400/90">· Data through {formatDate(dataAsOf!)}</span>
+            <span className="text-[11px] text-emerald-800 dark:text-emerald-400/90">· Data through {formatDate(dataAsOf!)}</span>
           ) : (
-            <span className="text-[11px] text-emerald-400/90">· Today ({formatDate(referenceDate)})</span>
+            <span className="text-[11px] text-emerald-800 dark:text-emerald-400/90">· Today ({formatDate(referenceDate)})</span>
           )}
           {lastSyncedAt && (
-            <span className="text-[10px] text-slate-400 hidden sm:inline">· Synced {lastSyncedAt}</span>
+            <span className="text-[10px] text-slate-500 dark:text-slate-400 hidden sm:inline">· Synced {lastSyncedAt}</span>
           )}
         </div>
       )}
 
       {/* ── Global Date Range Selector ────────────────────────────── */}
       {showSelector && (
-        <div className="flex items-center gap-1.5 bg-slate-900 border border-slate-700/80 hover:border-slate-600 rounded-lg px-2 py-1 text-xs text-slate-200">
-          <Calendar size={12} className="text-indigo-400 shrink-0" />
+        <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 hover:border-slate-300 dark:hover:border-slate-600 rounded-xl px-2.5 py-1 text-xs text-slate-800 dark:text-slate-200 shadow-xs">
+          <Calendar size={13} className="text-indigo-600 dark:text-indigo-400 shrink-0" />
           <select
-            className="bg-transparent text-xs text-slate-200 outline-none cursor-pointer pr-1 font-medium"
+            className="bg-transparent text-xs text-slate-800 dark:text-slate-200 outline-none cursor-pointer pr-1 font-semibold"
             value={selectedRange}
             onChange={e => setSelectedRange(e.target.value as DateRangeType)}
           >
-            <option value="today" className="bg-slate-900 text-slate-200">Today</option>
-            <option value="yesterday" className="bg-slate-900 text-slate-200">Yesterday</option>
-            <option value="7d" className="bg-slate-900 text-slate-200">Last 7 Days</option>
-            <option value="this_week" className="bg-slate-900 text-slate-200">This Week</option>
-            <option value="this_month" className="bg-slate-900 text-slate-200">This Month</option>
-            <option value="last_month" className="bg-slate-900 text-slate-200">Last Month</option>
-            <option value="30d" className="bg-slate-900 text-slate-200">Last 30 Days</option>
-            <option value="60d" className="bg-slate-900 text-slate-200">Last 60 Days</option>
-            <option value="90d" className="bg-slate-900 text-slate-200">Last 90 Days</option>
-            <option value="this_quarter" className="bg-slate-900 text-slate-200">This Quarter</option>
-            <option value="ytd" className="bg-slate-900 text-slate-200">Year-to-Date (YTD)</option>
-            <option value="12m" className="bg-slate-900 text-slate-200">Last 12 Months</option>
-            <option value="all" className="bg-slate-900 text-slate-200">All History</option>
-            <option value="custom" className="bg-slate-900 text-slate-200">Custom Range...</option>
+            <option value="today" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200">Today</option>
+            <option value="yesterday" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200">Yesterday</option>
+            <option value="7d" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200">Last 7 Days</option>
+            <option value="this_week" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200">This Week</option>
+            <option value="this_month" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200">This Month</option>
+            <option value="last_month" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200">Last Month</option>
+            <option value="30d" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200">Last 30 Days</option>
+            <option value="60d" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200">Last 60 Days</option>
+            <option value="90d" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200">Last 90 Days</option>
+            <option value="this_quarter" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200">This Quarter</option>
+            <option value="ytd" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200">Year-to-Date (YTD)</option>
+            <option value="12m" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200">Last 12 Months</option>
+            <option value="all" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200">All History</option>
+            <option value="custom" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200">Custom Range...</option>
           </select>
 
           {selectedRange === 'custom' && (
@@ -105,14 +105,14 @@ export default function DataFreshnessBadge({ className = '', showSelector = true
                 type="date"
                 value={customStart || activeBounds.start}
                 onChange={e => setSelectedRange('custom', e.target.value, customEnd || activeBounds.end)}
-                className="bg-slate-950 border border-slate-700 rounded px-1 py-0.5 text-slate-200 text-[10px]"
+                className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded px-1 py-0.5 text-slate-800 dark:text-slate-200 text-[10px]"
               />
               <span className="text-slate-500">to</span>
               <input
                 type="date"
                 value={customEnd || activeBounds.end}
                 onChange={e => setSelectedRange('custom', customStart || activeBounds.start, e.target.value)}
-                className="bg-slate-950 border border-slate-700 rounded px-1 py-0.5 text-slate-200 text-[10px]"
+                className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded px-1 py-0.5 text-slate-800 dark:text-slate-200 text-[10px]"
               />
             </div>
           )}
@@ -121,7 +121,7 @@ export default function DataFreshnessBadge({ className = '', showSelector = true
             onClick={() => refreshBiData()}
             disabled={loading}
             title="Refresh analytics data"
-            className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-slate-200 transition-colors ml-0.5 cursor-pointer disabled:opacity-50"
+            className="p-1 hover:bg-slate-200 dark:hover:bg-slate-800 rounded text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200 transition-colors ml-0.5 cursor-pointer disabled:opacity-50"
           >
             <RefreshCw size={11} className={loading ? 'animate-spin' : ''} />
           </button>

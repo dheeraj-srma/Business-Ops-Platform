@@ -310,19 +310,19 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6 pb-12">
       {/* ── Top Hero Banner: Executive Business Intelligence ───────────── */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-xl relative overflow-hidden">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-xs dark:shadow-xl relative overflow-hidden">
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2 mb-1 flex-wrap">
+            <div className="flex items-center gap-2 mb-1.5 flex-wrap">
               <DataFreshnessBadge />
-              <span className="text-xs text-slate-400 font-mono">
+              <span className="text-xs text-slate-500 dark:text-slate-400 font-mono">
                 {kpis.total_orders || 0} Orders Logged • {kpis.active_dealers || 0} Verified Accounts
               </span>
             </div>
-            <h1 className="text-xl sm:text-2xl font-extrabold text-white tracking-tight">
+            <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">
               Executive BI Dashboard
             </h1>
-            <p className="text-xs sm:text-sm text-slate-400 mt-1 max-w-2xl leading-relaxed">
+            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1 max-w-2xl leading-relaxed">
               Authoritative sales, inventory valuation, dispatches, and customer network telemetry.
             </p>
           </div>
@@ -330,14 +330,14 @@ export default function DashboardPage() {
           <div className="flex items-center gap-3 shrink-0">
             <Link
               href="/management/sales"
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 dark:bg-indigo-500 hover:bg-indigo-500 text-slate-950 font-bold text-xs shadow-lg shadow-indigo-500/20 transition-all cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 text-white font-bold text-xs shadow-md shadow-indigo-600/20 transition-all cursor-pointer"
             >
               <span>View Sales</span>
               <ArrowUpRight className="w-3.5 h-3.5" />
             </Link>
             <Link
               href="/management/dealers"
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs border border-slate-700 transition-all cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-semibold text-xs border border-slate-200 dark:border-slate-700 shadow-xs transition-all cursor-pointer"
             >
               <span>View Customers</span>
             </Link>
@@ -350,13 +350,13 @@ export default function DashboardPage() {
         {/* Gross Revenue */}
         <div
           onClick={() => setSelectedKpi(kpiDataMap.revenue)}
-          className="bg-white dark:bg-slate-900/40 hover:bg-slate-50 dark:hover:bg-slate-800/50 border border-slate-200 dark:border-slate-700/40 hover:border-slate-300 dark:hover:border-slate-500/50 rounded-2xl p-5 shadow-xs dark:shadow-none relative overflow-hidden group cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-indigo-950/20 active:scale-[0.99]"
+          className="bg-white dark:bg-slate-900/40 hover:bg-slate-50 dark:hover:bg-slate-800/50 border border-slate-200 dark:border-slate-700/40 hover:border-slate-300 dark:hover:border-slate-500/50 rounded-2xl p-5 shadow-xs dark:shadow-none relative overflow-hidden group cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md active:scale-[0.99]"
         >
           <div className="flex items-center justify-between text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2.5">
             <span className="tracking-wider text-[11px] font-bold text-slate-500 dark:text-slate-400 group-hover:text-slate-900 dark:group-hover:text-slate-200 transition-colors">
               TOTAL SALES
             </span>
-            <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/50 flex items-center justify-center text-slate-600 dark:text-slate-300 group-hover:text-sky-600 dark:group-hover:text-sky-400 group-hover:border-sky-300 dark:group-hover:border-sky-500/30 group-hover:bg-sky-50 dark:group-hover:bg-sky-500/10 transition-all duration-200">
+            <div className="w-8 h-8 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/50 flex items-center justify-center text-slate-600 dark:text-slate-300 group-hover:text-sky-600 dark:group-hover:text-sky-400 group-hover:border-sky-300 dark:group-hover:border-sky-500/30 group-hover:bg-sky-50 dark:group-hover:bg-sky-500/10 transition-all duration-200">
               <TrendingUp size={15} />
             </div>
           </div>
@@ -372,13 +372,13 @@ export default function DashboardPage() {
         {/* Inventory Asset Value */}
         <div
           onClick={() => setSelectedKpi(kpiDataMap.inventory)}
-          className="bg-white dark:bg-slate-900/40 hover:bg-slate-50 dark:hover:bg-slate-800/50 border border-slate-200 dark:border-slate-700/40 hover:border-slate-300 dark:hover:border-slate-500/50 rounded-2xl p-5 shadow-xs dark:shadow-none relative overflow-hidden group cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-indigo-950/20 active:scale-[0.99]"
+          className="bg-white dark:bg-slate-900/40 hover:bg-slate-50 dark:hover:bg-slate-800/50 border border-slate-200 dark:border-slate-700/40 hover:border-slate-300 dark:hover:border-slate-500/50 rounded-2xl p-5 shadow-xs dark:shadow-none relative overflow-hidden group cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md active:scale-[0.99]"
         >
           <div className="flex items-center justify-between text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2.5">
             <span className="tracking-wider text-[11px] font-bold text-slate-500 dark:text-slate-400 group-hover:text-slate-900 dark:group-hover:text-slate-200 transition-colors">
               INVENTORY VALUE
             </span>
-            <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/50 flex items-center justify-center text-slate-600 dark:text-slate-300 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 group-hover:border-indigo-300 dark:group-hover:border-indigo-800/60 group-hover:bg-indigo-50 dark:group-hover:bg-indigo-950/40 transition-all duration-200">
+            <div className="w-8 h-8 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/50 flex items-center justify-center text-slate-600 dark:text-slate-300 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 group-hover:border-indigo-300 dark:group-hover:border-indigo-800/60 group-hover:bg-indigo-50 dark:group-hover:bg-indigo-950/40 transition-all duration-200">
               <CircleDollarSign size={15} />
             </div>
           </div>
@@ -393,13 +393,13 @@ export default function DashboardPage() {
         {/* Procurement Spend */}
         <div
           onClick={() => setSelectedKpi(kpiDataMap.purchase)}
-          className="bg-white dark:bg-slate-900/40 hover:bg-slate-50 dark:hover:bg-slate-800/50 border border-slate-200 dark:border-slate-700/40 hover:border-slate-300 dark:hover:border-slate-500/50 rounded-2xl p-5 shadow-xs dark:shadow-none relative overflow-hidden group cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-indigo-950/20 active:scale-[0.99]"
+          className="bg-white dark:bg-slate-900/40 hover:bg-slate-50 dark:hover:bg-slate-800/50 border border-slate-200 dark:border-slate-700/40 hover:border-slate-300 dark:hover:border-slate-500/50 rounded-2xl p-5 shadow-xs dark:shadow-none relative overflow-hidden group cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md active:scale-[0.99]"
         >
           <div className="flex items-center justify-between text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2.5">
             <span className="tracking-wider text-[11px] font-bold text-slate-500 dark:text-slate-400 group-hover:text-slate-900 dark:group-hover:text-slate-200 transition-colors">
               PURCHASES
             </span>
-            <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/50 flex items-center justify-center text-slate-600 dark:text-slate-300 group-hover:text-amber-600 dark:group-hover:text-amber-400 group-hover:border-amber-300 dark:group-hover:border-amber-500/30 group-hover:bg-amber-50 dark:group-hover:bg-amber-500/10 transition-all duration-200">
+            <div className="w-8 h-8 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/50 flex items-center justify-center text-slate-600 dark:text-slate-300 group-hover:text-amber-600 dark:group-hover:text-amber-400 group-hover:border-amber-300 dark:group-hover:border-amber-500/30 group-hover:bg-amber-50 dark:group-hover:bg-amber-500/10 transition-all duration-200">
               <Truck size={15} />
             </div>
           </div>
@@ -414,13 +414,13 @@ export default function DashboardPage() {
         {/* Customer Network */}
         <div
           onClick={() => setSelectedKpi(kpiDataMap.customers)}
-          className="bg-white dark:bg-slate-900/40 hover:bg-slate-50 dark:hover:bg-slate-800/50 border border-slate-200 dark:border-slate-700/40 hover:border-slate-300 dark:hover:border-slate-500/50 rounded-2xl p-5 shadow-xs dark:shadow-none relative overflow-hidden group cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-indigo-950/20 active:scale-[0.99]"
+          className="bg-white dark:bg-slate-900/40 hover:bg-slate-50 dark:hover:bg-slate-800/50 border border-slate-200 dark:border-slate-700/40 hover:border-slate-300 dark:hover:border-slate-500/50 rounded-2xl p-5 shadow-xs dark:shadow-none relative overflow-hidden group cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md active:scale-[0.99]"
         >
           <div className="flex items-center justify-between text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2.5">
             <span className="tracking-wider text-[11px] font-bold text-slate-500 dark:text-slate-400 group-hover:text-slate-900 dark:group-hover:text-slate-200 transition-colors">
               CUSTOMERS
             </span>
-            <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/50 flex items-center justify-center text-slate-600 dark:text-slate-300 group-hover:text-purple-600 dark:group-hover:text-purple-400 group-hover:border-purple-300 dark:group-hover:border-purple-500/30 group-hover:bg-purple-50 dark:group-hover:bg-purple-500/10 transition-all duration-200">
+            <div className="w-8 h-8 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/50 flex items-center justify-center text-slate-600 dark:text-slate-300 group-hover:text-purple-600 dark:group-hover:text-purple-400 group-hover:border-purple-300 dark:group-hover:border-purple-500/30 group-hover:bg-purple-50 dark:group-hover:bg-purple-500/10 transition-all duration-200">
               <Store size={15} />
             </div>
           </div>
@@ -438,60 +438,61 @@ export default function DashboardPage() {
         {/* Gross Margin % */}
         <div
           onClick={() => setSelectedKpi(kpiDataMap.margin)}
-          className="p-3.5 sm:p-4 bg-slate-900/35 hover:bg-slate-800/45 border border-slate-700/40 hover:border-slate-500/50 rounded-xl shadow-2xs backdrop-blur-sm cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-slate-600/70 group active:scale-[0.99]"
+          className="p-3.5 sm:p-4 bg-white dark:bg-slate-900/60 hover:bg-slate-50 dark:hover:bg-slate-800/50 border border-slate-200 dark:border-slate-700/60 hover:border-slate-300 dark:hover:border-slate-600 rounded-xl shadow-xs dark:shadow-2xs cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md group active:scale-[0.99]"
         >
-          <div className="text-[10px] sm:text-[11px] font-semibold text-slate-400 uppercase tracking-wider group-hover:text-slate-200 transition-colors flex items-center justify-between">
+          <div className="text-[10px] sm:text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider group-hover:text-slate-800 dark:group-hover:text-slate-200 transition-colors flex items-center justify-between">
             <span>Gross Margin</span>
-            <span className="text-[9px] px-1 py-0.2 bg-rose-500/10 text-rose-400 rounded border border-rose-500/20 font-mono">UNAVAILABLE</span>
+            <span className="text-[9px] px-1.5 py-0.5 bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-400 rounded border border-rose-200 dark:border-rose-500/20 font-mono font-bold">UNAVAILABLE</span>
           </div>
-          <div className="text-lg sm:text-xl font-extrabold text-slate-400 mt-1 group-hover:text-slate-200 transition-colors">
+          <div className="text-lg sm:text-xl font-extrabold text-slate-500 dark:text-slate-400 mt-1 group-hover:text-slate-800 dark:group-hover:text-slate-200 transition-colors">
             N/A
           </div>
-          <div className="text-[10px] text-slate-500 mt-0.5">Landed COGS required</div>
+          <div className="text-[11px] text-slate-500 dark:text-slate-500 mt-0.5">Landed COGS required</div>
         </div>
 
         {/* Average Order Value */}
         <div
           onClick={() => setSelectedKpi(kpiDataMap.aov)}
-          className="p-3.5 sm:p-4 bg-slate-900/35 hover:bg-slate-800/45 border border-slate-700/40 hover:border-slate-500/50 rounded-xl shadow-2xs backdrop-blur-sm cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-slate-600/70 group active:scale-[0.99]"
+          className="p-3.5 sm:p-4 bg-white dark:bg-slate-900/60 hover:bg-slate-50 dark:hover:bg-slate-800/50 border border-slate-200 dark:border-slate-700/60 hover:border-slate-300 dark:hover:border-slate-600 rounded-xl shadow-xs dark:shadow-2xs cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md group active:scale-[0.99]"
         >
-          <div className="text-[10px] sm:text-[11px] font-semibold text-slate-400 uppercase tracking-wider group-hover:text-slate-200 transition-colors flex items-center justify-between">
+          <div className="text-[10px] sm:text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider group-hover:text-slate-800 dark:group-hover:text-slate-200 transition-colors flex items-center justify-between">
             <span>Average Voucher</span>
-            <span className="text-[9px] px-1 py-0.2 bg-sky-500/10 text-sky-400 rounded border border-sky-500/20 font-mono">ACTUAL</span>
+            <span className="text-[9px] px-1.5 py-0.5 bg-sky-50 dark:bg-sky-500/10 text-sky-700 dark:text-sky-400 rounded border border-sky-200 dark:border-sky-500/20 font-mono font-bold">ACTUAL</span>
           </div>
-          <div className="text-lg sm:text-xl font-extrabold text-white mt-1 group-hover:text-sky-300 transition-colors">
+          <div className="text-lg sm:text-xl font-extrabold text-slate-900 dark:text-white mt-1 group-hover:text-sky-600 dark:group-hover:text-sky-300 transition-colors">
             {kpiDataMap.aov.value}
           </div>
-          <div className="text-[10px] text-slate-400 mt-0.5">Mean ticket per voucher</div>
+          <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">Mean ticket per voucher</div>
         </div>
 
         {/* Asset Turnover Velocity */}
         <div
           onClick={() => setSelectedKpi(kpiDataMap.turnover)}
-          className="p-3.5 sm:p-4 bg-slate-900/35 hover:bg-slate-800/45 border border-slate-700/40 hover:border-slate-500/50 rounded-xl shadow-2xs backdrop-blur-sm cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-slate-600/70 group active:scale-[0.99]"
+          className="p-3.5 sm:p-4 bg-white dark:bg-slate-900/60 hover:bg-slate-50 dark:hover:bg-slate-800/50 border border-slate-200 dark:border-slate-700/60 hover:border-slate-300 dark:hover:border-slate-600 rounded-xl shadow-xs dark:shadow-2xs cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md group active:scale-[0.99]"
         >
-          <div className="text-[10px] sm:text-[11px] font-semibold text-slate-400 uppercase tracking-wider group-hover:text-slate-200 transition-colors flex items-center justify-between">
+          <div className="text-[10px] sm:text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider group-hover:text-slate-800 dark:group-hover:text-slate-200 transition-colors flex items-center justify-between">
             <span>Turnover Ratio</span>
-            <span className="text-[9px] px-1 py-0.2 bg-purple-500/10 text-purple-400 rounded border border-purple-500/20 font-mono">PURCH/INV</span>
+            <span className="text-[9px] px-1.5 py-0.5 bg-purple-50 dark:bg-purple-500/10 text-purple-700 dark:text-purple-400 rounded border border-purple-200 dark:border-purple-500/20 font-mono font-bold">PURCH/INV</span>
           </div>
-          <div className="text-lg sm:text-xl font-extrabold text-white mt-1 group-hover:text-purple-300 transition-colors">
+          <div className="text-lg sm:text-xl font-extrabold text-slate-900 dark:text-white mt-1 group-hover:text-purple-600 dark:group-hover:text-purple-300 transition-colors">
             {kpiDataMap.turnover.value}
           </div>
-          <div className="text-[10px] text-slate-400 mt-0.5">Purchases vs stock valuation</div>
+          <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">Purchases vs stock valuation</div>
         </div>
 
         {/* Fulfillment SLA */}
         <div
           onClick={() => setSelectedKpi(kpiDataMap.fulfillment)}
-          className="p-3.5 sm:p-4 bg-slate-900/35 hover:bg-slate-800/45 border border-slate-700/40 hover:border-slate-500/50 rounded-xl shadow-2xs backdrop-blur-sm cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-slate-600/70 group active:scale-[0.99]"
+          className="p-3.5 sm:p-4 bg-white dark:bg-slate-900/60 hover:bg-slate-50 dark:hover:bg-slate-800/50 border border-slate-200 dark:border-slate-700/60 hover:border-slate-300 dark:hover:border-slate-600 rounded-xl shadow-xs dark:shadow-2xs cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md group active:scale-[0.99]"
         >
-          <div className="text-[10px] sm:text-[11px] font-semibold text-slate-400 uppercase tracking-wider group-hover:text-slate-200 transition-colors flex items-center justify-between">
+          <div className="text-[10px] sm:text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider group-hover:text-slate-800 dark:group-hover:text-slate-200 transition-colors flex items-center justify-between">
             <span>Fulfillment Rate</span>
-            <span className="text-[9px] px-1 py-0.2 bg-cyan-500/10 text-cyan-400 rounded border border-cyan-500/20 font-mono">OPS</span>
+            <span className="text-[9px] px-1.5 py-0.5 bg-cyan-50 dark:bg-cyan-500/10 text-cyan-700 dark:text-cyan-400 rounded border border-cyan-200 dark:border-cyan-500/20 font-mono font-bold">OPS</span>
           </div>
-          <div className="text-lg sm:text-xl font-extrabold text-white mt-1 group-hover:text-indigo-700 dark:text-indigo-300 transition-colors">
+          <div className="text-lg sm:text-xl font-extrabold text-slate-900 dark:text-white mt-1 group-hover:text-indigo-600 dark:group-hover:text-indigo-300 transition-colors">
             {kpiDataMap.fulfillment.value}
           </div>
+          <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">Live order dispatches</div>
         </div>
       </div>
 

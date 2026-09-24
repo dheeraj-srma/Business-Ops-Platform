@@ -8,8 +8,8 @@ logger = logging.getLogger("salesman_service")
 class SalesmanService:
 
     @staticmethod
-    def get_team_summary(start_date: Optional[str] = None, end_date: Optional[str] = None) -> Dict[str, Any]:
-        return salesman_repo.get_team_summary(start_date=start_date, end_date=end_date)
+    def get_team_summary(start_date: Optional[str] = None, end_date: Optional[str] = None, salesman_id: Optional[str] = None) -> Dict[str, Any]:
+        return salesman_repo.get_team_summary(start_date=start_date, end_date=end_date, salesman_id=salesman_id)
 
     @staticmethod
     def get_salesman_performance_list(

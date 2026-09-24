@@ -683,40 +683,22 @@ export default function CentralAdminPage() {
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <span style={{
-            fontSize: '0.78rem',
-            padding: '6px 12px',
-            borderRadius: '20px',
-            background: dbHealth.checking
-              ? 'rgba(99, 102, 241, 0.15)'
+        <div className="flex items-center gap-3">
+          <span className={`text-xs font-semibold px-3 py-1.5 rounded-full flex items-center gap-1.5 border ${
+            dbHealth.checking
+              ? 'bg-indigo-50 dark:bg-indigo-950/30 border-indigo-200 dark:border-indigo-800 text-indigo-600 dark:text-indigo-400'
               : dbHealth.connected
-              ? 'rgba(16, 185, 129, 0.15)'
-              : 'rgba(239, 68, 68, 0.15)',
-            border: `1px solid ${
-              dbHealth.checking
-                ? 'rgba(99, 102, 241, 0.3)'
-                : dbHealth.connected
-                ? 'rgba(16, 185, 129, 0.3)'
-                : 'rgba(239, 68, 68, 0.3)'
-            }`,
-            color: dbHealth.checking ? '#6366f1' : dbHealth.connected ? '#10b981' : '#ef4444',
-            fontWeight: 600,
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px'
-          }}>
-            <span style={{
-              width: '8px',
-              height: '8px',
-              borderRadius: '50%',
-              background: dbHealth.checking ? '#6366f1' : dbHealth.connected ? '#10b981' : '#ef4444'
-            }} />
+              ? 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400'
+              : 'bg-rose-50 dark:bg-rose-950/30 border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-400'
+          }`}>
+            <span className={`w-2 h-2 rounded-full ${
+              dbHealth.checking ? 'bg-indigo-500' : dbHealth.connected ? 'bg-emerald-500' : 'bg-rose-500'
+            }`} />
             PostgreSQL: {dbHealth.checking ? 'Checking...' : dbHealth.connected ? 'Connected' : 'Disconnected'}
           </span>
           <button
             onClick={() => { fetchAdminOverview(); fetchUsers(); fetchAuditLogs(); fetchSettings(); fetchSystemHealth(); }}
-            style={{ padding: '8px 14px', borderRadius: '8px', background: '#1e293b', border: '1px solid #334155', color: '#f8fafc', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem' }}
+            className="px-3.5 py-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 text-xs sm:text-sm font-semibold flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors"
           >
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
             <span>Refresh</span>
@@ -726,9 +708,13 @@ export default function CentralAdminPage() {
 
       {/* Global Alert Notification */}
       {message && (
-        <div style={{ padding: '12px 16px', borderRadius: '8px', marginBottom: '1.25rem', background: message.type === 'success' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)', border: `1px solid ${message.type === 'success' ? '#10b981' : '#ef4444'}`, color: message.type === 'success' ? '#34d399' : '#f87171', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div className={`p-3.5 rounded-xl mb-5 border flex justify-between items-center text-sm font-medium ${
+          message.type === 'success'
+            ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300'
+            : 'bg-rose-50 dark:bg-rose-950/40 border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-300'
+        }`}>
           <span>{message.text}</span>
-          <button onClick={() => setMessage(null)} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: '1.1rem' }}>×</button>
+          <button onClick={() => setMessage(null)} className="bg-transparent border-none text-current cursor-pointer text-lg font-bold">×</button>
         </div>
       )}
 
@@ -763,75 +749,75 @@ export default function CentralAdminPage() {
 
       {/* TAB 1: OVERVIEW */}
       {activeTab === 'overview' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        <div className="flex flex-col gap-6">
           
           {/* Top KPI Cards */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.25rem' }}>
-            <div style={{ padding: '1.25rem', borderRadius: '12px', background: '#1e293b', border: '1px solid #334155' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#94a3b8', fontSize: '0.85rem' }}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
+              <div className="flex justify-between items-center text-slate-600 dark:text-slate-400 text-xs font-semibold uppercase tracking-wider">
                 <span>Users</span>
-                <Users size={18} color="#6366f1" />
+                <Users size={18} className="text-indigo-600 dark:text-indigo-400" />
               </div>
-              <div style={{ fontSize: '2rem', fontWeight: 800, marginTop: '8px', color: '#f8fafc' }}>
+              <div className="text-3xl font-extrabold text-slate-900 dark:text-slate-100 mt-2">
                 {overview?.user_stats?.total_users ?? users.length ?? 0}
               </div>
-              <div style={{ fontSize: '0.78rem', color: '#10b981', marginTop: '4px' }}>
-                ● {overview?.user_stats?.active_users ?? users.filter(u => u.is_active).length ?? 0} Active | {overview?.user_stats?.inactive_users ?? 0} Inactive
+              <div className="text-xs font-medium text-emerald-700 dark:text-emerald-400 mt-1 flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
+                {overview?.user_stats?.active_users ?? users.filter(u => u.is_active).length ?? 0} Active | {overview?.user_stats?.inactive_users ?? 0} Inactive
               </div>
             </div>
 
-            <div style={{ padding: '1.25rem', borderRadius: '12px', background: '#1e293b', border: '1px solid #334155' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#94a3b8', fontSize: '0.85rem' }}>
+            <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
+              <div className="flex justify-between items-center text-slate-600 dark:text-slate-400 text-xs font-semibold uppercase tracking-wider">
                 <span>Salesmen</span>
-                <UserCheck size={18} color="#f59e0b" />
+                <UserCheck size={18} className="text-amber-600 dark:text-amber-400" />
               </div>
-              <div style={{ fontSize: '2rem', fontWeight: 800, marginTop: '8px', color: '#f8fafc' }}>
+              <div className="text-3xl font-extrabold text-slate-900 dark:text-slate-100 mt-2">
                 {overview?.user_stats?.role_breakdown?.salesman ?? users.filter(u => u.role === 'salesman').length ?? 0}
               </div>
-              <div style={{ fontSize: '0.78rem', color: '#94a3b8', marginTop: '4px' }}>
+              <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                 Assigned to regional territories
               </div>
             </div>
 
-            <div style={{ padding: '1.25rem', borderRadius: '12px', background: '#1e293b', border: '1px solid #334155' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#94a3b8', fontSize: '0.85rem' }}>
+            <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
+              <div className="flex justify-between items-center text-slate-600 dark:text-slate-400 text-xs font-semibold uppercase tracking-wider">
                 <span>Master Products</span>
-                <Package size={18} color="#a855f7" />
+                <Package size={18} className="text-purple-600 dark:text-purple-400" />
               </div>
-              <div style={{ fontSize: '2rem', fontWeight: 800, marginTop: '8px', color: '#f8fafc' }}>
+              <div className="text-3xl font-extrabold text-slate-900 dark:text-slate-100 mt-2">
                 {overview?.master_counts?.products || 4315}
               </div>
-              <div style={{ fontSize: '0.78rem', color: '#94a3b8', marginTop: '4px' }}>
+              <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                 Canonical SKUs in PostgreSQL
               </div>
             </div>
 
-            <div style={{ padding: '1.25rem', borderRadius: '12px', background: '#1e293b', border: '1px solid #334155' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#94a3b8', fontSize: '0.85rem' }}>
+            <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
+              <div className="flex justify-between items-center text-slate-600 dark:text-slate-400 text-xs font-semibold uppercase tracking-wider">
                 <span>Dealers / Customers</span>
-                <Building2 size={18} color="#10b981" />
+                <Building2 size={18} className="text-emerald-600 dark:text-emerald-400" />
               </div>
-              <div style={{ fontSize: '2rem', fontWeight: 800, marginTop: '8px', color: '#f8fafc' }}>
+              <div className="text-3xl font-extrabold text-slate-900 dark:text-slate-100 mt-2">
                 {overview?.master_counts?.dealers || 804}
               </div>
-              <div style={{ fontSize: '0.78rem', color: '#94a3b8', marginTop: '4px' }}>
+              <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                 Registered dealer network
               </div>
             </div>
           </div>
 
           {/* Quick Actions Panel */}
-          <div style={{ padding: '1.25rem', borderRadius: '12px', background: '#1e293b', border: '1px solid #334155' }}>
-            <h3 style={{ fontSize: '1rem', fontWeight: 700, margin: '0 0 1rem 0', color: '#f8fafc' }}>Quick Administrative Actions</h3>
-            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+          <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
+            <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 mb-3">Quick Administrative Actions</h3>
+            <div className="flex gap-3 flex-wrap">
               <button
                 onClick={() => { setShowAddUserModal(true); setActiveTab('users'); }}
-                style={{ padding: '10px 16px', borderRadius: '8px', background: '#4f46e5', color: '#ffffff', border: 'none', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem' }}
+                className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs sm:text-sm flex items-center gap-2 cursor-pointer shadow-sm transition-colors"
               >
                 <Plus size={16} />
                 <span>Create User Account</span>
               </button>
-
             </div>
           </div>
 
@@ -840,25 +826,25 @@ export default function CentralAdminPage() {
 
       {/* TAB 2: USERS & ACCESS */}
       {activeTab === 'users' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+        <div className="flex flex-col gap-5">
           
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-              <div style={{ position: 'relative' }}>
-                <Search size={16} style={{ position: 'absolute', left: '12px', top: '10px', color: '#64748b' }} />
+          <div className="flex justify-between items-center flex-wrap gap-4">
+            <div className="flex gap-2.5 items-center">
+              <div className="relative">
+                <Search size={16} className="absolute left-3 top-2.5 text-slate-400 dark:text-slate-500" />
                 <input
                   type="text"
                   placeholder="Search user email or name..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  style={{ padding: '8px 12px 8px 36px', borderRadius: '8px', background: '#1e293b', border: '1px solid #334155', color: '#f8fafc', fontSize: '0.85rem', width: '260px' }}
+                  className="pl-9 pr-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 text-xs sm:text-sm w-64 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 shadow-xs"
                 />
               </div>
 
               <select
                 value={roleFilter}
                 onChange={(e) => setRoleFilter(e.target.value)}
-                style={{ padding: '8px 12px', borderRadius: '8px', background: '#1e293b', border: '1px solid #334155', color: '#f8fafc', fontSize: '0.85rem' }}
+                className="px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 text-xs sm:text-sm focus:outline-hidden focus:ring-2 focus:ring-indigo-500 shadow-xs cursor-pointer"
               >
                 <option value="">All Roles</option>
                 <option value="admin">Admin</option>
@@ -872,7 +858,7 @@ export default function CentralAdminPage() {
 
             <button
               onClick={() => setShowAddUserModal(true)}
-              style={{ padding: '9px 16px', borderRadius: '8px', background: '#4f46e5', color: '#ffffff', border: 'none', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem' }}
+              className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs sm:text-sm flex items-center gap-2 cursor-pointer shadow-sm transition-colors"
             >
               <Plus size={16} />
               <span>Add New User</span>
@@ -880,133 +866,138 @@ export default function CentralAdminPage() {
           </div>
 
           {/* Users Data Table */}
-          <div style={{ background: '#1e293b', borderRadius: '12px', border: '1px solid #334155', overflow: 'hidden' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
-              <thead>
-                <tr style={{ background: 'rgba(15, 23, 42, 0.6)', borderBottom: '1px solid #334155', color: '#94a3b8' }}>
-                  <th style={{ padding: '12px 16px' }}>User Details</th>
-                  <th style={{ padding: '12px 16px' }}>Role</th>
-                  <th style={{ padding: '12px 16px' }}>Salesman Ref</th>
-                  <th style={{ padding: '12px 16px' }}>Account Status</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'right' }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {usersState.status === 'loading' ? (
-                  <tr>
-                    <td colSpan={5} style={{ padding: '2rem', textAlign: 'center', color: '#6366f1' }}>
-                      Loading user accounts from PostgreSQL database...
-                    </td>
+          <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse text-left text-xs sm:text-sm">
+                <thead>
+                  <tr className="bg-slate-50 dark:bg-slate-950/60 border-b border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[11px]">
+                    <th className="py-3 px-4">User Details</th>
+                    <th className="py-3 px-4">Role</th>
+                    <th className="py-3 px-4">Salesman Ref</th>
+                    <th className="py-3 px-4">Account Status</th>
+                    <th className="py-3 px-4 text-right">Actions</th>
                   </tr>
-                ) : usersState.status === 'db_error' ? (
-                  <tr>
-                    <td colSpan={5} style={{ padding: '1.25rem' }}>
-                      <div style={{ padding: '1rem 1.25rem', borderRadius: '8px', background: 'rgba(239, 68, 68, 0.15)', border: '1px solid #ef4444', color: '#f87171' }}>
-                        <div style={{ fontWeight: 700, fontSize: '0.95rem', marginBottom: '4px' }}>PostgreSQL Database Connection Unavailable</div>
-                        <div style={{ fontSize: '0.85rem' }}>{usersState.errorMsg || 'The FastAPI backend cannot query the PostgreSQL/Supabase database.'}</div>
-                      </div>
-                    </td>
-                  </tr>
-                ) : usersState.status === 'auth_error' ? (
-                  <tr>
-                    <td colSpan={5} style={{ padding: '1.25rem' }}>
-                      <div style={{ padding: '1rem 1.25rem', borderRadius: '8px', background: 'rgba(245, 158, 11, 0.15)', border: '1px solid #f59e0b', color: '#fbbf24' }}>
-                        <div style={{ fontWeight: 700, fontSize: '0.95rem', marginBottom: '4px' }}>Administrator Authorization Required</div>
-                        <div style={{ fontSize: '0.85rem' }}>{usersState.errorMsg || 'Please log in with admin privileges to view user access control list.'}</div>
-                      </div>
-                    </td>
-                  </tr>
-                ) : usersState.status === 'error' ? (
-                  <tr>
-                    <td colSpan={5} style={{ padding: '1.25rem' }}>
-                      <div style={{ padding: '1rem 1.25rem', borderRadius: '8px', background: 'rgba(239, 68, 68, 0.15)', border: '1px solid #ef4444', color: '#f87171' }}>
-                        <div style={{ fontWeight: 700, fontSize: '0.95rem', marginBottom: '4px' }}>Backend API Response Error</div>
-                        <div style={{ fontSize: '0.85rem' }}>{usersState.errorMsg || 'Failed to retrieve user accounts from backend.'}</div>
-                      </div>
-                    </td>
-                  </tr>
-                ) : filteredUsers.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} style={{ padding: '2rem', textAlign: 'center', color: '#64748b' }}>
-                      No user accounts found matching query.
-                    </td>
-                  </tr>
-                ) : (
-                  filteredUsers.map((u) => (
-                    <tr key={u.id} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.05)' }}>
-                      <td style={{ padding: '12px 16px' }}>
-                        <div style={{ fontWeight: 600, color: '#f8fafc' }}>{u.full_name || 'User'}</div>
-                        <div style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
-                          {u.email}{u.username ? ` • @${u.username}` : ''}
-                        </div>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                  {usersState.status === 'loading' ? (
+                    <tr>
+                      <td colSpan={5} className="p-8 text-center text-indigo-600 dark:text-indigo-400 font-medium">
+                        Loading user accounts from PostgreSQL database...
                       </td>
-                      <td style={{ padding: '12px 16px' }}>
-                        <span style={{
-                          padding: '3px 10px',
-                          borderRadius: '12px',
-                          fontSize: '0.72rem',
-                          fontWeight: 700,
-                          textTransform: 'uppercase',
-                          background: (u.role === 'admin' || u.role === 'accountant') ? 'rgba(99, 102, 241, 0.15)' : (u.role === 'warehouse_manager' || u.role === 'stock_manager') ? 'rgba(52, 211, 153, 0.15)' : u.role === 'salesman' ? 'rgba(245, 158, 11, 0.15)' : u.role === 'customer' ? 'rgba(148, 163, 184, 0.15)' : 'rgba(148, 163, 184, 0.15)',
-                          color: (u.role === 'admin' || u.role === 'accountant') ? '#818cf8' : (u.role === 'warehouse_manager' || u.role === 'stock_manager') ? '#34d399' : u.role === 'salesman' ? '#fbbf24' : u.role === 'customer' ? '#94a3b8' : '#94a3b8',
-                          border: `1px solid ${(u.role === 'admin' || u.role === 'accountant') ? 'rgba(99, 102, 241, 0.3)' : (u.role === 'warehouse_manager' || u.role === 'stock_manager') ? 'rgba(52, 211, 153, 0.3)' : u.role === 'salesman' ? 'rgba(245, 158, 11, 0.3)' : 'rgba(148, 163, 184, 0.3)'}`
-                        }}>
-                          {(u.role || 'viewer').replace(/_/g, ' ')}
-                        </span>
-                      </td>
-                      <td style={{ padding: '12px 16px', color: '#cbd5e1' }}>
-                        {u.salesman_ref || u.salesman_id || '—'}
-                      </td>
-                      <td style={{ padding: '12px 16px' }}>
-                        <span style={{ color: u.is_active ? '#10b981' : '#ef4444', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem' }}>
-                          <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: u.is_active ? '#10b981' : '#ef4444' }} />
-                          {u.is_active ? 'Active' : 'Inactive'}
-                        </span>
-                      </td>
-                      <td style={{ padding: '12px 16px', textAlign: 'right' }}>
-                        <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end', alignItems: 'center' }}>
-                          {/* 1. Update Password (Key) */}
-                          <button
-                            onClick={() => { setSelectedUser(u); setShowResetPassModal(true); }}
-                            style={{ padding: '6px 8px', borderRadius: '6px', background: '#334155', border: '1px solid #475569', color: '#6366f1', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
-                            title="Update Password"
-                          >
-                            <Key size={14} />
-                          </button>
-
-                          {/* 2. Update Details (Edit) */}
-                          <button
-                            onClick={() => openEditUserModal(u)}
-                            style={{ padding: '6px 8px', borderRadius: '6px', background: '#334155', border: '1px solid #475569', color: '#f59e0b', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
-                            title="Update Details (Name, Email, Role, Phone)"
-                          >
-                            <Edit size={14} />
-                          </button>
-
-                          {/* 3. Deactivate / Activate User (Power) */}
-                          <button
-                            onClick={() => handleToggleUserStatus(u.id, u.is_active)}
-                            style={{ padding: '6px 8px', borderRadius: '6px', background: u.is_active ? 'rgba(239, 68, 68, 0.2)' : 'rgba(16, 185, 129, 0.2)', border: `1px solid ${u.is_active ? '#ef4444' : '#10b981'}`, color: u.is_active ? '#f87171' : '#34d399', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
-                            title={u.is_active ? 'Deactivate User Account' : 'Activate User Account'}
-                          >
-                            <Power size={14} />
-                          </button>
-
-                          {/* 4. Delete User (Trash) */}
-                          <button
-                            onClick={() => { setSelectedUser(u); setShowDeleteUserModal(true); }}
-                            style={{ padding: '6px 8px', borderRadius: '6px', background: 'rgba(239, 68, 68, 0.2)', border: '1px solid #ef4444', color: '#ef4444', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
-                            title="Delete User Account"
-                          >
-                            <Trash2 size={14} />
-                          </button>
+                    </tr>
+                  ) : usersState.status === 'db_error' ? (
+                    <tr>
+                      <td colSpan={5} className="p-4">
+                        <div className="p-4 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-300">
+                          <div className="font-bold text-sm mb-1">PostgreSQL Database Connection Unavailable</div>
+                          <div className="text-xs">{usersState.errorMsg || 'The FastAPI backend cannot query the PostgreSQL/Supabase database.'}</div>
                         </div>
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                  ) : usersState.status === 'auth_error' ? (
+                    <tr>
+                      <td colSpan={5} className="p-4">
+                        <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300">
+                          <div className="font-bold text-sm mb-1">Administrator Authorization Required</div>
+                          <div className="text-xs">{usersState.errorMsg || 'Please log in with admin privileges to view user access control list.'}</div>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : usersState.status === 'error' ? (
+                    <tr>
+                      <td colSpan={5} className="p-4">
+                        <div className="p-4 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-300">
+                          <div className="font-bold text-sm mb-1">Backend API Response Error</div>
+                          <div className="text-xs">{usersState.errorMsg || 'Failed to retrieve user accounts from backend.'}</div>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : filteredUsers.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="p-8 text-center text-slate-500 dark:text-slate-400 font-medium">
+                        No user accounts found matching query.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredUsers.map((u) => (
+                      <tr key={u.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors">
+                        <td className="py-3 px-4">
+                          <div className="font-semibold text-slate-900 dark:text-slate-100">{u.full_name || 'User'}</div>
+                          <div className="text-xs text-slate-500 dark:text-slate-400">
+                            {u.email}{u.username ? ` • @${u.username}` : ''}
+                          </div>
+                        </td>
+                        <td className="py-3 px-4">
+                          <span className={`inline-block px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider border ${
+                            (u.role === 'admin' || u.role === 'accountant')
+                              ? 'bg-indigo-50 dark:bg-indigo-950/40 border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-400'
+                              : (u.role === 'warehouse_manager' || u.role === 'stock_manager')
+                              ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400'
+                              : u.role === 'salesman'
+                              ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400'
+                              : 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300'
+                          }`}>
+                            {(u.role || 'viewer').replace(/_/g, ' ')}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-slate-600 dark:text-slate-300 font-mono text-xs">
+                          {u.salesman_ref || u.salesman_id || '—'}
+                        </td>
+                        <td className="py-3 px-4">
+                          <span className={`text-xs font-semibold inline-flex items-center gap-1.5 ${u.is_active ? 'text-emerald-700 dark:text-emerald-400' : 'text-rose-700 dark:text-rose-400'}`}>
+                            <span className={`w-2 h-2 rounded-full ${u.is_active ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+                            {u.is_active ? 'Active' : 'Inactive'}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-right">
+                          <div className="flex gap-1.5 justify-end items-center">
+                            {/* 1. Update Password (Key) */}
+                            <button
+                              onClick={() => { setSelectedUser(u); setShowResetPassModal(true); }}
+                              className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 border border-slate-200 dark:border-slate-700 text-indigo-600 dark:text-indigo-400 cursor-pointer transition-colors"
+                              title="Update Password"
+                            >
+                              <Key size={14} />
+                            </button>
+
+                            {/* 2. Update Details (Edit) */}
+                            <button
+                              onClick={() => openEditUserModal(u)}
+                              className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-amber-50 dark:hover:bg-amber-950/50 border border-slate-200 dark:border-slate-700 text-amber-600 dark:text-amber-400 cursor-pointer transition-colors"
+                              title="Update Details (Name, Email, Role, Phone)"
+                            >
+                              <Edit size={14} />
+                            </button>
+
+                            {/* 3. Deactivate / Activate User (Power) */}
+                            <button
+                              onClick={() => handleToggleUserStatus(u.id, u.is_active)}
+                              className={`p-1.5 rounded-lg border cursor-pointer transition-colors ${
+                                u.is_active
+                                  ? 'bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 dark:hover:bg-rose-900/50 border-rose-200 dark:border-rose-800 text-rose-600 dark:text-rose-400'
+                                  : 'bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 border-emerald-200 dark:border-emerald-800 text-emerald-600 dark:text-emerald-400'
+                              }`}
+                              title={u.is_active ? 'Deactivate User Account' : 'Activate User Account'}
+                            >
+                              <Power size={14} />
+                            </button>
+
+                            {/* 4. Delete User (Trash) */}
+                            <button
+                              onClick={() => { setSelectedUser(u); setShowDeleteUserModal(true); }}
+                              className="p-1.5 rounded-lg bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 dark:hover:bg-rose-900/50 border border-rose-200 dark:border-rose-800 text-rose-600 dark:text-rose-400 cursor-pointer transition-colors"
+                              title="Delete User Account"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
 
         </div>
@@ -1014,13 +1005,13 @@ export default function CentralAdminPage() {
 
       {/* TAB: CUSTOMER & SALESMAN ASSIGNMENTS */}
       {activeTab === 'customer-assignments' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+        <div className="flex flex-col gap-5">
           
           {/* Header & Controls */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-            <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-              <div style={{ position: 'relative' }}>
-                <Search size={16} style={{ position: 'absolute', left: '12px', top: '10px', color: '#64748b' }} />
+          <div className="flex justify-between items-center flex-wrap gap-4">
+            <div className="flex gap-2.5 items-center flex-wrap">
+              <div className="relative">
+                <Search size={16} className="absolute left-3 top-2.5 text-slate-400 dark:text-slate-500" />
                 <input
                   type="text"
                   placeholder="Search customer name or code..."
@@ -1030,7 +1021,7 @@ export default function CentralAdminPage() {
                     setAssignmentPage(0);
                     fetchCustomerAssignments(0, e.target.value, selectedSalesmanFilter);
                   }}
-                  style={{ padding: '8px 12px 8px 36px', borderRadius: '8px', background: '#1e293b', border: '1px solid #334155', color: '#f8fafc', fontSize: '0.85rem', width: '280px' }}
+                  className="pl-9 pr-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 text-xs sm:text-sm w-72 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 shadow-xs"
                 />
               </div>
 
@@ -1041,7 +1032,7 @@ export default function CentralAdminPage() {
                   setAssignmentPage(0);
                   fetchCustomerAssignments(0, assignmentSearch, e.target.value);
                 }}
-                style={{ padding: '8px 12px', borderRadius: '8px', background: '#1e293b', border: '1px solid #334155', color: '#f8fafc', fontSize: '0.85rem' }}
+                className="px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 text-xs sm:text-sm focus:outline-hidden focus:ring-2 focus:ring-indigo-500 shadow-xs cursor-pointer"
               >
                 <option value="">All Field Salesmen ({assignmentsTotal})</option>
                 <option value="unassigned">Unassigned / Direct House Accounts</option>
@@ -1055,14 +1046,14 @@ export default function CentralAdminPage() {
 
             {/* Bulk Reassignment Action Toolbar */}
             {selectedCustomerIds.length > 0 && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'rgba(99, 102, 241, 0.1)', padding: '6px 12px', borderRadius: '8px', border: '1px solid rgba(99, 102, 241, 0.3)' }}>
-                <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#a5b4fc' }}>
+              <div className="flex items-center gap-2.5 bg-indigo-50 dark:bg-indigo-950/40 p-2 px-3.5 rounded-xl border border-indigo-200 dark:border-indigo-800">
+                <span className="text-xs font-bold text-indigo-700 dark:text-indigo-300">
                   {selectedCustomerIds.length} customer{selectedCustomerIds.length > 1 ? 's' : ''} selected
                 </span>
                 <select
                   value={bulkTargetSalesman}
                   onChange={(e) => setBulkTargetSalesman(e.target.value)}
-                  style={{ padding: '6px 10px', borderRadius: '6px', background: '#0f172a', border: '1px solid #334155', color: '#f8fafc', fontSize: '0.8rem' }}
+                  className="px-2.5 py-1 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 text-xs"
                 >
                   <option value="">Reassign to Salesman...</option>
                   <option value="unassigned">Unassigned / Direct</option>
@@ -1075,22 +1066,15 @@ export default function CentralAdminPage() {
                 <button
                   disabled={!bulkTargetSalesman}
                   onClick={handleBulkReassign}
-                  style={{
-                    padding: '6px 12px',
-                    borderRadius: '6px',
-                    background: bulkTargetSalesman ? '#4f46e5' : '#334155',
-                    color: '#ffffff',
-                    border: 'none',
-                    fontWeight: 600,
-                    fontSize: '0.8rem',
-                    cursor: bulkTargetSalesman ? 'pointer' : 'not-allowed'
-                  }}
+                  className={`px-3 py-1 rounded-lg text-xs font-bold text-white transition-colors ${
+                    bulkTargetSalesman ? 'bg-indigo-600 hover:bg-indigo-500 cursor-pointer' : 'bg-slate-400 dark:bg-slate-700 cursor-not-allowed'
+                  }`}
                 >
                   Apply
                 </button>
                 <button
                   onClick={() => setSelectedCustomerIds([])}
-                  style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: '0.78rem', cursor: 'pointer', textDecoration: 'underline' }}
+                  className="bg-transparent border-none text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 text-xs cursor-pointer underline"
                 >
                   Cancel
                 </button>
@@ -1099,166 +1083,138 @@ export default function CentralAdminPage() {
           </div>
 
           {/* Assignments Data Table */}
-          <div style={{ background: '#1e293b', borderRadius: '12px', border: '1px solid #334155', overflow: 'hidden' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
-              <thead>
-                <tr style={{ background: 'rgba(15, 23, 42, 0.6)', borderBottom: '1px solid #334155', color: '#94a3b8' }}>
-                  <th style={{ padding: '12px 14px', width: '40px', textAlign: 'center' }}>
-                    <input
-                      type="checkbox"
-                      checked={assignmentCustomers.length > 0 && selectedCustomerIds.length === assignmentCustomers.length}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setSelectedCustomerIds(assignmentCustomers.map(c => c.id));
-                        } else {
-                          setSelectedCustomerIds([]);
-                        }
-                      }}
-                      style={{ cursor: 'pointer' }}
-                    />
-                  </th>
-                  <th style={{ padding: '12px 16px' }}>Customer / Shop Name</th>
-                  <th style={{ padding: '12px 16px' }}>Customer Code</th>
-                  <th style={{ padding: '12px 16px' }}>Contact & Phone</th>
-                  <th style={{ padding: '12px 16px' }}>Current Salesman</th>
-                  <th style={{ padding: '12px 16px', minWidth: '240px' }}>Reassign Salesman</th>
-                </tr>
-              </thead>
-              <tbody>
-                {assignmentsLoading ? (
-                  <tr>
-                    <td colSpan={6} style={{ padding: '2.5rem', textAlign: 'center', color: '#6366f1' }}>
-                      <RefreshCw size={20} className="animate-spin" style={{ margin: '0 auto 8px auto' }} />
-                      <div>Loading customer accounts & salesman assignments...</div>
-                    </td>
+          <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse text-left text-xs sm:text-sm">
+                <thead>
+                  <tr className="bg-slate-50 dark:bg-slate-950/60 border-b border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[11px]">
+                    <th className="py-3 px-3.5 w-10 text-center">
+                      <input
+                        type="checkbox"
+                        checked={assignmentCustomers.length > 0 && selectedCustomerIds.length === assignmentCustomers.length}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedCustomerIds(assignmentCustomers.map(c => c.id));
+                          } else {
+                            setSelectedCustomerIds([]);
+                          }
+                        }}
+                        className="cursor-pointer rounded border-slate-300 dark:border-slate-700 text-indigo-600"
+                      />
+                    </th>
+                    <th className="py-3 px-4">Customer / Shop Name</th>
+                    <th className="py-3 px-4">Customer Code</th>
+                    <th className="py-3 px-4">Contact & Phone</th>
+                    <th className="py-3 px-4">Current Salesman</th>
+                    <th className="py-3 px-4 min-w-[240px]">Reassign Salesman</th>
                   </tr>
-                ) : assignmentCustomers.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} style={{ padding: '2.5rem', textAlign: 'center', color: '#64748b' }}>
-                      No customers found matching search or filter criteria.
-                    </td>
-                  </tr>
-                ) : (
-                  assignmentCustomers.map((cust) => {
-                    const isSelected = selectedCustomerIds.includes(cust.id);
-                    const isReassigning = reassigningId === cust.id;
-                    return (
-                      <tr key={cust.id} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.05)', background: isSelected ? 'rgba(99, 102, 241, 0.08)' : 'transparent' }}>
-                        <td style={{ padding: '12px 14px', textAlign: 'center' }}>
-                          <input
-                            type="checkbox"
-                            checked={isSelected}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setSelectedCustomerIds(prev => [...prev, cust.id]);
-                              } else {
-                                setSelectedCustomerIds(prev => prev.filter(id => id !== cust.id));
-                              }
-                            }}
-                            style={{ cursor: 'pointer' }}
-                          />
-                        </td>
-                        <td style={{ padding: '12px 16px' }}>
-                          <div style={{ fontWeight: 600, color: '#f8fafc' }}>{cust.name}</div>
-                          {cust.gst_number && cust.gst_number !== '—' && (
-                            <div style={{ fontSize: '0.72rem', color: '#64748b' }}>GST: {cust.gst_number}</div>
-                          )}
-                        </td>
-                        <td style={{ padding: '12px 16px' }}>
-                          <span style={{ fontFamily: 'monospace', fontSize: '0.78rem', color: '#cbd5e1', background: 'rgba(255, 255, 255, 0.06)', padding: '2px 6px', borderRadius: '4px' }}>
-                            {cust.customer_code}
-                          </span>
-                        </td>
-                        <td style={{ padding: '12px 16px', color: '#94a3b8', fontSize: '0.8rem' }}>
-                          {cust.phone || '—'}
-                        </td>
-                        <td style={{ padding: '12px 16px' }}>
-                          <span style={{
-                            padding: '3px 10px',
-                            borderRadius: '12px',
-                            fontSize: '0.72rem',
-                            fontWeight: 700,
-                            background: cust.assigned_salesman_id ? 'rgba(245, 158, 11, 0.15)' : 'rgba(148, 163, 184, 0.15)',
-                            color: cust.assigned_salesman_id ? '#fbbf24' : '#94a3b8',
-                            border: `1px solid ${cust.assigned_salesman_id ? 'rgba(245, 158, 11, 0.3)' : 'rgba(148, 163, 184, 0.3)'}`
-                          }}>
-                            {cust.salesman_code} • {cust.salesman_name}
-                          </span>
-                        </td>
-                        <td style={{ padding: '12px 16px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <select
-                              disabled={isReassigning}
-                              value={cust.assigned_salesman_id || 'unassigned'}
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                  {assignmentsLoading ? (
+                    <tr>
+                      <td colSpan={6} className="p-10 text-center text-indigo-600 dark:text-indigo-400 font-medium">
+                        <RefreshCw size={20} className="animate-spin mx-auto mb-2" />
+                        <div>Loading customer accounts & salesman assignments...</div>
+                      </td>
+                    </tr>
+                  ) : assignmentCustomers.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="p-10 text-center text-slate-500 dark:text-slate-400 font-medium">
+                        No customers found matching search or filter criteria.
+                      </td>
+                    </tr>
+                  ) : (
+                    assignmentCustomers.map((cust) => {
+                      const isSelected = selectedCustomerIds.includes(cust.id);
+                      const isReassigning = reassigningId === cust.id;
+                      return (
+                        <tr key={cust.id} className={`hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors ${isSelected ? 'bg-indigo-50/50 dark:bg-indigo-950/20' : ''}`}>
+                          <td className="py-3 px-3.5 text-center">
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
                               onChange={(e) => {
-                                const newSmId = e.target.value === 'unassigned' ? null : e.target.value;
-                                handleReassignCustomer(cust.id, newSmId);
+                                if (e.target.checked) {
+                                  setSelectedCustomerIds(prev => [...prev, cust.id]);
+                                } else {
+                                  setSelectedCustomerIds(prev => prev.filter(id => id !== cust.id));
+                                }
                               }}
-                              style={{
-                                padding: '6px 10px',
-                                borderRadius: '6px',
-                                background: '#0f172a',
-                                border: '1px solid #334155',
-                                color: '#f8fafc',
-                                fontSize: '0.8rem',
-                                width: '100%',
-                                maxWidth: '240px',
-                                cursor: isReassigning ? 'wait' : 'pointer'
-                              }}
-                            >
-                              <option value="unassigned">Direct / House Account</option>
-                              {salesmenList.map((sm) => (
-                                <option key={sm.id} value={sm.id}>
-                                  {sm.salesman_code} — {sm.full_name}
-                                </option>
-                              ))}
-                            </select>
-                            {isReassigning && <RefreshCw size={14} className="animate-spin text-indigo-400" />}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
+                              className="cursor-pointer rounded border-slate-300 dark:border-slate-700 text-indigo-600"
+                            />
+                          </td>
+                          <td className="py-3 px-4">
+                            <div className="font-semibold text-slate-900 dark:text-slate-100">{cust.name}</div>
+                            {cust.gst_number && cust.gst_number !== '—' && (
+                              <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">GST: {cust.gst_number}</div>
+                            )}
+                          </td>
+                          <td className="py-3 px-4">
+                            <span className="font-mono text-xs text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700">
+                              {cust.customer_code}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-slate-600 dark:text-slate-400 text-xs">
+                            {cust.phone || '—'}
+                          </td>
+                          <td className="py-3 px-4">
+                            <span className={`inline-block px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${
+                              cust.assigned_salesman_id
+                                ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400'
+                                : 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'
+                            }`}>
+                              {cust.salesman_code} • {cust.salesman_name}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4">
+                            <div className="flex items-center gap-2">
+                              <select
+                                disabled={isReassigning}
+                                value={cust.assigned_salesman_id || 'unassigned'}
+                                onChange={(e) => {
+                                  const newSmId = e.target.value === 'unassigned' ? null : e.target.value;
+                                  handleReassignCustomer(cust.id, newSmId);
+                                }}
+                                className="px-2.5 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 text-xs w-full max-w-[240px] focus:outline-hidden focus:ring-1 focus:ring-indigo-500 cursor-pointer disabled:cursor-wait"
+                              >
+                                <option value="unassigned">Direct / House Account</option>
+                                {salesmenList.map((sm) => (
+                                  <option key={sm.id} value={sm.id}>
+                                    {sm.salesman_code} — {sm.full_name}
+                                  </option>
+                                ))}
+                              </select>
+                              {isReassigning && <RefreshCw size={14} className="animate-spin text-indigo-600 dark:text-indigo-400" />}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
 
             {/* Pagination Controls */}
-            <div style={{ padding: '12px 16px', background: 'rgba(15, 23, 42, 0.6)', borderTop: '1px solid #334155', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.82rem', color: '#94a3b8' }}>
+            <div className="p-3.5 px-4 bg-slate-50 dark:bg-slate-950/60 border-t border-slate-200 dark:border-slate-800 flex justify-between items-center text-xs text-slate-600 dark:text-slate-400 font-medium">
               <div>
                 Showing {assignmentsTotal > 0 ? assignmentPage * ASSIGNMENTS_PER_PAGE + 1 : 0} to {Math.min((assignmentPage + 1) * ASSIGNMENTS_PER_PAGE, assignmentsTotal)} of {assignmentsTotal} customers
               </div>
-              <div style={{ display: 'flex', gap: '8px' }}>
+              <div className="flex gap-2 items-center">
                 <button
                   disabled={assignmentPage === 0 || assignmentsLoading}
                   onClick={() => setAssignmentPage(prev => Math.max(0, prev - 1))}
-                  style={{
-                    padding: '5px 12px',
-                    borderRadius: '6px',
-                    background: assignmentPage === 0 ? '#1e293b' : '#334155',
-                    color: assignmentPage === 0 ? '#64748b' : '#f8fafc',
-                    border: '1px solid #475569',
-                    cursor: assignmentPage === 0 ? 'not-allowed' : 'pointer',
-                    fontSize: '0.8rem'
-                  }}
+                  className="px-3 py-1 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
                 >
                   Previous
                 </button>
-                <span style={{ padding: '5px 10px', color: '#cbd5e1' }}>
+                <span className="px-2 text-slate-700 dark:text-slate-300 font-semibold">
                   Page {assignmentPage + 1} of {Math.max(1, Math.ceil(assignmentsTotal / ASSIGNMENTS_PER_PAGE))}
                 </span>
                 <button
                   disabled={(assignmentPage + 1) * ASSIGNMENTS_PER_PAGE >= assignmentsTotal || assignmentsLoading}
                   onClick={() => setAssignmentPage(prev => prev + 1)}
-                  style={{
-                    padding: '5px 12px',
-                    borderRadius: '6px',
-                    background: (assignmentPage + 1) * ASSIGNMENTS_PER_PAGE >= assignmentsTotal ? '#1e293b' : '#334155',
-                    color: (assignmentPage + 1) * ASSIGNMENTS_PER_PAGE >= assignmentsTotal ? '#64748b' : '#f8fafc',
-                    border: '1px solid #475569',
-                    cursor: (assignmentPage + 1) * ASSIGNMENTS_PER_PAGE >= assignmentsTotal ? 'not-allowed' : 'pointer',
-                    fontSize: '0.8rem'
-                  }}
+                  className="px-3 py-1 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
                 >
                   Next
                 </button>
@@ -1311,60 +1267,59 @@ export default function CentralAdminPage() {
 
       {/* TAB 4: MASTER DATA */}
       {activeTab === 'master-data' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '1.25rem' }}>
-          <div style={{ padding: '1.25rem', borderRadius: '12px', background: '#1e293b', border: '1px solid #334155' }}>
-            <h3 style={{ fontSize: '1rem', fontWeight: 700, margin: '0 0 1rem 0', color: '#6366f1' }}>Dealers & Customers Directory</h3>
-            <p style={{ fontSize: '0.82rem', color: '#94a3b8' }}>
-              Authoritative dealer entity mapping in PostgreSQL. Registered dealers: <strong>{overview?.master_counts?.dealers || 804}</strong>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+          <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
+            <h3 className="text-sm font-bold text-indigo-600 dark:text-indigo-400 mb-2">Dealers & Customers Directory</h3>
+            <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+              Authoritative dealer entity mapping in PostgreSQL. Registered dealers: <strong className="text-slate-900 dark:text-slate-100 font-bold">{overview?.master_counts?.dealers || 804}</strong>
             </p>
           </div>
 
-          <div style={{ padding: '1.25rem', borderRadius: '12px', background: '#1e293b', border: '1px solid #334155' }}>
-            <h3 style={{ fontSize: '1rem', fontWeight: 700, margin: '0 0 1rem 0', color: '#a855f7' }}>Suppliers & Vendors</h3>
-            <p style={{ fontSize: '0.82rem', color: '#94a3b8' }}>
-              Raw material ingot and metal rod suppliers. Active suppliers: <strong>{overview?.master_counts?.suppliers || 211}</strong>
+          <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
+            <h3 className="text-sm font-bold text-purple-600 dark:text-purple-400 mb-2">Suppliers & Vendors</h3>
+            <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+              Raw material ingot and metal rod suppliers. Active suppliers: <strong className="text-slate-900 dark:text-slate-100 font-bold">{overview?.master_counts?.suppliers || 211}</strong>
             </p>
           </div>
 
-          <div style={{ padding: '1.25rem', borderRadius: '12px', background: '#1e293b', border: '1px solid #334155' }}>
-            <h3 style={{ fontSize: '1rem', fontWeight: 700, margin: '0 0 1rem 0', color: '#10b981' }}>Canonical Products Catalog</h3>
-            <p style={{ fontSize: '0.82rem', color: '#94a3b8' }}>
-              Live product SKUs and inventory tracking. Active catalog SKUs: <strong>{overview?.master_counts?.products || 4315}</strong>
+          <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
+            <h3 className="text-sm font-bold text-emerald-600 dark:text-emerald-400 mb-2">Canonical Products Catalog</h3>
+            <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+              Live product SKUs and inventory tracking. Active catalog SKUs: <strong className="text-slate-900 dark:text-slate-100 font-bold">{overview?.master_counts?.products || 4315}</strong>
             </p>
           </div>
         </div>
       )}
 
       {/* TAB 5: SYSTEM HEALTH */}
-      
       {activeTab === 'system-health' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.25rem' }}>
-          <div style={{ padding: '1.25rem', borderRadius: '12px', background: '#1e293b', border: '1px solid #334155' }}>
-            <h3 style={{ fontSize: '0.95rem', fontWeight: 700, margin: '0 0 8px 0', color: '#10b981' }}>PostgreSQL Database</h3>
-            <p style={{ fontSize: '0.85rem', color: '#cbd5e1', margin: 0 }}>Status: <strong>Connected</strong></p>
-            <p style={{ fontSize: '0.78rem', color: '#94a3b8', marginTop: '4px' }}>Supabase Hosted Database</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
+            <h3 className="text-sm font-bold text-emerald-600 dark:text-emerald-400 mb-1">PostgreSQL Database</h3>
+            <p className="text-xs text-slate-800 dark:text-slate-200 m-0">Status: <strong className="text-emerald-600 dark:text-emerald-400 font-bold">Connected</strong></p>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">Supabase Hosted Database</p>
           </div>
 
-          <div style={{ padding: '1.25rem', borderRadius: '12px', background: '#1e293b', border: '1px solid #334155' }}>
-            <h3 style={{ fontSize: '0.95rem', fontWeight: 700, margin: '0 0 8px 0', color: '#6366f1' }}>FastAPI Backend API</h3>
-            <p style={{ fontSize: '0.85rem', color: '#cbd5e1', margin: 0 }}>Status: <strong>Healthy (v2.0.0)</strong></p>
-            <p style={{ fontSize: '0.78rem', color: '#94a3b8', marginTop: '4px' }}>Port 8000 Central Access Layer</p>
+          <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
+            <h3 className="text-sm font-bold text-indigo-600 dark:text-indigo-400 mb-1">FastAPI Backend API</h3>
+            <p className="text-xs text-slate-800 dark:text-slate-200 m-0">Status: <strong className="text-indigo-600 dark:text-indigo-400 font-bold">Healthy (v2.0.0)</strong></p>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">Port 8000 Central Access Layer</p>
           </div>
         </div>
       )}
 
       {/* ADD USER MODAL */}
       {showAddUserModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0, 0, 0, 0.75)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
-          <div style={{ width: '100%', maxWidth: '440px', background: '#1e293b', border: '1px solid #334155', borderRadius: '14px', padding: '1.5rem', color: '#f8fafc' }}>
-            <h2 style={{ fontSize: '1.2rem', fontWeight: 700, margin: '0 0 1rem 0' }}>Create New User Account</h2>
-            <form onSubmit={handleCreateUser} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-2xl text-slate-900 dark:text-slate-100">
+            <h2 className="text-lg font-bold mb-4 text-slate-900 dark:text-slate-100">Create New User Account</h2>
+            <form onSubmit={handleCreateUser} className="flex flex-col gap-4">
               <div>
-                <label style={{ fontSize: '0.78rem', color: '#94a3b8', display: 'block', marginBottom: '4px' }}>User Role</label>
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">User Role</label>
                 <select
                   value={newUserForm.role}
                   onChange={(e) => setNewUserForm({ ...newUserForm, role: e.target.value })}
-                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', background: '#0f172a', border: '1px solid #334155', color: '#f8fafc', fontSize: '0.85rem' }}
+                  className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 text-xs sm:text-sm focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
                 >
                   <option value="salesman">Salesman</option>
                   <option value="accountant">Accountant</option>
@@ -1376,105 +1331,105 @@ export default function CentralAdminPage() {
               </div>
 
               <div>
-                <label style={{ fontSize: '0.78rem', color: '#94a3b8', display: 'block', marginBottom: '4px' }}>Email Address *</label>
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Email Address *</label>
                 <input
                   type="email"
                   required
                   value={newUserForm.email}
                   onChange={(e) => setNewUserForm({ ...newUserForm, email: e.target.value })}
                   placeholder="user@example.com"
-                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', background: '#0f172a', border: '1px solid #334155', color: '#f8fafc', fontSize: '0.85rem' }}
+                  className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 text-xs sm:text-sm focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
 
               {newUserForm.role === 'customer' ? (
-                <div style={{ background: '#0f172a', border: '1px solid #334155', borderRadius: '10px', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                  <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-4 flex flex-col gap-3">
+                  <div className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
                     Customer Details
                   </div>
                   <div>
-                    <label style={{ fontSize: '0.78rem', color: '#94a3b8', display: 'block', marginBottom: '4px' }}>Customer Name *</label>
+                    <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Customer Name *</label>
                     <input
                       type="text"
                       required={newUserForm.role === 'customer'}
                       value={newUserForm.customer_name}
                       onChange={(e) => setNewUserForm({ ...newUserForm, customer_name: e.target.value })}
                       placeholder="e.g. BRIJRAJ CREATIVE"
-                      style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', background: '#0f172a', border: '1px solid #334155', color: '#f8fafc', fontSize: '0.85rem' }}
+                      className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-400 text-xs sm:text-sm focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
                     />
                   </div>
                   <div>
-                    <label style={{ fontSize: '0.78rem', color: '#94a3b8', display: 'block', marginBottom: '4px' }}>Customer's Shop Name</label>
+                    <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Customer's Shop Name</label>
                     <input
                       type="text"
                       value={newUserForm.shop_name}
                       onChange={(e) => setNewUserForm({ ...newUserForm, shop_name: e.target.value })}
                       placeholder="e.g. Brijraj Hardware & Sanitary"
-                      style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', background: '#0f172a', border: '1px solid #334155', color: '#f8fafc', fontSize: '0.85rem' }}
+                      className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-400 text-xs sm:text-sm focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
                     />
                   </div>
                   <div>
-                    <label style={{ fontSize: '0.78rem', color: '#94a3b8', display: 'block', marginBottom: '4px' }}>Shop Location / City</label>
+                    <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Shop Location / City</label>
                     <input
                       type="text"
                       value={newUserForm.location}
                       onChange={(e) => setNewUserForm({ ...newUserForm, location: e.target.value })}
                       placeholder="e.g. Faridabad, Haryana"
-                      style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', background: '#0f172a', border: '1px solid #334155', color: '#f8fafc', fontSize: '0.85rem' }}
+                      className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-400 text-xs sm:text-sm focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
                     />
                   </div>
                   <div>
-                    <label style={{ fontSize: '0.78rem', color: '#94a3b8', display: 'block', marginBottom: '4px' }}>Phone Number</label>
+                    <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Phone Number</label>
                     <input
                       type="tel"
                       value={newUserForm.phone}
                       onChange={(e) => setNewUserForm({ ...newUserForm, phone: e.target.value })}
                       placeholder="+91 98765 43210"
-                      style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', background: '#0f172a', border: '1px solid #334155', color: '#f8fafc', fontSize: '0.85rem' }}
+                      className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-400 text-xs sm:text-sm focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
                     />
                   </div>
                 </div>
               ) : (
                 <>
                   <div>
-                    <label style={{ fontSize: '0.78rem', color: '#94a3b8', display: 'block', marginBottom: '4px' }}>Full Name *</label>
+                    <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Full Name *</label>
                     <input
                       type="text"
                       required
                       value={newUserForm.full_name}
                       onChange={(e) => setNewUserForm({ ...newUserForm, full_name: e.target.value })}
                       placeholder="User Full Name"
-                      style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', background: '#0f172a', border: '1px solid #334155', color: '#f8fafc', fontSize: '0.85rem' }}
+                      className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 text-xs sm:text-sm focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
                     />
                   </div>
                   <div>
-                    <label style={{ fontSize: '0.78rem', color: '#94a3b8', display: 'block', marginBottom: '4px' }}>Phone Number</label>
+                    <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Phone Number</label>
                     <input
                       type="tel"
                       value={newUserForm.phone}
                       onChange={(e) => setNewUserForm({ ...newUserForm, phone: e.target.value })}
                       placeholder="+91 98765 43210"
-                      style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', background: '#0f172a', border: '1px solid #334155', color: '#f8fafc', fontSize: '0.85rem' }}
+                      className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 text-xs sm:text-sm focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
                     />
                   </div>
                 </>
               )}
 
               <div>
-                <label style={{ fontSize: '0.78rem', color: '#94a3b8', display: 'block', marginBottom: '4px' }}>Initial Password</label>
-                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Initial Password</label>
+                <div className="relative flex items-center">
                   <input
                     type={showNewUserPassword ? 'text' : 'password'}
                     required
                     value={newUserForm.password}
                     onChange={(e) => setNewUserForm({ ...newUserForm, password: e.target.value })}
                     placeholder="Enter initial password"
-                    style={{ width: '100%', padding: '8px 38px 8px 12px', borderRadius: '6px', background: '#0f172a', border: '1px solid #334155', color: '#f8fafc', fontSize: '0.85rem' }}
+                    className="w-full px-3 pr-10 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 text-xs sm:text-sm focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
                   />
                   <button
                     type="button"
                     onClick={() => setShowNewUserPassword(!showNewUserPassword)}
-                    style={{ position: 'absolute', right: '8px', background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '4px' }}
+                    className="absolute right-2.5 bg-transparent border-none text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 cursor-pointer p-1"
                     title={showNewUserPassword ? 'Hide password' : 'Show password'}
                   >
                     {showNewUserPassword ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -1482,9 +1437,20 @@ export default function CentralAdminPage() {
                 </div>
               </div>
 
-              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '1rem' }}>
-                <button type="button" onClick={() => setShowAddUserModal(false)} style={{ padding: '8px 14px', borderRadius: '6px', background: '#334155', color: '#f8fafc', border: 'none', cursor: 'pointer' }}>Cancel</button>
-                <button type="submit" style={{ padding: '8px 14px', borderRadius: '6px', background: '#4f46e5', color: '#ffffff', border: 'none', fontWeight: 600, cursor: 'pointer' }}>Create User</button>
+              <div className="flex gap-2.5 justify-end mt-3">
+                <button
+                  type="button"
+                  onClick={() => setShowAddUserModal(false)}
+                  className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold cursor-pointer transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold cursor-pointer shadow-sm transition-colors"
+                >
+                  Create User
+                </button>
               </div>
             </form>
           </div>
@@ -1493,25 +1459,25 @@ export default function CentralAdminPage() {
 
       {/* RESET PASSWORD MODAL */}
       {showResetPassModal && selectedUser && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0, 0, 0, 0.75)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
-          <div style={{ width: '100%', maxWidth: '400px', background: '#1e293b', border: '1px solid #334155', borderRadius: '14px', padding: '1.5rem', color: '#f8fafc' }}>
-            <h2 style={{ fontSize: '1.1rem', fontWeight: 700, margin: '0 0 1rem 0' }}>Update Password for {selectedUser.email}</h2>
-            <form onSubmit={handleResetPasswordSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="w-full max-w-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-2xl text-slate-900 dark:text-slate-100">
+            <h2 className="text-base font-bold mb-3 text-slate-900 dark:text-slate-100">Update Password for {selectedUser.email}</h2>
+            <form onSubmit={handleResetPasswordSubmit} className="flex flex-col gap-4">
               <div>
-                <label style={{ fontSize: '0.78rem', color: '#94a3b8', display: 'block', marginBottom: '4px' }}>New / Temporary Password</label>
-                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">New / Temporary Password</label>
+                <div className="relative flex items-center">
                   <input
                     type={showResetPassword ? 'text' : 'password'}
                     required
                     value={tempPassword}
                     onChange={(e) => setTempPassword(e.target.value)}
                     placeholder="Enter new password"
-                    style={{ width: '100%', padding: '8px 38px 8px 12px', borderRadius: '6px', background: '#0f172a', border: '1px solid #334155', color: '#f8fafc', fontSize: '0.85rem' }}
+                    className="w-full px-3 pr-10 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-400 text-xs sm:text-sm focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
                   />
                   <button
                     type="button"
                     onClick={() => setShowResetPassword(!showResetPassword)}
-                    style={{ position: 'absolute', right: '8px', background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '4px' }}
+                    className="absolute right-2.5 bg-transparent border-none text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 cursor-pointer p-1"
                     title={showResetPassword ? 'Hide password' : 'Show password'}
                   >
                     {showResetPassword ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -1519,9 +1485,20 @@ export default function CentralAdminPage() {
                 </div>
               </div>
 
-              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
-                <button type="button" onClick={() => setShowResetPassModal(false)} style={{ padding: '8px 14px', borderRadius: '6px', background: '#334155', color: '#f8fafc', border: 'none', cursor: 'pointer' }}>Cancel</button>
-                <button type="submit" style={{ padding: '8px 14px', borderRadius: '6px', background: '#4f46e5', color: '#ffffff', border: 'none', fontWeight: 600, cursor: 'pointer' }}>Update Password</button>
+              <div className="flex gap-2.5 justify-end mt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowResetPassModal(false)}
+                  className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold cursor-pointer transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold cursor-pointer shadow-sm transition-colors"
+                >
+                  Update Password
+                </button>
               </div>
             </form>
           </div>
@@ -1530,16 +1507,16 @@ export default function CentralAdminPage() {
 
       {/* EDIT USER DETAILS MODAL */}
       {showEditUserModal && selectedUser && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0, 0, 0, 0.75)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
-          <div style={{ width: '100%', maxWidth: '440px', background: '#1e293b', border: '1px solid #334155', borderRadius: '14px', padding: '1.5rem', color: '#f8fafc' }}>
-            <h2 style={{ fontSize: '1.2rem', fontWeight: 700, margin: '0 0 1rem 0' }}>Update User Details</h2>
-            <form onSubmit={handleEditUserSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-2xl text-slate-900 dark:text-slate-100">
+            <h2 className="text-lg font-bold mb-4 text-slate-900 dark:text-slate-100">Update User Details</h2>
+            <form onSubmit={handleEditUserSubmit} className="flex flex-col gap-4">
               <div>
-                <label style={{ fontSize: '0.78rem', color: '#94a3b8', display: 'block', marginBottom: '4px' }}>User Role</label>
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">User Role</label>
                 <select
                   value={editUserForm.role}
                   onChange={(e) => setEditUserForm({ ...editUserForm, role: e.target.value })}
-                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', background: '#0f172a', border: '1px solid #334155', color: '#f8fafc', fontSize: '0.85rem' }}
+                  className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 text-xs sm:text-sm focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
                 >
                   <option value="salesman">Salesman</option>
                   <option value="accountant">Accountant</option>
@@ -1551,91 +1528,102 @@ export default function CentralAdminPage() {
               </div>
 
               <div>
-                <label style={{ fontSize: '0.78rem', color: '#94a3b8', display: 'block', marginBottom: '4px' }}>Email Address *</label>
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Email Address *</label>
                 <input
                   type="email"
                   required
                   value={editUserForm.email}
                   onChange={(e) => setEditUserForm({ ...editUserForm, email: e.target.value })}
-                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', background: '#0f172a', border: '1px solid #334155', color: '#f8fafc', fontSize: '0.85rem' }}
+                  className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 text-xs sm:text-sm focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
 
               {editUserForm.role === 'customer' ? (
-                <div style={{ background: '#0f172a', border: '1px solid #334155', borderRadius: '10px', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                  <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-4 flex flex-col gap-3">
+                  <div className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
                     Customer Details
                   </div>
                   <div>
-                    <label style={{ fontSize: '0.78rem', color: '#94a3b8', display: 'block', marginBottom: '4px' }}>Customer Name *</label>
+                    <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Customer Name *</label>
                     <input
                       type="text"
                       required={editUserForm.role === 'customer'}
                       value={editUserForm.customer_name}
                       onChange={(e) => setEditUserForm({ ...editUserForm, customer_name: e.target.value })}
                       placeholder="e.g. BRIJRAJ CREATIVE"
-                      style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', background: '#0f172a', border: '1px solid #334155', color: '#f8fafc', fontSize: '0.85rem' }}
+                      className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-400 text-xs sm:text-sm focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
                     />
                   </div>
                   <div>
-                    <label style={{ fontSize: '0.78rem', color: '#94a3b8', display: 'block', marginBottom: '4px' }}>Customer's Shop Name</label>
+                    <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Customer's Shop Name</label>
                     <input
                       type="text"
                       value={editUserForm.shop_name}
                       onChange={(e) => setEditUserForm({ ...editUserForm, shop_name: e.target.value })}
                       placeholder="e.g. Brijraj Hardware & Sanitary"
-                      style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', background: '#0f172a', border: '1px solid #334155', color: '#f8fafc', fontSize: '0.85rem' }}
+                      className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-400 text-xs sm:text-sm focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
                     />
                   </div>
                   <div>
-                    <label style={{ fontSize: '0.78rem', color: '#94a3b8', display: 'block', marginBottom: '4px' }}>Shop Location / City</label>
+                    <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Shop Location / City</label>
                     <input
                       type="text"
                       value={editUserForm.location}
                       onChange={(e) => setEditUserForm({ ...editUserForm, location: e.target.value })}
                       placeholder="e.g. Faridabad, Haryana"
-                      style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', background: '#0f172a', border: '1px solid #334155', color: '#f8fafc', fontSize: '0.85rem' }}
+                      className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-400 text-xs sm:text-sm focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
                     />
                   </div>
                   <div>
-                    <label style={{ fontSize: '0.78rem', color: '#94a3b8', display: 'block', marginBottom: '4px' }}>Phone Number</label>
+                    <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Phone Number</label>
                     <input
                       type="tel"
                       value={editUserForm.phone}
                       onChange={(e) => setEditUserForm({ ...editUserForm, phone: e.target.value })}
                       placeholder="+91 98765 43210"
-                      style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', background: '#0f172a', border: '1px solid #334155', color: '#f8fafc', fontSize: '0.85rem' }}
+                      className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-400 text-xs sm:text-sm focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
                     />
                   </div>
                 </div>
               ) : (
                 <>
                   <div>
-                    <label style={{ fontSize: '0.78rem', color: '#94a3b8', display: 'block', marginBottom: '4px' }}>Full Name *</label>
+                    <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Full Name *</label>
                     <input
                       type="text"
                       required
                       value={editUserForm.full_name}
                       onChange={(e) => setEditUserForm({ ...editUserForm, full_name: e.target.value })}
-                      style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', background: '#0f172a', border: '1px solid #334155', color: '#f8fafc', fontSize: '0.85rem' }}
+                      className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 text-xs sm:text-sm focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
                     />
                   </div>
                   <div>
-                    <label style={{ fontSize: '0.78rem', color: '#94a3b8', display: 'block', marginBottom: '4px' }}>Phone Number</label>
+                    <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Phone Number</label>
                     <input
                       type="tel"
                       value={editUserForm.phone}
                       onChange={(e) => setEditUserForm({ ...editUserForm, phone: e.target.value })}
                       placeholder="+91 98765 43210"
-                      style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', background: '#0f172a', border: '1px solid #334155', color: '#f8fafc', fontSize: '0.85rem' }}
+                      className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 text-xs sm:text-sm focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
                     />
                   </div>
                 </>
               )}
 
-              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '1rem' }}>
-                <button type="button" onClick={() => setShowEditUserModal(false)} style={{ padding: '8px 14px', borderRadius: '6px', background: '#334155', color: '#f8fafc', border: 'none', cursor: 'pointer' }}>Cancel</button>
-                <button type="submit" style={{ padding: '8px 14px', borderRadius: '6px', background: '#f59e0b', color: '#ffffff', border: 'none', fontWeight: 600, cursor: 'pointer' }}>Save Changes</button>
+              <div className="flex gap-2.5 justify-end mt-3">
+                <button
+                  type="button"
+                  onClick={() => setShowEditUserModal(false)}
+                  className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold cursor-pointer transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold cursor-pointer shadow-sm transition-colors"
+                >
+                  Save Changes
+                </button>
               </div>
             </form>
           </div>
@@ -1644,26 +1632,36 @@ export default function CentralAdminPage() {
 
       {/* DELETE USER CONFIRMATION MODAL */}
       {showDeleteUserModal && selectedUser && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0, 0, 0, 0.75)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
-          <div style={{ width: '100%', maxWidth: '420px', background: '#1e293b', border: '1px solid #ef4444', borderRadius: '14px', padding: '1.5rem', color: '#f8fafc' }}>
-            <h2 style={{ fontSize: '1.15rem', fontWeight: 700, margin: '0 0 0.75rem 0', color: '#f87171', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <AlertTriangle size={20} color="#f87171" />
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="w-full max-w-sm bg-white dark:bg-slate-900 border border-rose-200 dark:border-rose-900 rounded-2xl p-6 shadow-2xl text-slate-900 dark:text-slate-100">
+            <h2 className="text-base font-bold mb-2 text-rose-600 dark:text-rose-400 flex items-center gap-2">
+              <AlertTriangle size={18} className="text-rose-600 dark:text-rose-400" />
               <span>Confirm Delete User</span>
             </h2>
-            <p style={{ fontSize: '0.88rem', color: '#cbd5e1', lineHeight: '1.5', margin: '0 0 1.25rem 0' }}>
-              Are you sure you want to permanently delete user account <strong>{selectedUser.email}</strong> ({selectedUser.full_name || 'User'}) from PostgreSQL database?
+            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed mb-4">
+              Are you sure you want to permanently delete user account <strong className="text-slate-900 dark:text-slate-100 font-bold">{selectedUser.email}</strong> ({selectedUser.full_name || 'User'}) from PostgreSQL database?
               <br /><br />
-              <span style={{ color: '#f87171', fontSize: '0.8rem' }}>This action cannot be undone.</span>
+              <span className="text-rose-600 dark:text-rose-400 font-semibold">This action cannot be undone.</span>
             </p>
 
-            <form onSubmit={handleDeleteUserSubmit} style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-              <button type="button" onClick={() => setShowDeleteUserModal(false)} style={{ padding: '8px 14px', borderRadius: '6px', background: '#334155', color: '#f8fafc', border: 'none', cursor: 'pointer' }}>Cancel</button>
-              <button type="submit" style={{ padding: '8px 14px', borderRadius: '6px', background: '#ef4444', color: '#ffffff', border: 'none', fontWeight: 600, cursor: 'pointer' }}>Permanently Delete User</button>
+            <form onSubmit={handleDeleteUserSubmit} className="flex gap-2.5 justify-end">
+              <button
+                type="button"
+                onClick={() => setShowDeleteUserModal(false)}
+                className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold cursor-pointer transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold cursor-pointer shadow-sm transition-colors"
+              >
+                Permanently Delete User
+              </button>
             </form>
           </div>
         </div>
       )}
-
     </div>
   );
 }

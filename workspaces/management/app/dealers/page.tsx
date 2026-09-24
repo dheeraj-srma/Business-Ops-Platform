@@ -529,10 +529,10 @@ export default function CustomersPage() {
               </div>
 
               {/* Footer Bar */}
-              <div className="pt-2 border-t border-slate-800 text-[11px] text-indigo-400 flex items-center justify-between">
+              <div className="pt-2 border-t border-slate-200 dark:border-slate-800 text-[11px] text-indigo-600 dark:text-indigo-400 flex items-center justify-between">
                 <div className="flex items-center gap-1.5 truncate">
-                  <ShieldCheck size={14} className="shrink-0 text-indigo-400" />
-                  <span className="truncate">
+                  <ShieldCheck size={14} className="shrink-0 text-indigo-600 dark:text-indigo-400" />
+                  <span className="truncate text-slate-600 dark:text-slate-300">
                     {topProfile?.acceptance_rate_pct !== undefined
                       ? `Tier 1 Platinum Partner • ${topProfile.acceptance_rate_pct}% Acceptance (${topProfile.return_rate_pct}% returns)`
                       : 'Tier 1 Platinum Partner • Zero defaults'}
@@ -540,7 +540,7 @@ export default function CustomersPage() {
                 </div>
                 <button
                   onClick={() => setActiveTab('performance')}
-                  className="text-[11px] font-bold text-indigo-400 hover:text-indigo-300 transition-colors shrink-0 ml-2"
+                  className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors shrink-0 ml-2 cursor-pointer"
                 >
                   View Performance →
                 </button>

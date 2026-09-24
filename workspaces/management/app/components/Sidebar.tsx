@@ -228,22 +228,22 @@ export default function Sidebar() {
           {/* Alerts Popover Panel */}
           {alertsOpen && (
             <div
-              className="fade-in"
+              className="fade-in popover-panel"
               style={{
                 position: 'absolute',
                 bottom: isCollapsed ? '0' : 'calc(100% + 8px)',
                 left: isCollapsed ? 'calc(100% + 12px)' : '0',
                 width: isCollapsed ? '320px' : '100%',
-                background: '#0f172a',
-                border: '1px solid #334155',
+                background: 'var(--surface-elevated, var(--surface, #0f172a))',
+                border: '1px solid var(--border, #334155)',
                 borderRadius: '12px',
                 padding: '0.9rem',
-                boxShadow: '0 20px 50px rgba(0, 0, 0, 0.9)',
+                boxShadow: 'var(--shadow-modal, 0 20px 50px rgba(0, 0, 0, 0.4))',
                 zIndex: 9999,
-                color: '#f8fafc'
+                color: 'var(--text-primary, #f8fafc)'
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '0.6rem', borderBottom: '1px solid #334155', marginBottom: '0.75rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '0.6rem', borderBottom: '1px solid var(--border, #334155)', marginBottom: '0.75rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <Bell size={16} className="text-warning-cl" />
                   <span style={{ fontWeight: 700, fontSize: '0.88rem' }}>Pending Order Alerts</span>
@@ -266,9 +266,9 @@ export default function Sidebar() {
                     const first = rows[0];
                     const totalQty = rows.reduce((s, r) => s + (Number(r.Quantity) || 0), 0);
                     return (
-                      <div className="popover-item-card" key={orderId} style={{ padding: '8px 10px', borderRadius: '8px', background: 'rgba(30, 41, 59, 0.6)', border: '1px solid rgba(255, 255, 255, 0.05)', marginBottom: '8px' }}>
+                      <div className="popover-item-card" key={orderId} style={{ padding: '8px 10px', borderRadius: '8px', background: 'var(--surface-muted, rgba(30, 41, 59, 0.6))', border: '1px solid var(--border, rgba(255, 255, 255, 0.05))', marginBottom: '8px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                          <span style={{ fontWeight: 700, color: '#6366f1', fontSize: '0.82rem' }}>{orderId}</span>
+                          <span style={{ fontWeight: 700, color: 'var(--accent, #6366f1)', fontSize: '0.82rem' }}>{orderId}</span>
                           <span style={{ fontSize: '0.7rem', color: '#f59e0b', fontWeight: 600 }}>Needs Review</span>
                         </div>
                         <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: '2px' }}>
@@ -319,22 +319,22 @@ export default function Sidebar() {
           {/* Admin Popover Panel */}
           {adminOpen && (
             <div
-              className="fade-in"
+              className="fade-in popover-panel"
               style={{
                 position: 'absolute',
                 bottom: isCollapsed ? '0' : 'calc(100% + 8px)',
                 left: isCollapsed ? 'calc(100% + 12px)' : '0',
                 width: isCollapsed ? '280px' : '100%',
-                background: '#0f172a',
-                border: '1px solid #334155',
+                background: 'var(--surface-elevated, var(--surface, #0f172a))',
+                border: '1px solid var(--border, #334155)',
                 borderRadius: '12px',
                 padding: '0.9rem',
-                boxShadow: '0 20px 50px rgba(0, 0, 0, 0.9)',
+                boxShadow: 'var(--shadow-modal, 0 20px 50px rgba(0, 0, 0, 0.4))',
                 zIndex: 9999,
-                color: '#f8fafc'
+                color: 'var(--text-primary, #f8fafc)'
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', paddingBottom: '0.6rem', borderBottom: '1px solid #334155', marginBottom: '0.6rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', paddingBottom: '0.6rem', borderBottom: '1px solid var(--border, #334155)', marginBottom: '0.6rem' }}>
                 <div className="admin-avatar" style={{ width: '34px', height: '34px', fontSize: '0.85rem' }}>
                   <span>AD</span>
                 </div>

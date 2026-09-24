@@ -2,6 +2,7 @@
 
 import React, { useMemo } from 'react';
 import { usePathname } from 'next/navigation';
+import './app/globals.css';
 import { ThemeProvider } from './app/context/ThemeContext';
 import { DialogProvider } from './app/context/DialogContext';
 import { GlobalTooltipProvider } from './app/components/common/Tooltip';

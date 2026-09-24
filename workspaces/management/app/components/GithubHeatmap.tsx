@@ -245,19 +245,19 @@ export default function GithubHeatmap({
   };
 
   return (
-    <div ref={containerRef} className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-xl relative backdrop-blur-md z-10">
+    <div ref={containerRef} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-xs relative z-10">
       {/* Persistent Section Header Title & Range Controls (Never disappears) */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 pb-3 border-b border-slate-800/80">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 pb-3 border-b border-slate-200 dark:border-slate-800/80">
         <div>
-          <h3 className="text-base sm:text-lg font-extrabold text-white tracking-tight flex items-center gap-2">
+          <h3 className="text-base sm:text-lg font-extrabold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
             <Calendar size={18} className="text-indigo-600 dark:text-indigo-400" />
             <span>{cardTitle}</span>
           </h3>
-          <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p>
+          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5 font-medium">{subtitle}</p>
         </div>
 
         {onRangeChange && (
-          <div className="flex items-center gap-1 bg-slate-950/80 p-1 rounded-xl border border-slate-800 text-[11px] self-start sm:self-auto">
+          <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-950/80 p-1 rounded-xl border border-slate-200 dark:border-slate-800 text-[11px] self-start sm:self-auto shadow-xs">
             {[
               { id: '7d', label: '7D' },
               { id: '30d', label: '30D' },
@@ -271,8 +271,8 @@ export default function GithubHeatmap({
                 onClick={() => onRangeChange(r.id)}
                 className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${
                   isRangeActive(r.id)
-                    ? 'bg-indigo-600 text-white shadow-sm'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                    ? 'bg-indigo-600 text-white shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-800/60'
                 }`}
               >
                 {r.label}
@@ -283,11 +283,11 @@ export default function GithubHeatmap({
       </div>
 
       {isLoading ? (
-        <div className="h-56 flex items-center justify-center text-slate-400 text-sm animate-pulse">
+        <div className="h-56 flex items-center justify-center text-slate-500 dark:text-slate-400 text-sm animate-pulse font-medium">
           Loading activity heatmap...
         </div>
       ) : weeks.length === 0 ? (
-        <div className="h-56 flex items-center justify-center text-slate-400 text-sm">
+        <div className="h-56 flex items-center justify-center text-slate-500 dark:text-slate-400 text-sm font-medium">
           No order activity recorded for selected range.
         </div>
       ) : (
@@ -297,11 +297,11 @@ export default function GithubHeatmap({
 
             <div className="min-w-[480px]">
               {/* Month Labels Row */}
-              <div className="flex text-[11px] text-slate-400 mb-2.5 ml-9 relative h-4">
+              <div className="flex text-[11px] text-slate-600 dark:text-slate-400 mb-2.5 ml-9 relative h-4">
                 {monthLabels.map((m, idx) => (
                   <div
                     key={idx}
-                    className="absolute font-bold text-slate-400"
+                    className="absolute font-bold text-slate-700 dark:text-slate-400"
                     style={{ left: `${m.weekIndex * 20}px` }}
                   >
                     {m.monthName}
@@ -312,7 +312,7 @@ export default function GithubHeatmap({
               {/* 7-Row Grid Body */}
               <div className="flex">
                 {/* Day Labels Column */}
-                <div className="flex flex-col justify-between text-[10px] text-slate-400 font-bold w-9 pr-2 py-0.5">
+                <div className="flex flex-col justify-between text-[10px] text-slate-600 dark:text-slate-400 font-bold w-9 pr-2 py-0.5">
                   {dayNames.map((name, i) => (
                     <div key={i} className="h-4 flex items-center justify-end">
                       {name}
@@ -341,72 +341,72 @@ export default function GithubHeatmap({
             </div>
 
             {/* Bottom Legend */}
-            <div className="mt-5 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
+            <div className="mt-5 pt-3 border-t border-slate-200 dark:border-slate-800/80 flex items-center justify-between text-xs text-slate-600 dark:text-slate-400">
               <div className="flex items-center gap-2">
-                <span className="text-[11px] font-medium text-slate-400">Activity Level:</span>
+                <span className="text-[11px] font-bold text-slate-700 dark:text-slate-400">Activity Level:</span>
                 <div className="flex items-center gap-1.5 text-[10px] font-semibold">
                   <span className="text-slate-500">None</span>
-                  <div className="w-3.5 h-3.5 rounded-[3.5px] bg-slate-950/70 border border-slate-800/80" />
-                  <div className="w-3.5 h-3.5 rounded-[3.5px] bg-cyan-950/90 border border-cyan-850/80" />
-                  <div className="w-3.5 h-3.5 rounded-[3.5px] bg-cyan-700/80 border border-cyan-600/90" />
-                  <div className="w-3.5 h-3.5 rounded-[3.5px] bg-indigo-600 dark:bg-indigo-500 border border-cyan-400" />
-                  <div className="w-3.5 h-3.5 rounded-[3.5px] bg-indigo-500 border border-cyan-300" />
+                  <div className="w-3.5 h-3.5 rounded-[3.5px] bg-slate-100 dark:bg-slate-950/70 border border-slate-300 dark:border-slate-800/80" />
+                  <div className="w-3.5 h-3.5 rounded-[3.5px] bg-indigo-100 dark:bg-cyan-950/90 border border-indigo-200 dark:border-cyan-850/80" />
+                  <div className="w-3.5 h-3.5 rounded-[3.5px] bg-indigo-300 dark:bg-cyan-700/80 border border-indigo-400 dark:border-cyan-600/90" />
+                  <div className="w-3.5 h-3.5 rounded-[3.5px] bg-indigo-500 dark:bg-indigo-500 border border-indigo-600 dark:border-cyan-400" />
+                  <div className="w-3.5 h-3.5 rounded-[3.5px] bg-indigo-700 dark:bg-indigo-400 border border-indigo-800 dark:border-cyan-300" />
                   <span className="text-indigo-600 dark:text-indigo-400 font-bold">High</span>
                 </div>
               </div>
-              <div className="text-[11px] text-slate-400">
+              <div className="text-[11px] text-slate-600 dark:text-slate-400 font-medium">
                 Active Days: <span className="text-indigo-600 dark:text-indigo-400 font-extrabold">{computedSummary.active_days}</span> / {days.length}
               </div>
             </div>
           </div>
 
           {/* Right Column: Activity Insights Box (Placed at Top alongside title) */}
-          <div className="lg:col-span-5 self-start mt-0 bg-slate-950/70 border border-slate-800/80 rounded-xl p-4 flex flex-col justify-between space-y-3">
+          <div className="lg:col-span-5 self-start mt-0 bg-slate-50 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800/80 rounded-2xl p-4 flex flex-col justify-between space-y-3 shadow-xs">
             {/* Box Header */}
-            <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
-              <span className="text-xs font-extrabold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800/80">
+              <span className="text-xs font-extrabold uppercase tracking-wider text-slate-800 dark:text-slate-300 flex items-center gap-1.5">
                 <Zap size={14} className="text-indigo-600 dark:text-indigo-400" />
                 <span>Activity Insights</span>
               </span>
-              <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 px-2 py-0.5 rounded-md border border-indigo-200 dark:border-indigo-800/40">
+              <span className="text-[10px] font-bold text-indigo-700 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 px-2 py-0.5 rounded-md border border-indigo-200 dark:border-indigo-800/40">
                 Purchasing Velocity
               </span>
             </div>
 
             {/* Velocity Metrics Grid (2x2 Cards) */}
             <div className="grid grid-cols-2 gap-2 text-xs">
-              <div className="p-2.5 bg-slate-900/80 rounded-lg border border-slate-800 flex flex-col justify-between">
-                <div className="text-[10px] text-slate-400 uppercase font-semibold">Busiest Day</div>
-                <div className="text-sm font-black text-slate-100 mt-1">{peakStats.busiestDay}</div>
+              <div className="p-2.5 bg-white dark:bg-slate-900/80 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-col justify-between shadow-xs">
+                <div className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-bold">Busiest Day</div>
+                <div className="text-sm font-black text-slate-900 dark:text-slate-100 mt-1">{peakStats.busiestDay}</div>
               </div>
 
-              <div className="p-2.5 bg-slate-900/80 rounded-lg border border-slate-800 flex flex-col justify-between">
-                <div className="text-[10px] text-slate-400 uppercase font-semibold">Active Streak</div>
+              <div className="p-2.5 bg-white dark:bg-slate-900/80 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-col justify-between shadow-xs">
+                <div className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-bold">Active Streak</div>
                 <div className="text-sm font-black text-indigo-600 dark:text-indigo-400 mt-1">{peakStats.longestStreak} Days</div>
               </div>
 
-              <div className="p-2.5 bg-slate-900/80 rounded-lg border border-slate-800 flex flex-col justify-between">
-                <div className="text-[10px] text-slate-400 uppercase font-semibold">Re-order Gap</div>
-                <div className="text-sm font-black text-sky-400 mt-1">
+              <div className="p-2.5 bg-white dark:bg-slate-900/80 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-col justify-between shadow-xs">
+                <div className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-bold">Re-order Gap</div>
+                <div className="text-sm font-black text-sky-600 dark:text-sky-400 mt-1">
                   {peakStats.reorderInterval ? `Every ${peakStats.reorderInterval}d` : 'Frequent'}
                 </div>
               </div>
 
-              <div className="p-2.5 bg-slate-900/80 rounded-lg border border-slate-800 flex flex-col justify-between">
-                <div className="text-[10px] text-slate-400 uppercase font-semibold">Avg / Active Day</div>
-                <div className="text-sm font-black text-amber-400 mt-1">{computedSummary.avg_orders_per_active_day} Ords</div>
+              <div className="p-2.5 bg-white dark:bg-slate-900/80 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-col justify-between shadow-xs">
+                <div className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-bold">Avg / Active Day</div>
+                <div className="text-sm font-black text-amber-600 dark:text-amber-400 mt-1">{computedSummary.avg_orders_per_active_day} Ords</div>
               </div>
             </div>
 
             {/* Activity Purchasing Ratio Progress Bar */}
-            <div className="pt-2 border-t border-slate-800/80 space-y-1.5 text-xs">
-              <div className="flex justify-between text-[11px] text-slate-400">
+            <div className="pt-2 border-t border-slate-200 dark:border-slate-800/80 space-y-1.5 text-xs">
+              <div className="flex justify-between text-[11px] text-slate-600 dark:text-slate-400 font-medium">
                 <span>Active Purchasing Ratio</span>
-                <span className="font-bold text-slate-200">
+                <span className="font-bold text-slate-900 dark:text-slate-200">
                   {Math.round((computedSummary.active_days / Math.max(1, days.length)) * 100)}% active
                 </span>
               </div>
-              <div className="h-2 w-full bg-slate-900 rounded-full overflow-hidden flex">
+              <div className="h-2 w-full bg-slate-200 dark:bg-slate-900 rounded-full overflow-hidden flex">
                 <div
                   style={{ width: `${(distribution.high / Math.max(1, days.length)) * 100}%` }}
                   className="bg-indigo-500 h-full"
@@ -414,24 +414,24 @@ export default function GithubHeatmap({
                 />
                 <div
                   style={{ width: `${(distribution.medium / Math.max(1, days.length)) * 100}%` }}
-                  className="bg-cyan-600 h-full"
+                  className="bg-sky-500 h-full"
                   title={`Medium volume: ${distribution.medium} days`}
                 />
                 <div
                   style={{ width: `${(distribution.low / Math.max(1, days.length)) * 100}%` }}
-                  className="bg-cyan-850 h-full"
+                  className="bg-indigo-300 dark:bg-cyan-850 h-full"
                   title={`Low volume: ${distribution.low} days`}
                 />
               </div>
-              <div className="flex justify-between text-[10px] text-slate-400 pt-0.5">
+              <div className="flex justify-between text-[10px] text-slate-600 dark:text-slate-400 pt-0.5 font-medium">
                 <span className="flex items-center gap-1">
                   <span className="w-2 h-2 rounded-full bg-indigo-500 inline-block" /> High ({distribution.high}d)
                 </span>
                 <span className="flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full bg-cyan-600 inline-block" /> Med ({distribution.medium}d)
+                  <span className="w-2 h-2 rounded-full bg-sky-500 inline-block" /> Med ({distribution.medium}d)
                 </span>
                 <span className="flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full bg-slate-800 inline-block" /> Quiet ({distribution.inactive}d)
+                  <span className="w-2 h-2 rounded-full bg-slate-300 dark:bg-slate-800 inline-block" /> Quiet ({distribution.inactive}d)
                 </span>
               </div>
             </div>
@@ -442,27 +442,27 @@ export default function GithubHeatmap({
       {/* ── Floating Hover Tooltip ────────────────────────────────────── */}
       {hoveredDay && tooltipPos && (
         <div
-          className={`absolute z-50 pointer-events-none transform -translate-x-1/2 bg-slate-950/95 border border-slate-700 text-white rounded-xl p-3 shadow-2xl backdrop-blur-md text-xs w-48 space-y-1 transition-all duration-75 ${
+          className={`absolute z-50 pointer-events-none transform -translate-x-1/2 bg-white dark:bg-slate-950/95 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-2xl p-3 shadow-xl text-xs w-48 space-y-1 transition-all duration-75 ${
             tooltipPos.isNearTop ? 'translate-y-0' : '-translate-y-full'
           }`}
           style={{ left: `${tooltipPos.x}px`, top: `${tooltipPos.y}px` }}
         >
-          <div className="font-bold text-slate-300 pb-1 border-b border-slate-800 flex items-center justify-between">
+          <div className="font-bold text-slate-800 dark:text-slate-300 pb-1 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
             <span>{formatTooltipDate(hoveredDay.date)}</span>
             <Calendar size={12} className="text-indigo-600 dark:text-indigo-400" />
           </div>
-          <div className="pt-1 flex items-center justify-between">
-            <span className="text-slate-400">Orders:</span>
+          <div className="pt-1 flex items-center justify-between font-medium">
+            <span className="text-slate-500 dark:text-slate-400">Orders:</span>
             <span className="font-extrabold text-indigo-600 dark:text-indigo-400">{hoveredDay.orders}</span>
           </div>
-          <div className="flex items-center justify-between">
-            <span className="text-slate-400">Sales:</span>
-            <span className="font-bold text-sky-400">₹{(hoveredDay.sales || 0).toLocaleString('en-IN')}</span>
+          <div className="flex items-center justify-between font-medium">
+            <span className="text-slate-500 dark:text-slate-400">Sales:</span>
+            <span className="font-bold text-sky-600 dark:text-sky-400">₹{(hoveredDay.sales || 0).toLocaleString('en-IN')}</span>
           </div>
           {hoveredDay.customers !== undefined && (
-            <div className="flex items-center justify-between">
-              <span className="text-slate-400">Customers:</span>
-              <span className="font-medium text-slate-200">{hoveredDay.customers}</span>
+            <div className="flex items-center justify-between font-medium">
+              <span className="text-slate-500 dark:text-slate-400">Customers:</span>
+              <span className="font-bold text-slate-700 dark:text-slate-200">{hoveredDay.customers}</span>
             </div>
           )}
         </div>

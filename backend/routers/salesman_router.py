@@ -23,10 +23,11 @@ def optional_auth(credentials: Optional[HTTPAuthorizationCredentials] = Security
 def get_team_summary(
     start_date: Optional[str] = Query(None),
     end_date: Optional[str] = Query(None),
+    salesman_id: Optional[str] = Query(None),
     current_user: dict = Depends(optional_auth)
 ):
     try:
-        return salesman_service.get_team_summary(start_date=start_date, end_date=end_date)
+        return salesman_service.get_team_summary(start_date=start_date, end_date=end_date, salesman_id=salesman_id)
     except Exception as exc:
         logger.error(f"Error fetching team summary: {exc}")
         raise HTTPException(status_code=500, detail="Failed to retrieve team performance summary.")

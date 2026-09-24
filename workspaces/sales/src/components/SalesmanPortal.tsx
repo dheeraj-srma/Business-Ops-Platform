@@ -31,7 +31,8 @@ import {
   Clock,
   MapPin,
   CloudOff,
-  ShieldCheck
+  ShieldCheck,
+  ChevronDown
 } from 'lucide-react';
 
 import type {
@@ -243,6 +244,62 @@ export default function SalesmanPortal() {
     }
   }, [profile]);
 
+
+  // Customer Selector UX State (Assigned Toggle, Search, Dropdown)
+  const [onlyAssigned, setOnlyAssigned] = useState<boolean>(true);
+  const [customerSearchQuery, setCustomerSearchQuery] = useState<string>('');
+  const [isCustomerDropdownOpen, setIsCustomerDropdownOpen] = useState<boolean>(false);
+  const [customerAssignmentWarning, setCustomerAssignmentWarning] = useState<string>('');
+  const [highlightedCustomerIndex, setHighlightedCustomerIndex] = useState<number>(-1);
+  const customerDropdownRef = useRef<HTMLDivElement>(null);
+  const customerSearchInputRef = useRef<HTMLInputElement>(null);
+  const customerListContainerRef = useRef<HTMLDivElement>(null);
+
+  // Set default Assigned toggle based on user role
+  useEffect(() => {
+    if (profile?.role === 'salesman' || userRole === 'Salesman') {
+      setOnlyAssigned(true);
+    }
+  }, [profile?.role, userRole]);
+
+  // Click outside to close Customer searchable dropdown
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent | TouchEvent) => {
+      if (customerDropdownRef.current && !customerDropdownRef.current.contains(e.target as Node)) {
+        setIsCustomerDropdownOpen(false);
+      }
+    };
+    if (isCustomerDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('touchstart', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
+  }, [isCustomerDropdownOpen]);
+
+  // Focus search input when dropdown opens
+  useEffect(() => {
+    if (isCustomerDropdownOpen) {
+      setTimeout(() => {
+        customerSearchInputRef.current?.focus();
+      }, 50);
+    } else {
+      setCustomerSearchQuery('');
+      setHighlightedCustomerIndex(-1);
+    }
+  }, [isCustomerDropdownOpen]);
+
+  // Scroll highlighted customer into view during keyboard navigation
+  useEffect(() => {
+    if (highlightedCustomerIndex >= 0 && customerListContainerRef.current) {
+      const el = customerListContainerRef.current.children[highlightedCustomerIndex] as HTMLElement;
+      if (el && typeof el.scrollIntoView === 'function') {
+        el.scrollIntoView({ block: 'nearest' });
+      }
+    }
+  }, [highlightedCustomerIndex]);
 
   // Offline Queue State (Non-sensitive client queue for offline resilience)
   const [offlineQueue, setOfflineQueue] = useState<QueuedOrder[]>(() => getOfflineQueue());
@@ -1046,6 +1103,20 @@ export default function SalesmanPortal() {
     });
   }, [dealers]);
 
+  // Master unique list of all customers across the authoritative catalog
+  const allMasterCustomers = useMemo(() => {
+    const seen = new Set<string>();
+    const list: DealerRecord[] = [];
+    dealers.forEach(d => {
+      const name = (d['Shop Name'] || '').trim();
+      if (name && !seen.has(name.toLowerCase())) {
+        seen.add(name.toLowerCase());
+        list.push(d);
+      }
+    });
+    return list.sort((a, b) => a['Shop Name'].localeCompare(b['Shop Name']));
+  }, [dealers]);
+
   // Assigned Customers for the currently selected Salesman (Sorted alphabetically)
   const assignedCustomers = useMemo(() => {
     if (!selectedSalesman) return [];
@@ -1054,7 +1125,10 @@ export default function SalesmanPortal() {
     const smId = smMatch?.id?.toLowerCase();
     const smCanonical = smMatch?.name?.toLowerCase();
 
-    return dealers
+    const seen = new Set<string>();
+    const list: DealerRecord[] = [];
+
+    dealers
       .filter(d => {
         const dName = (d['Salesman Name'] || '').toLowerCase().trim();
         const dId = (d['Salesman ID'] || '').toLowerCase().trim();
@@ -1065,25 +1139,117 @@ export default function SalesmanPortal() {
         );
         return isMatch && Boolean(d['Shop Name']);
       })
-      .sort((a, b) => a['Shop Name'].localeCompare(b['Shop Name']));
+      .forEach(d => {
+        const name = (d['Shop Name'] || '').trim();
+        if (name && !seen.has(name.toLowerCase())) {
+          seen.add(name.toLowerCase());
+          list.push(d);
+        }
+      });
+
+    return list.sort((a, b) => a['Shop Name'].localeCompare(b['Shop Name']));
   }, [dealers, selectedSalesman]);
 
-  // Available Shop Names for Selected Salesman
-  const availableShops = useMemo(() => {
-    return assignedCustomers.map(d => d['Shop Name']);
-  }, [assignedCustomers]);
+  // Base list depending on Assigned toggle & selectedSalesman
+  const baseCustomerList = useMemo(() => {
+    if (onlyAssigned && selectedSalesman) {
+      return assignedCustomers;
+    }
+    return allMasterCustomers;
+  }, [onlyAssigned, selectedSalesman, assignedCustomers, allMasterCustomers]);
 
+  // Multi-field Search Filter applied to the Customer population
+  const filteredCustomerList = useMemo(() => {
+    if (!customerSearchQuery.trim()) {
+      return baseCustomerList;
+    }
+    const q = customerSearchQuery.trim().toLowerCase();
+    const tokens = q.split(/\s+/).filter(Boolean);
+
+    return baseCustomerList.filter(cust => {
+      const name = (cust['Shop Name'] || '').toLowerCase();
+      const code = (cust['Customer Code'] || '').toLowerCase();
+      const city = (cust.City || '').toLowerCase();
+      const state = (cust.State || '').toLowerCase();
+      const phone = (cust.Phone || '').toLowerCase();
+      const address = (cust.Address || '').toLowerCase();
+      const contact = (cust['Contact Person'] || '').toLowerCase();
+      const gstin = ((cust as any).GSTIN || '').toLowerCase();
+
+      return tokens.every(
+        t =>
+          name.includes(t) ||
+          code.includes(t) ||
+          city.includes(t) ||
+          state.includes(t) ||
+          phone.includes(t) ||
+          address.includes(t) ||
+          contact.includes(t) ||
+          gstin.includes(t)
+      );
+    });
+  }, [baseCustomerList, customerSearchQuery]);
+
+  // Toggle handler for Assigned checkbox with selected customer safety
+  const handleToggleAssigned = (checked: boolean) => {
+    setOnlyAssigned(checked);
+    if (checked && selectedShop && selectedSalesman) {
+      const isAssigned = assignedCustomers.some(
+        d => d['Shop Name'].toLowerCase() === selectedShop.toLowerCase()
+      );
+      if (!isAssigned) {
+        setSelectedShop('');
+        setCustomerAssignmentWarning('Selected customer is not assigned to you.');
+        setTimeout(() => {
+          setCustomerAssignmentWarning('');
+        }, 5000);
+      }
+    }
+  };
 
   // Keep shop selection synchronized when salesman changes
   useEffect(() => {
-    if (availableShops.length > 0) {
-      if (selectedShop && !availableShops.includes(selectedShop)) {
+    if (selectedShop && onlyAssigned && selectedSalesman) {
+      const isAssigned = assignedCustomers.some(
+        d => d['Shop Name'].toLowerCase() === selectedShop.toLowerCase()
+      );
+      if (!isAssigned) {
         setSelectedShop('');
       }
-    } else {
-      setSelectedShop('');
     }
-  }, [selectedSalesman, availableShops, selectedShop]);
+  }, [selectedSalesman, assignedCustomers, onlyAssigned, selectedShop]);
+
+  // Search input keyboard shortcuts (Escape, ArrowUp, ArrowDown, Enter)
+  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Escape') {
+      setIsCustomerDropdownOpen(false);
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setHighlightedCustomerIndex(prev => {
+        const next = prev + 1;
+        return next < filteredCustomerList.length ? next : 0;
+      });
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setHighlightedCustomerIndex(prev => {
+        const next = prev - 1;
+        return next >= 0 ? next : filteredCustomerList.length - 1;
+      });
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (highlightedCustomerIndex >= 0 && highlightedCustomerIndex < filteredCustomerList.length) {
+        const chosen = filteredCustomerList[highlightedCustomerIndex];
+        setSelectedShop(chosen['Shop Name']);
+        setIsCustomerDropdownOpen(false);
+        setCustomerSearchQuery('');
+      } else if (filteredCustomerList.length > 0) {
+        const chosen = filteredCustomerList[0];
+        setSelectedShop(chosen['Shop Name']);
+        setIsCustomerDropdownOpen(false);
+        setCustomerSearchQuery('');
+      }
+    }
+  };
 
 
   // Matched Dealer Record (Auto-resolved when both fields are selected)
@@ -2630,18 +2796,51 @@ export default function SalesmanPortal() {
                 )}
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center justify-between">
-                  <span className="flex items-center gap-1.5">
+              <div className="relative" ref={customerDropdownRef}>
+                {/* Header with Label and Compact Assigned Toggle */}
+                <div className="flex items-center justify-between mb-1.5 gap-2">
+                  <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
                     <Building className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-                    Assigned Customer / Shop
-                  </span>
-                  {selectedSalesman && (
-                    <span className="font-normal text-[10px] text-indigo-600 dark:text-indigo-400 font-semibold bg-indigo-50 dark:bg-indigo-950/60 px-2 py-0.5 rounded-full border border-indigo-200 dark:border-indigo-800/60">
-                      {assignedCustomers.length} Assigned
-                    </span>
+                    Customer
+                  </label>
+                  {userRole !== 'Customer' && (
+                    <label
+                      htmlFor="assigned-customer-toggle"
+                      className="inline-flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-slate-700 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 select-none transition-colors"
+                      title={onlyAssigned ? "Showing only assigned customers. Uncheck to show all customers." : "Showing all customers. Check to show assigned only."}
+                    >
+                      <input
+                        id="assigned-customer-toggle"
+                        type="checkbox"
+                        checked={onlyAssigned}
+                        onChange={e => handleToggleAssigned(e.target.checked)}
+                        className="w-3.5 h-3.5 rounded border-slate-300 dark:border-slate-700 text-indigo-600 focus:ring-indigo-500 cursor-pointer accent-indigo-600"
+                      />
+                      <span>Assigned</span>
+                      <span className="text-[10px] font-normal text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800/80 px-1.5 py-0.5 rounded-full border border-slate-200 dark:border-slate-700">
+                        {baseCustomerList.length}
+                      </span>
+                    </label>
                   )}
-                </label>
+                </div>
+
+                {/* Warning notification if selected customer was cleared on toggle */}
+                {customerAssignmentWarning && (
+                  <div className="mb-2 px-2.5 py-1 rounded-lg bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800/60 text-amber-800 dark:text-amber-300 text-[11px] flex items-center justify-between animate-in fade-in duration-200">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <AlertTriangle className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+                      <span className="truncate">{customerAssignmentWarning}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setCustomerAssignmentWarning('')}
+                      className="text-amber-600 hover:text-amber-800 dark:text-amber-400 p-0.5"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                )}
+
                 {userRole === 'Customer' ? (
                   <div className="w-full bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 dark:text-slate-100 flex items-center justify-between font-medium">
                     <span className="flex items-center gap-2">
@@ -2653,21 +2852,170 @@ export default function SalesmanPortal() {
                     </span>
                   </div>
                 ) : (
-                  <select
-                    value={selectedShop}
-                    disabled={!selectedSalesman}
-                    onChange={e => setSelectedShop(e.target.value)}
-                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 dark:text-slate-100 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer font-medium"
-                  >
-                    <option value="" disabled className="text-slate-400">
-                      {selectedSalesman ? 'Select Assigned Customer...' : 'Select Salesman First...'}
-                    </option>
-                    {assignedCustomers.map(cust => (
-                      <option key={cust['Shop Name']} value={cust['Shop Name']}>
-                        {cust['Shop Name']}{cust.City ? ` — ${cust.City}` : ''}{cust['Customer Code'] ? ` [${cust['Customer Code']}]` : ''}
-                      </option>
-                    ))}
-                  </select>
+                  <>
+                    {/* Searchable Dropdown Trigger */}
+                    <button
+                      type="button"
+                      disabled={!selectedSalesman && !isAdminOrManager}
+                      onClick={() => setIsCustomerDropdownOpen(!isCustomerDropdownOpen)}
+                      className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-left text-slate-900 dark:text-slate-100 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-between font-medium"
+                    >
+                      {selectedShop ? (
+                        <div className="flex items-center gap-2 min-w-0 truncate">
+                          <Store className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                          <span className="font-semibold truncate">{selectedShop}</span>
+                          {cityVal !== '--' && (
+                            <span className="text-[11px] text-slate-500 dark:text-slate-400 shrink-0">
+                              ({cityVal})
+                            </span>
+                          )}
+                          {customerCodeVal !== '--' && (
+                            <span className="text-[10px] font-mono bg-slate-200/80 dark:bg-slate-800 px-1.5 py-0.5 rounded text-slate-700 dark:text-slate-300 shrink-0">
+                              {customerCodeVal}
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-slate-400 dark:text-slate-500 flex items-center gap-1.5">
+                          <Search className="w-3.5 h-3.5" />
+                          {selectedSalesman || isAdminOrManager ? 'Search or select customer...' : 'Select Salesman First...'}
+                        </span>
+                      )}
+                      <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                        {selectedShop && (
+                          <span
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedShop('');
+                            }}
+                            className="p-1 hover:bg-slate-200 dark:hover:bg-slate-800 rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                            title="Clear selection"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </span>
+                        )}
+                        <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${isCustomerDropdownOpen ? 'rotate-180' : ''}`} />
+                      </div>
+                    </button>
+
+                    {/* Popover Dropdown */}
+                    {isCustomerDropdownOpen && (
+                      <div className="absolute left-0 right-0 top-full mt-1.5 z-50 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
+                        {/* Search Input Bar */}
+                        <div className="p-2 border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/70">
+                          <div className="relative flex items-center">
+                            <Search className="w-3.5 h-3.5 absolute left-3 text-slate-400 pointer-events-none" />
+                            <input
+                              ref={customerSearchInputRef}
+                              type="text"
+                              value={customerSearchQuery}
+                              onChange={e => {
+                                setCustomerSearchQuery(e.target.value);
+                                setHighlightedCustomerIndex(-1);
+                              }}
+                              onKeyDown={handleSearchKeyDown}
+                              placeholder="Search by name, code, city, phone..."
+                              className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg pl-9 pr-8 py-1.5 text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                            />
+                            {customerSearchQuery && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setCustomerSearchQuery('');
+                                  customerSearchInputRef.current?.focus();
+                                }}
+                                className="absolute right-2.5 p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+                          <div className="flex items-center justify-between mt-1.5 px-1 text-[10px] text-slate-500 dark:text-slate-400">
+                            <span>
+                              Showing <strong className="text-slate-700 dark:text-slate-300">{filteredCustomerList.length}</strong> of {baseCustomerList.length} {onlyAssigned ? 'assigned' : 'total'} customers
+                            </span>
+                            {customerSearchQuery && (
+                              <span className="font-medium text-indigo-600 dark:text-indigo-400">
+                                Filtered
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Customer List */}
+                        <div
+                          ref={customerListContainerRef}
+                          className="max-h-64 sm:max-h-72 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800/60"
+                        >
+                          {filteredCustomerList.length === 0 ? (
+                            <div className="py-8 text-center text-xs text-slate-500 dark:text-slate-400 px-4">
+                              <Store className="w-8 h-8 mx-auto text-slate-300 dark:text-slate-700 mb-2" />
+                              <p className="font-semibold text-slate-700 dark:text-slate-300">No customers found</p>
+                              {customerSearchQuery ? (
+                                <p className="text-[11px] text-slate-400 mt-0.5">
+                                  No results matching "{customerSearchQuery}"
+                                </p>
+                              ) : onlyAssigned ? (
+                                <p className="text-[11px] text-slate-400 mt-0.5">
+                                  No assigned customers for {selectedSalesman}. Uncheck "Assigned" to view all customers.
+                                </p>
+                              ) : null}
+                            </div>
+                          ) : (
+                            filteredCustomerList.map((cust, idx) => {
+                              const isSelected = selectedShop.toLowerCase() === (cust['Shop Name'] || '').toLowerCase();
+                              const isHighlighted = idx === highlightedCustomerIndex;
+
+                              return (
+                                <button
+                                  key={`${cust['Shop Name']}-${cust['Customer Code'] || idx}`}
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedShop(cust['Shop Name']);
+                                    setIsCustomerDropdownOpen(false);
+                                    setCustomerSearchQuery('');
+                                  }}
+                                  onMouseEnter={() => setHighlightedCustomerIndex(idx)}
+                                  className={`w-full text-left px-3.5 py-2.5 text-xs transition-colors flex items-center justify-between gap-2 cursor-pointer ${
+                                    isSelected
+                                      ? 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-900 dark:text-indigo-200 font-semibold'
+                                      : isHighlighted
+                                      ? 'bg-slate-100 dark:bg-slate-800/70 text-slate-900 dark:text-slate-100'
+                                      : 'hover:bg-slate-50 dark:hover:bg-slate-800/40 text-slate-800 dark:text-slate-200'
+                                  }`}
+                                >
+                                  <div className="min-w-0 flex-1">
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-semibold truncate">{cust['Shop Name']}</span>
+                                      {cust['Customer Code'] && (
+                                        <span className="font-mono text-[10px] font-bold px-1.5 py-0.2 bg-slate-200/80 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded shrink-0">
+                                          {cust['Customer Code']}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div className="flex items-center gap-2 mt-0.5 text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                                      {cust.City && <span>{cust.City}</span>}
+                                      {cust.City && cust.State && <span>&bull;</span>}
+                                      {cust.State && <span>{cust.State}</span>}
+                                      {cust.Phone && (
+                                        <>
+                                          <span>&bull;</span>
+                                          <span className="font-mono">{cust.Phone}</span>
+                                        </>
+                                      )}
+                                    </div>
+                                  </div>
+                                  {isSelected && (
+                                    <CheckCircle2 className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                                  )}
+                                </button>
+                              );
+                            })
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             </div>

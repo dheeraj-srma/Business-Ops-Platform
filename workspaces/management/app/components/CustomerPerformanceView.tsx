@@ -493,14 +493,14 @@ export default function CustomerPerformanceView() {
   return (
     <div className="space-y-6 animate-fadeIn">
       {/* ── Top Unified Date Range & Selector Control Bar (Matching Salesman Layout) ── */}
-      <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 shadow-lg flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 backdrop-blur-md">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="p-2.5 bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/40 rounded-xl text-indigo-600 dark:text-indigo-400">
             <Calendar size={20} />
           </div>
           <div>
-            <div className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Scope</div>
-            <div className="text-sm font-bold text-white flex items-center gap-2">
+            <div className="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider">Scope</div>
+            <div className="text-sm font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
               <span>Customer Performance</span>
             </div>
           </div>
@@ -509,16 +509,16 @@ export default function CustomerPerformanceView() {
         {/* Filters */}
         <div className="flex flex-wrap items-center gap-3">
           {/* Customer Focus Dropdown */}
-          <div className="flex items-center gap-2 bg-slate-950/80 px-3 py-2 rounded-xl border border-slate-800 text-xs">
-            <Users size={14} className="text-sky-400" />
+          <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-950 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 text-xs shadow-xs">
+            <Users size={14} className="text-indigo-600 dark:text-indigo-400" />
             <select
               value={selectedCustomerId}
               onChange={(e) => setSelectedCustomerId(e.target.value)}
-              className="bg-transparent text-white font-semibold focus:outline-none cursor-pointer max-w-[240px] truncate"
+              className="bg-transparent text-slate-900 dark:text-white font-semibold focus:outline-hidden cursor-pointer max-w-[240px] truncate"
             >
-              <option value="all" className="bg-slate-900 text-white">All Customers ({customersData.length} Accounts)</option>
+              <option value="all" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">All Customers ({customersData.length} Accounts)</option>
               {customersData.map((c, idx) => (
-                <option key={`${c.id}-${idx}`} value={c.id} className="bg-slate-900 text-white">
+                <option key={`${c.id}-${idx}`} value={c.id} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">
                   {c.name} ({c.city})
                 </option>
               ))}
@@ -526,27 +526,27 @@ export default function CustomerPerformanceView() {
           </div>
 
           {/* Date Range Selector */}
-          <div className="flex items-center gap-2 bg-slate-950/80 px-3 py-2 rounded-xl border border-slate-800 text-xs">
-            <span className="text-slate-400 font-medium">Period:</span>
+          <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-950 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 text-xs shadow-xs">
+            <span className="text-slate-500 dark:text-slate-400 font-medium">Period:</span>
             <select
               value={dateRange}
               onChange={(e) => handleDateRangeChange(e.target.value)}
-              className="bg-transparent text-indigo-600 dark:text-indigo-400 font-bold focus:outline-none cursor-pointer"
+              className="bg-transparent text-indigo-600 dark:text-indigo-400 font-bold focus:outline-hidden cursor-pointer"
             >
-              <option value="today" className="bg-slate-900 text-white">Today</option>
-              <option value="yesterday" className="bg-slate-900 text-white">Yesterday</option>
-              <option value="7d" className="bg-slate-900 text-white">Last 7 Days</option>
-              <option value="this_week" className="bg-slate-900 text-white">This Week</option>
-              <option value="this_month" className="bg-slate-900 text-white">This Month</option>
-              <option value="last_month" className="bg-slate-900 text-white">Last Month</option>
-              <option value="30d" className="bg-slate-900 text-white">Last 30 Days</option>
-              <option value="60d" className="bg-slate-900 text-white">Last 60 Days</option>
-              <option value="90d" className="bg-slate-900 text-white">Last 90 Days</option>
-              <option value="this_quarter" className="bg-slate-900 text-white">This Quarter</option>
-              <option value="ytd" className="bg-slate-900 text-white">Year-to-Date (YTD)</option>
-              <option value="12m" className="bg-slate-900 text-white">Last 12 Months</option>
-              <option value="all" className="bg-slate-900 text-white">All History</option>
-              <option value="custom" className="bg-slate-900 text-white">Custom Range</option>
+              <option value="today" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">Today</option>
+              <option value="yesterday" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">Yesterday</option>
+              <option value="7d" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">Last 7 Days</option>
+              <option value="this_week" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">This Week</option>
+              <option value="this_month" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">This Month</option>
+              <option value="last_month" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">Last Month</option>
+              <option value="30d" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">Last 30 Days</option>
+              <option value="60d" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">Last 60 Days</option>
+              <option value="90d" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">Last 90 Days</option>
+              <option value="this_quarter" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">This Quarter</option>
+              <option value="ytd" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">Year-to-Date (YTD)</option>
+              <option value="12m" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">Last 12 Months</option>
+              <option value="all" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">All History</option>
+              <option value="custom" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">Custom Range</option>
             </select>
           </div>
 
@@ -556,24 +556,24 @@ export default function CustomerPerformanceView() {
                 type="date"
                 value={customStart}
                 onChange={(e) => setCustomStart(e.target.value)}
-                className="bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-1.5 text-white focus:outline-none focus:border-indigo-500"
+                className="bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl px-2.5 py-1.5 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500 shadow-xs"
               />
-              <span className="text-slate-500">to</span>
+              <span className="text-slate-500 font-medium">to</span>
               <input
                 type="date"
                 value={customEnd}
                 onChange={(e) => setCustomEnd(e.target.value)}
-                className="bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-1.5 text-white focus:outline-none focus:border-indigo-500"
+                className="bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl px-2.5 py-1.5 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500 shadow-xs"
               />
               {customStart && customEnd && customStart > customEnd && (
-                <span className="text-[10px] text-rose-400 font-semibold">Start date must be before end date</span>
+                <span className="text-[10px] text-rose-600 dark:text-rose-400 font-semibold">Start date must be before end date</span>
               )}
             </div>
           )}
 
           <button
             onClick={() => fetchHeatmap(selectedCustomerId, heatmapRange)}
-            className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl transition-all border border-slate-700/50"
+            className="p-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl transition-all border border-slate-200 dark:border-slate-700/50 cursor-pointer shadow-xs"
             title="Refresh Data"
           >
             <RefreshCw size={14} className={loadingHeatmap ? 'animate-spin' : ''} />
@@ -583,70 +583,70 @@ export default function CustomerPerformanceView() {
 
       {/* ── 1. Aggregate KPI Cards (Matching Salesman Performance Layout) ── */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-        <div className="bg-slate-900/70 border border-slate-800/80 rounded-2xl p-4 shadow-lg">
-          <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-[11px] font-semibold uppercase tracking-wider">Total Sales</span>
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800/80 rounded-2xl p-4 shadow-xs">
+          <div className="flex items-center justify-between text-slate-600 dark:text-slate-400 mb-2">
+            <span className="text-[11px] font-bold uppercase tracking-wider">Total Sales</span>
             <DollarSign size={16} className="text-indigo-600 dark:text-indigo-400" />
           </div>
-          <div className="text-lg font-extrabold text-white">
+          <div className="text-lg font-extrabold text-slate-900 dark:text-white">
             ₹{metrics.totalSales.toLocaleString('en-IN')}
           </div>
-          <div className="text-[10px] text-slate-500 mt-1">Live data</div>
+          <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 font-medium">Live data</div>
         </div>
 
-        <div className="bg-slate-900/70 border border-slate-800/80 rounded-2xl p-4 shadow-lg">
-          <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-[11px] font-semibold uppercase tracking-wider">Orders</span>
-            <ShoppingCart size={16} className="text-sky-400" />
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800/80 rounded-2xl p-4 shadow-xs">
+          <div className="flex items-center justify-between text-slate-600 dark:text-slate-400 mb-2">
+            <span className="text-[11px] font-bold uppercase tracking-wider">Orders</span>
+            <ShoppingCart size={16} className="text-sky-600 dark:text-sky-400" />
           </div>
-          <div className="text-lg font-extrabold text-white">
+          <div className="text-lg font-extrabold text-slate-900 dark:text-white">
             {metrics.orders.toLocaleString('en-IN')}
           </div>
-          <div className="text-[10px] text-slate-500 mt-1">Completed orders</div>
+          <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 font-medium">Completed orders</div>
         </div>
 
-        <div className="bg-slate-900/70 border border-slate-800/80 rounded-2xl p-4 shadow-lg">
-          <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-[11px] font-semibold uppercase tracking-wider">Average Order</span>
-            <TrendingUp size={16} className="text-amber-400" />
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800/80 rounded-2xl p-4 shadow-xs">
+          <div className="flex items-center justify-between text-slate-600 dark:text-slate-400 mb-2">
+            <span className="text-[11px] font-bold uppercase tracking-wider">Average Order</span>
+            <TrendingUp size={16} className="text-amber-600 dark:text-amber-400" />
           </div>
-          <div className="text-lg font-extrabold text-white">
+          <div className="text-lg font-extrabold text-slate-900 dark:text-white">
             ₹{metrics.avgOrder.toLocaleString('en-IN')}
           </div>
-          <div className="text-[10px] text-slate-500 mt-1">Average order value</div>
+          <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 font-medium">Average order value</div>
         </div>
 
-        <div className="bg-slate-900/70 border border-slate-800/80 rounded-2xl p-4 shadow-lg">
-          <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-[11px] font-semibold uppercase tracking-wider">Units Sold</span>
-            <Package size={16} className="text-indigo-400" />
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800/80 rounded-2xl p-4 shadow-xs">
+          <div className="flex items-center justify-between text-slate-600 dark:text-slate-400 mb-2">
+            <span className="text-[11px] font-bold uppercase tracking-wider">Units Sold</span>
+            <Package size={16} className="text-purple-600 dark:text-purple-400" />
           </div>
-          <div className="text-lg font-extrabold text-white">
+          <div className="text-lg font-extrabold text-slate-900 dark:text-white">
             {metrics.unitsSold.toLocaleString('en-IN')}
           </div>
-          <div className="text-[10px] text-slate-500 mt-1">Total units</div>
+          <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 font-medium">Total units</div>
         </div>
 
-        <div className="bg-slate-900/70 border border-slate-800/80 rounded-2xl p-4 shadow-lg">
-          <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-[11px] font-semibold uppercase tracking-wider">{selectedCustomer ? 'Products' : 'Customers'}</span>
-            <Building2 size={16} className="text-purple-400" />
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800/80 rounded-2xl p-4 shadow-xs">
+          <div className="flex items-center justify-between text-slate-600 dark:text-slate-400 mb-2">
+            <span className="text-[11px] font-bold uppercase tracking-wider">{selectedCustomer ? 'Products' : 'Customers'}</span>
+            <Building2 size={16} className="text-emerald-600 dark:text-emerald-400" />
           </div>
-          <div className="text-lg font-extrabold text-white">
+          <div className="text-lg font-extrabold text-slate-900 dark:text-white">
             {selectedCustomer ? `${metrics.products} SKUs` : `${customersData.length} Accounts`}
           </div>
-          <div className="text-[10px] text-slate-500 mt-1">{selectedCustomer ? 'Distinct items' : 'Unique accounts'}</div>
+          <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 font-medium">{selectedCustomer ? 'Distinct items' : 'Unique accounts'}</div>
         </div>
 
-        <div className="bg-slate-900/70 border border-slate-800/80 rounded-2xl p-4 shadow-lg">
-          <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-[11px] font-semibold uppercase tracking-wider">Active Days</span>
-            <Calendar size={16} className="text-teal-400" />
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800/80 rounded-2xl p-4 shadow-xs">
+          <div className="flex items-center justify-between text-slate-600 dark:text-slate-400 mb-2">
+            <span className="text-[11px] font-bold uppercase tracking-wider">Active Days</span>
+            <Calendar size={16} className="text-teal-600 dark:text-teal-400" />
           </div>
-          <div className="text-lg font-extrabold text-white">
+          <div className="text-lg font-extrabold text-slate-900 dark:text-white">
             {metrics.activeDays} Days
           </div>
-          <div className="text-[10px] text-slate-500 mt-1">Purchase activity</div>
+          <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 font-medium">Purchase activity</div>
         </div>
       </div>
 
@@ -662,34 +662,34 @@ export default function CustomerPerformanceView() {
 
       {/* ── 3. Selected Customer Focus Analytics Detail View (Matching Salesman Detail) ── */}
       {selectedCustomerId !== 'all' && selectedCustomer && (
-        <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-5">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-xs space-y-5">
           {/* Header Card */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200 dark:border-slate-800">
             <div>
               <div className="flex items-center gap-2 mb-1">
                 <span className={`px-2.5 py-0.5 rounded-md text-[10px] font-bold border uppercase ${
-                  selectedCustomer.tier === 'Platinum' ? 'bg-indigo-900/60 text-indigo-300 border-indigo-700/60' :
-                  selectedCustomer.tier === 'Gold' ? 'bg-amber-900/60 text-amber-300 border-amber-700/60' :
-                  selectedCustomer.tier === 'Silver' ? 'bg-slate-800 text-slate-300 border-slate-700' :
-                  'bg-slate-800 text-slate-400 border-slate-700'
+                  selectedCustomer.tier === 'Platinum' ? 'bg-indigo-50 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-700/60' :
+                  selectedCustomer.tier === 'Gold' ? 'bg-amber-50 dark:bg-amber-900/60 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-700/60' :
+                  selectedCustomer.tier === 'Silver' ? 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700' :
+                  'bg-orange-50 dark:bg-slate-800 text-orange-700 dark:text-slate-400 border-orange-200 dark:border-slate-700'
                 }`}>
                   {selectedCustomer.tier} Tier Account
                 </span>
-                <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400">
+                <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60">
                   ACTIVE
                 </span>
               </div>
-              <h2 className="text-xl font-extrabold text-white tracking-tight flex items-center gap-2">
+              <h2 className="text-xl font-extrabold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
                 {selectedCustomer.name}
-                <span className="text-xs font-medium text-slate-400 font-mono">({selectedCustomer.id})</span>
+                <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 font-mono">({selectedCustomer.id})</span>
               </h2>
-              <div className="text-xs text-slate-400 mt-1 flex flex-wrap items-center gap-4">
-                <span className="flex items-center gap-1">
-                  <MapPin size={12} className="text-sky-400" />
+              <div className="text-xs text-slate-600 dark:text-slate-400 mt-1 flex flex-wrap items-center gap-4">
+                <span className="flex items-center gap-1 font-medium">
+                  <MapPin size={12} className="text-indigo-600 dark:text-sky-400" />
                   {selectedCustomer.city}, {selectedCustomer.state}
                 </span>
-                <span className="flex items-center gap-1">
-                  <UserCheck size={12} className="text-indigo-400" />
+                <span className="flex items-center gap-1 font-medium">
+                  <UserCheck size={12} className="text-purple-600 dark:text-indigo-400" />
                   Rep: {selectedCustomer.salesman}
                 </span>
                 <span className="text-slate-500 font-mono text-[11px]">
@@ -700,7 +700,7 @@ export default function CustomerPerformanceView() {
 
             <button
               onClick={() => setSelectedCustomerId('all')}
-              className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl transition-all border border-slate-700/60 flex items-center gap-2 self-start sm:self-auto"
+              className="px-3.5 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold rounded-xl transition-all border border-slate-200 dark:border-slate-700/60 flex items-center gap-2 self-start sm:self-auto cursor-pointer shadow-xs"
             >
               <span>View All Customers</span>
               <ChevronRight size={14} />
@@ -709,71 +709,71 @@ export default function CustomerPerformanceView() {
 
           {/* Exact Sales Breakdown Panel */}
           <div>
-            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
-              <FileText size={14} className="text-sky-400" />
+            <h4 className="text-xs font-bold text-slate-700 dark:text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+              <FileText size={14} className="text-indigo-600 dark:text-sky-400" />
               Sales Breakdown
             </h4>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
-              <div className="bg-slate-950/60 p-3 rounded-xl border border-slate-800/80">
-                <div className="text-slate-400 mb-1">Gross Sales</div>
-                <div className="text-sm font-extrabold text-white">₹{selectedCustomer.revenue.toLocaleString('en-IN')}</div>
+              <div className="bg-slate-50 dark:bg-slate-950/60 p-3.5 rounded-xl border border-slate-200 dark:border-slate-800/80 shadow-xs">
+                <div className="text-slate-600 dark:text-slate-400 mb-1 font-medium">Gross Sales</div>
+                <div className="text-base font-extrabold text-slate-900 dark:text-white">₹{selectedCustomer.revenue.toLocaleString('en-IN')}</div>
               </div>
-              <div className="bg-slate-950/60 p-3 rounded-xl border border-slate-800/80">
-                <div className="text-slate-400 mb-1">Total Vouchers</div>
-                <div className="text-sm font-extrabold text-sky-400">{selectedCustomer.orders}</div>
-                <div className="text-[10px] text-slate-500 mt-0.5">Average ₹{selectedCustomer.avg_order.toLocaleString('en-IN')}</div>
+              <div className="bg-slate-50 dark:bg-slate-950/60 p-3.5 rounded-xl border border-slate-200 dark:border-slate-800/80 shadow-xs">
+                <div className="text-slate-600 dark:text-slate-400 mb-1 font-medium">Total Vouchers</div>
+                <div className="text-base font-extrabold text-sky-600 dark:text-sky-400">{selectedCustomer.orders}</div>
+                <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">Average ₹{selectedCustomer.avg_order.toLocaleString('en-IN')}</div>
               </div>
-              <div className="bg-slate-950/60 p-3 rounded-xl border border-slate-800/80">
-                <div className="text-slate-400 mb-1">Units Dispatched</div>
-                <div className="text-sm font-extrabold text-amber-400">{selectedCustomer.units_sold.toLocaleString('en-IN')}</div>
-                <div className="text-[10px] text-slate-500 mt-0.5">Across {selectedCustomer.products_count} distinct SKUs</div>
+              <div className="bg-slate-50 dark:bg-slate-950/60 p-3.5 rounded-xl border border-slate-200 dark:border-slate-800/80 shadow-xs">
+                <div className="text-slate-600 dark:text-slate-400 mb-1 font-medium">Units Dispatched</div>
+                <div className="text-base font-extrabold text-amber-600 dark:text-amber-400">{selectedCustomer.units_sold.toLocaleString('en-IN')}</div>
+                <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">Across {selectedCustomer.products_count} distinct SKUs</div>
               </div>
-              <div className="bg-slate-950/60 p-3 rounded-xl border border-slate-800/80">
-                <div className="text-slate-400 mb-1">Active Days</div>
-                <div className="text-sm font-extrabold text-teal-400">{selectedCustomer.active_days} Days</div>
-                <div className="text-[10px] text-slate-500 mt-0.5">Purchase activity</div>
+              <div className="bg-slate-50 dark:bg-slate-950/60 p-3.5 rounded-xl border border-slate-200 dark:border-slate-800/80 shadow-xs">
+                <div className="text-slate-600 dark:text-slate-400 mb-1 font-medium">Active Days</div>
+                <div className="text-base font-extrabold text-teal-600 dark:text-teal-400">{selectedCustomer.active_days} Days</div>
+                <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">Purchase activity</div>
               </div>
             </div>
           </div>
 
           {/* Commercial & Fulfillment Health Panel */}
           <div>
-            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
-              <ShieldCheck size={14} className="text-emerald-400" />
+            <h4 className="text-xs font-bold text-slate-700 dark:text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+              <ShieldCheck size={14} className="text-emerald-600 dark:text-emerald-400" />
               Commercial & Fulfillment Health
             </h4>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
-              <div className="bg-slate-950/60 p-3 rounded-xl border border-slate-800/80">
-                <div className="text-slate-400 mb-1">Net Commercial Sales</div>
-                <div className="text-sm font-extrabold text-emerald-400">
+              <div className="bg-slate-50 dark:bg-slate-950/60 p-3.5 rounded-xl border border-slate-200 dark:border-slate-800/80 shadow-xs">
+                <div className="text-slate-600 dark:text-slate-400 mb-1 font-medium">Net Commercial Sales</div>
+                <div className="text-base font-extrabold text-emerald-600 dark:text-emerald-400">
                   ₹{(customerProfile?.net_sales ?? selectedCustomer.revenue).toLocaleString('en-IN')}
                 </div>
-                <div className="text-[10px] text-slate-500 mt-0.5">After return deductions</div>
+                <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">After return deductions</div>
               </div>
-              <div className="bg-slate-950/60 p-3 rounded-xl border border-slate-800/80">
-                <div className="text-slate-400 mb-1">Fulfillment Acceptance</div>
-                <div className="text-sm font-extrabold text-indigo-400">
+              <div className="bg-slate-50 dark:bg-slate-950/60 p-3.5 rounded-xl border border-slate-200 dark:border-slate-800/80 shadow-xs">
+                <div className="text-slate-600 dark:text-slate-400 mb-1 font-medium">Fulfillment Acceptance</div>
+                <div className="text-base font-extrabold text-indigo-600 dark:text-indigo-400">
                   {customerProfile ? `${customerProfile.acceptance_rate_pct}%` : '100%'}
                 </div>
-                <div className="text-[10px] text-slate-500 mt-0.5">
+                <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
                   {customerProfile ? `${customerProfile.return_rate_pct}% returns (₹${customerProfile.return_amount.toLocaleString('en-IN')})` : 'Zero returns'}
                 </div>
               </div>
-              <div className="bg-slate-950/60 p-3 rounded-xl border border-slate-800/80">
-                <div className="text-slate-400 mb-1">Dispatch Cadence</div>
-                <div className="text-sm font-extrabold text-purple-400">
+              <div className="bg-slate-50 dark:bg-slate-950/60 p-3.5 rounded-xl border border-slate-200 dark:border-slate-800/80 shadow-xs">
+                <div className="text-slate-600 dark:text-slate-400 mb-1 font-medium">Dispatch Cadence</div>
+                <div className="text-base font-extrabold text-purple-600 dark:text-purple-400">
                   {customerProfile?.avg_cadence_days ? `Every ~${customerProfile.avg_cadence_days}d` : 'Single order'}
                 </div>
-                <div className="text-[10px] text-slate-500 mt-0.5">
+                <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
                   {customerProfile?.tenor_days ? `${customerProfile.tenor_days} days relationship span` : 'Recent account'}
                 </div>
               </div>
-              <div className="bg-slate-950/60 p-3 rounded-xl border border-slate-800/80">
-                <div className="text-slate-400 mb-1">Last Order Recency</div>
-                <div className="text-sm font-extrabold text-teal-400">
+              <div className="bg-slate-50 dark:bg-slate-950/60 p-3.5 rounded-xl border border-slate-200 dark:border-slate-800/80 shadow-xs">
+                <div className="text-slate-600 dark:text-slate-400 mb-1 font-medium">Last Order Recency</div>
+                <div className="text-base font-extrabold text-teal-600 dark:text-teal-400">
                   {customerProfile?.days_since_last_order !== undefined ? `${customerProfile.days_since_last_order} days ago` : 'Active'}
                 </div>
-                <div className="text-[10px] text-slate-500 mt-0.5">
+                <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
                   {customerProfile?.max_voucher ? `Max voucher: ₹${customerProfile.max_voucher.toLocaleString('en-IN')}` : 'Live status'}
                 </div>
               </div>
@@ -783,39 +783,39 @@ export default function CustomerPerformanceView() {
           {/* Top Procured Lines & Top Purchased Products Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {/* Left: Top Procured Lines */}
-            <div className="bg-slate-950/70 border border-slate-800/90 rounded-xl p-4 flex flex-col justify-between">
+            <div className="bg-slate-50 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800/90 rounded-2xl p-4.5 flex flex-col justify-between shadow-xs">
               <div>
                 <div className="flex items-center justify-between gap-2 mb-3">
-                  <div className="flex items-center gap-2 text-indigo-400 font-bold text-xs uppercase tracking-wider">
+                  <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400 font-bold text-xs uppercase tracking-wider">
                     <Layers size={15} />
                     <span>Top Procured Categories</span>
                   </div>
-                  <span className="text-[10px] font-semibold text-slate-400">Category Share</span>
+                  <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase">Category Share</span>
                 </div>
                 <div className="space-y-2.5">
                   {customerProfile?.top_lines && customerProfile.top_lines.length > 0 ? (
                     customerProfile.top_lines.map((line, idx) => (
-                      <div key={`${line.line_name}-${idx}`} className="bg-slate-900/80 p-2.5 rounded-lg border border-slate-800/70">
-                        <div className="flex items-center justify-between text-xs mb-1">
-                          <span className="font-bold text-slate-200">{line.line_name}</span>
-                          <span className="font-extrabold text-indigo-400">
-                            ₹{line.amount.toLocaleString('en-IN')} <span className="text-slate-400 font-normal">({line.share_pct}%)</span>
+                      <div key={`${line.line_name}-${idx}`} className="bg-white dark:bg-slate-900/80 p-3 rounded-xl border border-slate-200 dark:border-slate-800/70 shadow-xs">
+                        <div className="flex items-center justify-between text-xs mb-1.5">
+                          <span className="font-bold text-slate-800 dark:text-slate-200">{line.line_name}</span>
+                          <span className="font-extrabold text-indigo-600 dark:text-indigo-400">
+                            ₹{line.amount.toLocaleString('en-IN')} <span className="text-slate-500 dark:text-slate-400 font-normal">({line.share_pct}%)</span>
                           </span>
                         </div>
-                        <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden mb-1.5">
+                        <div className="w-full bg-slate-200 dark:bg-slate-800 h-2 rounded-full overflow-hidden mb-1.5">
                           <div
                             className="bg-gradient-to-r from-indigo-500 to-sky-400 h-full rounded-full transition-all duration-500"
                             style={{ width: `${Math.min(100, line.share_pct)}%` }}
                           />
                         </div>
-                        <div className="flex items-center justify-between text-[10px] text-slate-400">
+                        <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 font-medium">
                           <span>{line.skus} distinct SKUs</span>
                           <span>{line.quantity.toLocaleString('en-IN')} units dispatched</span>
                         </div>
                       </div>
                     ))
                   ) : (
-                    <div className="text-slate-500 text-xs py-4 text-center">
+                    <div className="text-slate-500 dark:text-slate-400 text-xs py-4 text-center">
                       {loadingProfile ? 'Analyzing category breakdown...' : 'No category breakdown available'}
                     </div>
                   )}
@@ -824,35 +824,35 @@ export default function CustomerPerformanceView() {
             </div>
 
             {/* Right: Top Purchased Products */}
-            <div className="bg-slate-950/70 border border-slate-800/90 rounded-xl p-4 flex flex-col justify-between">
+            <div className="bg-slate-50 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800/90 rounded-2xl p-4.5 flex flex-col justify-between shadow-xs">
               <div>
                 <div className="flex items-center justify-between gap-2 mb-3">
-                  <div className="flex items-center gap-2 text-sky-400 font-bold text-xs uppercase tracking-wider">
+                  <div className="flex items-center gap-2 text-sky-600 dark:text-sky-400 font-bold text-xs uppercase tracking-wider">
                     <Package size={15} />
                     <span>Top Purchased Products</span>
                   </div>
-                  <span className="text-[10px] font-semibold text-slate-400">Highest Volume SKUs</span>
+                  <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase">Highest Volume SKUs</span>
                 </div>
                 <div className="space-y-2.5">
                   {customerProfile?.top_products && customerProfile.top_products.length > 0 ? (
                     customerProfile.top_products.map((prod, idx) => (
-                      <div key={`${prod.product_name}-${idx}`} className="bg-slate-900/80 p-2.5 rounded-lg border border-slate-800/70">
+                      <div key={`${prod.product_name}-${idx}`} className="bg-white dark:bg-slate-900/80 p-3 rounded-xl border border-slate-200 dark:border-slate-800/70 shadow-xs">
                         <div className="flex items-start justify-between gap-2 text-xs mb-1">
-                          <div className="font-semibold text-slate-200 line-clamp-1 flex-1" title={prod.product_name}>
+                          <div className="font-semibold text-slate-800 dark:text-slate-200 line-clamp-1 flex-1" title={prod.product_name}>
                             {prod.product_name}
                           </div>
-                          <span className="font-extrabold text-sky-400 shrink-0">₹{prod.amount.toLocaleString('en-IN')}</span>
+                          <span className="font-extrabold text-sky-600 dark:text-sky-400 shrink-0">₹{prod.amount.toLocaleString('en-IN')}</span>
                         </div>
-                        <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1 border-t border-slate-800/40">
-                          <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 font-medium">{prod.category}</span>
-                          <span className="text-amber-400 font-medium">
+                        <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 pt-1.5 border-t border-slate-100 dark:border-slate-800/40 font-medium">
+                          <span className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold">{prod.category}</span>
+                          <span className="text-amber-600 dark:text-amber-400 font-semibold">
                             {prod.quantity.toLocaleString('en-IN')} {prod.unit} ({prod.share_pct}% share)
                           </span>
                         </div>
                       </div>
                     ))
                   ) : (
-                    <div className="text-slate-500 text-xs py-4 text-center">
+                    <div className="text-slate-500 dark:text-slate-400 text-xs py-4 text-center">
                       {loadingProfile ? 'Analyzing top products...' : 'No product line data available'}
                     </div>
                   )}
@@ -864,16 +864,16 @@ export default function CustomerPerformanceView() {
           {/* Interactive Chart for Time-Series Trend */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+              <h4 className="text-xs font-bold text-slate-700 dark:text-slate-400 uppercase tracking-wider flex items-center gap-2">
                 <BarChart3 size={14} className="text-indigo-600 dark:text-indigo-400" />
                 Sales Timeline
               </h4>
-              <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-lg border border-slate-800 text-[11px]">
+              <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-950 p-1 rounded-xl border border-slate-200 dark:border-slate-800 text-[11px]">
                 {(['daily', 'weekly', 'monthly'] as const).map(g => (
                   <button
                     key={g}
                     onClick={() => setChartGranularity(g)}
-                    className={`px-2.5 py-1 rounded-md capitalize font-medium transition-all ${chartGranularity === g ? 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 font-bold' : 'text-slate-400 hover:text-white'}`}
+                    className={`px-2.5 py-1 rounded-lg capitalize font-semibold transition-all cursor-pointer ${chartGranularity === g ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}`}
                   >
                     {g}
                   </button>
@@ -916,15 +916,15 @@ export default function CustomerPerformanceView() {
       )}
 
       {/* ── 5. Customer Directory & Comparison Table (Matching Salesman Table Layout) ── */}
-      <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-xl backdrop-blur-md">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-xs">
         {/* Table Filter Controls */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 pb-4 border-b border-slate-800">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 pb-4 border-b border-slate-200 dark:border-slate-800">
           <div>
-            <h3 className="text-base sm:text-lg font-bold text-white tracking-tight flex items-center gap-2">
-              <Users size={18} className="text-sky-400" />
+            <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
+              <Users size={18} className="text-indigo-600 dark:text-sky-400" />
               Customer Accounts Directory
             </h3>
-            <p className="text-xs text-slate-400 mt-0.5">Authoritative performance ledger across all {customersData.length} customer accounts</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 font-medium">Authoritative performance ledger across all {customersData.length} customer accounts</p>
           </div>
 
           <div className="flex items-center gap-3">
@@ -936,44 +936,44 @@ export default function CustomerPerformanceView() {
                 placeholder={`Search ${customersData.length} customers...`}
                 value={searchQuery}
                 onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }}
-                className="pl-9 pr-3 py-1.5 bg-slate-950/80 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-sky-500 w-44 sm:w-60"
+                className="pl-9 pr-3 py-1.5 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 w-44 sm:w-60 shadow-xs"
               />
             </div>
 
             {/* Tier Filter */}
-            <div className="flex items-center gap-1.5 bg-slate-950/80 px-2.5 py-1.5 rounded-xl border border-slate-800 text-xs text-slate-400">
+            <div className="flex items-center gap-1.5 bg-white dark:bg-slate-950 px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-400 shadow-xs">
               <Filter size={12} />
               <select
                 value={tierFilter}
                 onChange={(e) => { setTierFilter(e.target.value); setPage(1); }}
-                className="bg-transparent text-white focus:outline-none cursor-pointer text-xs"
+                className="bg-transparent text-slate-900 dark:text-white font-semibold focus:outline-hidden cursor-pointer text-xs"
               >
-                <option value="all" className="bg-slate-900">All Tiers</option>
-                <option value="Platinum" className="bg-slate-900">Platinum Tier</option>
-                <option value="Gold" className="bg-slate-900">Gold Tier</option>
-                <option value="Silver" className="bg-slate-900">Silver Tier</option>
-                <option value="Bronze" className="bg-slate-900">Bronze Tier</option>
+                <option value="all" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">All Tiers</option>
+                <option value="Platinum" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">Platinum Tier</option>
+                <option value="Gold" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">Gold Tier</option>
+                <option value="Silver" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">Silver Tier</option>
+                <option value="Bronze" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">Bronze Tier</option>
               </select>
             </div>
           </div>
         </div>
 
         {/* Pagination Bar */}
-        <div className="flex items-center justify-between text-xs text-slate-400 mb-3">
+        <div className="flex items-center justify-between text-xs text-slate-600 dark:text-slate-400 font-medium mb-3">
           <span>Showing {filteredCustomerOptions.length === 0 ? 0 : (page - 1) * pageSize + 1} to {Math.min(page * pageSize, filteredCustomerOptions.length)} of {filteredCustomerOptions.length} customers</span>
           <div className="flex items-center gap-2">
             <button
               disabled={page <= 1}
               onClick={() => setPage(p => Math.max(1, p - 1))}
-              className="px-2.5 py-1 bg-slate-800 rounded-lg border border-slate-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-700 text-slate-200"
+              className="px-3 py-1 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold cursor-pointer shadow-xs transition-colors"
             >
               Prev
             </button>
-            <span>Page {page} of {Math.max(1, Math.ceil(filteredCustomerOptions.length / pageSize))}</span>
+            <span className="font-bold text-slate-900 dark:text-white">Page {page} of {Math.max(1, Math.ceil(filteredCustomerOptions.length / pageSize))}</span>
             <button
               disabled={page >= Math.ceil(filteredCustomerOptions.length / pageSize)}
               onClick={() => setPage(p => p + 1)}
-              className="px-2.5 py-1 bg-slate-800 rounded-lg border border-slate-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-700 text-slate-200"
+              className="px-3 py-1 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold cursor-pointer shadow-xs transition-colors"
             >
               Next
             </button>
@@ -981,8 +981,8 @@ export default function CustomerPerformanceView() {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs text-slate-300">
-            <thead className="bg-slate-800/60 text-slate-400 font-bold uppercase text-[10px] border-b border-slate-800">
+          <table className="w-full text-left text-xs text-slate-700 dark:text-slate-300">
+            <thead className="bg-slate-50 dark:bg-slate-950/60 text-slate-700 dark:text-slate-300 font-bold uppercase text-[11px] border-b border-slate-200 dark:border-slate-800">
               <tr>
                 <th className="py-3 px-4">Customer Name</th>
                 <th className="py-3 px-4">Location</th>
@@ -996,37 +996,37 @@ export default function CustomerPerformanceView() {
                 <th className="py-3 px-4 text-center">Action</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/50 font-medium">
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50 font-medium">
               {filteredCustomerOptions.slice((page - 1) * pageSize, page * pageSize).map((c, idx) => (
-                <tr key={`${c.id}-${(page - 1) * pageSize + idx}`} className="hover:bg-slate-800/30 transition-colors">
+                <tr key={`${c.id}-${(page - 1) * pageSize + idx}`} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/30 transition-colors">
                   <td className="py-3 px-4">
-                    <div className="font-bold text-slate-100">{c.name}</div>
-                    <div className="text-[10px] text-slate-400 font-mono">{c.id}</div>
+                    <div className="font-bold text-slate-900 dark:text-slate-100">{c.name}</div>
+                    <div className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">{c.id}</div>
                   </td>
-                  <td className="py-3 px-4 text-slate-300">
+                  <td className="py-3 px-4 text-slate-700 dark:text-slate-300">
                     <div>{c.city}</div>
-                    <div className="text-[10px] text-slate-500">{c.state}</div>
+                    <div className="text-[10px] text-slate-500 dark:text-slate-500">{c.state}</div>
                   </td>
-                  <td className="py-3 px-4 font-medium text-slate-300">{c.salesman}</td>
+                  <td className="py-3 px-4 font-semibold text-slate-700 dark:text-slate-300">{c.salesman}</td>
                   <td className="py-3 px-4 text-center">
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                      c.tier === 'Platinum' ? 'bg-indigo-900/60 text-indigo-300 border border-indigo-700/60' :
-                      c.tier === 'Gold' ? 'bg-amber-900/60 text-amber-300 border border-amber-700/60' :
-                      c.tier === 'Silver' ? 'bg-slate-800 text-slate-300 border border-slate-700' :
-                      'bg-slate-800/60 text-slate-400'
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+                      c.tier === 'Platinum' ? 'bg-indigo-50 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-700/60' :
+                      c.tier === 'Gold' ? 'bg-amber-50 dark:bg-amber-900/60 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-700/60' :
+                      c.tier === 'Silver' ? 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700' :
+                      'bg-orange-50 dark:bg-slate-800 text-orange-700 dark:text-slate-400 border-orange-200 dark:border-slate-700'
                     }`}>
                       {c.tier}
                     </span>
                   </td>
-                  <td className="py-3 px-4 text-center font-semibold text-slate-200">{c.orders}</td>
-                  <td className="py-3 px-4 text-right font-medium text-amber-400">{c.units_sold.toLocaleString('en-IN')}</td>
-                  <td className="py-3 px-4 text-right font-medium text-purple-400">₹{c.avg_order.toLocaleString('en-IN')}</td>
-                  <td className="py-3 px-4 text-center text-slate-300">{c.products_count} SKUs</td>
-                  <td className="py-3 px-4 text-right font-bold text-indigo-400">₹{c.revenue.toLocaleString('en-IN')}</td>
+                  <td className="py-3 px-4 text-center font-bold text-slate-800 dark:text-slate-200">{c.orders}</td>
+                  <td className="py-3 px-4 text-right font-semibold text-amber-600 dark:text-amber-400">{c.units_sold.toLocaleString('en-IN')}</td>
+                  <td className="py-3 px-4 text-right font-semibold text-purple-600 dark:text-purple-400">₹{c.avg_order.toLocaleString('en-IN')}</td>
+                  <td className="py-3 px-4 text-center text-slate-600 dark:text-slate-300 font-medium">{c.products_count} SKUs</td>
+                  <td className="py-3 px-4 text-right font-extrabold text-indigo-600 dark:text-indigo-400">₹{c.revenue.toLocaleString('en-IN')}</td>
                   <td className="py-3 px-4 text-center">
                     <button
                       onClick={() => { setSelectedCustomerId(c.id); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-                      className="px-2.5 py-1 rounded bg-indigo-950/60 hover:bg-indigo-900 text-indigo-400 border border-indigo-800/50 text-[10px] font-semibold transition-all"
+                      className="px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 dark:hover:bg-indigo-900 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800/50 text-[11px] font-bold transition-all cursor-pointer shadow-xs"
                     >
                       Inspect
                     </button>
@@ -1035,7 +1035,7 @@ export default function CustomerPerformanceView() {
               ))}
               {filteredCustomerOptions.length === 0 && (
                 <tr>
-                  <td colSpan={10} className="py-8 text-center text-slate-500">
+                  <td colSpan={10} className="py-8 text-center text-slate-500 font-medium">
                     No customers found matching "{searchQuery}"
                   </td>
                 </tr>

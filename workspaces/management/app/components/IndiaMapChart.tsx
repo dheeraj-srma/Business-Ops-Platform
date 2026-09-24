@@ -359,55 +359,31 @@ export default function IndiaMapChart() {
 
   return (
     <div
-      className="panel"
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        minHeight: '520px',
-        height: 'auto',
-        width: '100%',
-        boxSizing: 'border-box',
-        padding: '1.25rem 1.5rem',
-        gap: '0.75rem',
-        background: '#0b0f19',
-        border: '1px solid #1e293b',
-        borderRadius: '16px',
-        boxShadow: '0 20px 40px rgba(0, 0, 0, 0.8)'
-      }}
+      className="panel flex flex-col min-h-[520px] h-auto w-full box-border p-5 sm:p-6 gap-3 bg-white dark:bg-[#0b0f19] border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xs"
     >
       {/* ── Top Header, Interactive Breadcrumb & Toolbar Controls ────────── */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+      <div className="flex justify-between items-center flex-wrap gap-3">
         <div>
-          <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <MapPin size={20} className="text-accent" />
+          <div className="text-base sm:text-lg font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+            <MapPin size={20} className="text-indigo-600 dark:text-indigo-400" />
             <span>India Regional Revenue & Dealer Distribution Map</span>
           </div>
 
           {/* Clean Interactive Breadcrumb */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', marginTop: '4px', color: '#94a3b8' }}>
+          <div className="flex items-center gap-1.5 text-xs sm:text-sm mt-1 text-slate-600 dark:text-slate-400">
             <span
               onClick={() => handleBreadcrumbClick('india')}
-              style={{
-                color: drillLevel === 'india' ? '#f8fafc' : '#6366f1',
-                fontWeight: drillLevel === 'india' ? 800 : 600,
-                cursor: 'pointer',
-                textDecoration: drillLevel === 'india' ? 'none' : 'underline'
-              }}
+              className={`cursor-pointer ${drillLevel === 'india' ? 'text-slate-900 dark:text-slate-100 font-extrabold' : 'text-indigo-600 dark:text-indigo-400 hover:underline font-semibold'}`}
             >
               India
             </span>
 
             {(drillLevel === 'state' || drillLevel === 'city' || drillLevel === 'customer') && (
               <>
-                <ChevronRight size={14} className="text-slate-500" />
+                <ChevronRight size={14} className="text-slate-400" />
                 <span
                   onClick={() => handleBreadcrumbClick('state')}
-                  style={{
-                    color: drillLevel === 'state' ? '#f8fafc' : '#6366f1',
-                    fontWeight: drillLevel === 'state' ? 800 : 600,
-                    cursor: 'pointer',
-                    textDecoration: drillLevel === 'state' ? 'none' : 'underline'
-                  }}
+                  className={`cursor-pointer ${drillLevel === 'state' ? 'text-slate-900 dark:text-slate-100 font-extrabold' : 'text-indigo-600 dark:text-indigo-400 hover:underline font-semibold'}`}
                 >
                   {selectedState.name}
                 </span>
@@ -416,15 +392,10 @@ export default function IndiaMapChart() {
 
             {(drillLevel === 'city' || drillLevel === 'customer') && selectedCity && (
               <>
-                <ChevronRight size={14} className="text-slate-500" />
+                <ChevronRight size={14} className="text-slate-400" />
                 <span
                   onClick={() => handleBreadcrumbClick('city')}
-                  style={{
-                    color: drillLevel === 'city' ? '#f8fafc' : '#6366f1',
-                    fontWeight: drillLevel === 'city' ? 800 : 600,
-                    cursor: 'pointer',
-                    textDecoration: drillLevel === 'city' ? 'none' : 'underline'
-                  }}
+                  className={`cursor-pointer ${drillLevel === 'city' ? 'text-slate-900 dark:text-slate-100 font-extrabold' : 'text-indigo-600 dark:text-indigo-400 hover:underline font-semibold'}`}
                 >
                   {selectedCity.name}
                 </span>
@@ -433,8 +404,8 @@ export default function IndiaMapChart() {
 
             {drillLevel === 'customer' && selectedCustomer && (
               <>
-                <ChevronRight size={14} className="text-slate-500" />
-                <span style={{ color: '#f8fafc', fontWeight: 800 }}>
+                <ChevronRight size={14} className="text-slate-400" />
+                <span className="text-slate-900 dark:text-slate-100 font-extrabold">
                   {selectedCustomer.name}
                 </span>
               </>
@@ -443,25 +414,16 @@ export default function IndiaMapChart() {
         </div>
 
         {/* Time Range Selector Controls */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', color: '#94a3b8', background: 'rgba(30, 41, 59, 0.6)', border: '1px solid #334155', padding: '5px 12px', borderRadius: '6px' }}>
-            <Calendar size={13} className="text-accent" />
-            <span>Range: <strong>{timeRange === '30d' ? 'Last 30 Days' : timeRange === '90d' ? 'Last 90 Days' : timeRange === 'ytd' ? 'Year to Date' : 'All Time'}</strong></span>
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <div className="flex items-center gap-1.5 text-xs font-medium text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-lg shadow-xs">
+            <Calendar size={13} className="text-indigo-600 dark:text-indigo-400" />
+            <span>Range: <strong className="font-bold text-slate-900 dark:text-slate-100">{timeRange === '30d' ? 'Last 30 Days' : timeRange === '90d' ? 'Last 90 Days' : timeRange === 'ytd' ? 'Year to Date' : 'All Time'}</strong></span>
           </div>
 
           <select
             value={timeRange}
             onChange={(e) => setTimeRange(e.target.value as any)}
-            style={{
-              background: '#1e293b',
-              border: '1px solid #334155',
-              borderRadius: '6px',
-              color: '#f8fafc',
-              fontSize: '0.75rem',
-              padding: '5px 10px',
-              outline: 'none',
-              cursor: 'pointer'
-            }}
+            className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 text-xs px-2.5 py-1.5 outline-hidden focus:ring-2 focus:ring-indigo-500 cursor-pointer shadow-xs font-medium"
           >
             <option value="30d">Last 30 Days</option>
             <option value="90d">Last 90 Days</option>
@@ -472,52 +434,29 @@ export default function IndiaMapChart() {
       </div>
 
       {/* ── Main Card Layout (Preserved Exactly: Left Map, Right Panel) ────── */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        flexWrap: 'wrap',
-        minHeight: '380px',
-        width: '100%',
-        gap: '1.5rem',
-        boxSizing: 'border-box'
-      }}>
+      <div className="flex items-center justify-between flex-wrap min-h-[380px] w-full gap-6 box-border">
 
         {/* ── LEFT SIDE: True Vector GeoJSON Map with Smooth Camera Zoom ─────── */}
-        <div style={{
-          flex: '1 1 45%',
-          height: '360px',
-          position: 'relative',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          minWidth: '280px',
-          maxWidth: '100%',
-          boxSizing: 'border-box',
-          overflow: 'hidden',
-          background: '#070a12',
-          borderRadius: '12px',
-          border: '1px solid rgba(255,255,255,0.05)'
-        }}>
+        <div className="flex-1 basis-[45%] h-[360px] relative flex items-center justify-center min-w-[280px] max-w-full box-border overflow-hidden bg-[#070a12] rounded-xl border border-slate-800 shadow-inner">
           {/* Zoom & Reset Overlay Buttons */}
-          <div style={{ position: 'absolute', bottom: '10px', left: '10px', display: 'flex', flexDirection: 'column', gap: '6px', zIndex: 10 }}>
+          <div className="absolute bottom-2.5 left-2.5 flex flex-col gap-1.5 z-10">
             <button
               onClick={handleZoomIn}
-              style={{ width: '28px', height: '28px', background: '#1e293b', border: '1px solid #334155', borderRadius: '6px', color: '#f8fafc', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              className="w-7 h-7 bg-slate-800/90 hover:bg-slate-700 border border-slate-700 rounded-md text-slate-100 cursor-pointer flex items-center justify-center transition-colors shadow-sm"
               title="Zoom In"
             >
               <ZoomIn size={15} />
             </button>
             <button
               onClick={handleZoomOut}
-              style={{ width: '28px', height: '28px', background: '#1e293b', border: '1px solid #334155', borderRadius: '6px', color: '#f8fafc', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              className="w-7 h-7 bg-slate-800/90 hover:bg-slate-700 border border-slate-700 rounded-md text-slate-100 cursor-pointer flex items-center justify-center transition-colors shadow-sm"
               title="Zoom Out"
             >
               <ZoomOut size={15} />
             </button>
             <button
               onClick={handleReset}
-              style={{ width: '28px', height: '28px', background: '#1e293b', border: '1px solid #334155', borderRadius: '6px', color: '#f8fafc', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              className="w-7 h-7 bg-slate-800/90 hover:bg-slate-700 border border-slate-700 rounded-md text-slate-100 cursor-pointer flex items-center justify-center transition-colors shadow-sm"
               title="Reset Zoom to India"
             >
               <RotateCcw size={14} />
@@ -738,35 +677,22 @@ export default function IndiaMapChart() {
         </div>
 
         {/* ── RIGHT SIDE: Context-Sensitive Information Panel ─────────────── */}
-        <div style={{
-          flex: '1 1 45%',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'center',
-          gap: '0.85rem',
-          boxSizing: 'border-box',
-          minWidth: '280px',
-          maxWidth: '100%'
-        }}>
+        <div className="flex-1 basis-[45%] flex flex-col justify-center gap-3.5 box-border min-w-[280px] max-w-full">
           
           <div
-            className="fade-in"
+            className="fade-in p-5 rounded-2xl bg-slate-50 dark:bg-[#131b2e] border border-slate-200 dark:border-slate-800 shadow-xs"
             style={{
-              padding: '1.2rem',
-              background: '#131b2e',
-              borderRadius: '14px',
-              border: `1.5px solid ${selectedCustomer ? '#10b981' : hoveredCityObj ? '#6366f1' : (hoveredStateObj?.color || selectedState.color)}`,
-              boxShadow: `0 10px 30px rgba(0,0,0,0.5), 0 0 20px ${selectedCustomer ? '#10b98130' : hoveredCityObj ? '#6366f130' : (hoveredStateObj?.color || selectedState.color) + '30'}`
+              borderLeft: `4px solid ${selectedCustomer ? '#10b981' : hoveredCityObj ? '#6366f1' : (hoveredStateObj?.color || selectedState.color)}`
             }}
           >
             {/* Context Title Header */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-              <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div className="flex items-center justify-between mb-3">
+              <div className="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
                 {drillLevel === 'india' && !hoveredStateObj && <MapPin size={18} style={{ color: selectedState.color }} />}
                 {drillLevel === 'india' && hoveredStateObj && <MapPin size={18} style={{ color: hoveredStateObj.color }} />}
                 {drillLevel === 'state' && !hoveredCityObj && !selectedCustomer && <MapPin size={18} style={{ color: selectedState.color }} />}
-                {drillLevel === 'state' && hoveredCityObj && !selectedCustomer && <Store size={18} style={{ color: '#6366f1' }} />}
-                {selectedCustomer && <UserCheck size={18} style={{ color: '#10b981' }} />}
+                {drillLevel === 'state' && hoveredCityObj && !selectedCustomer && <Store size={18} className="text-indigo-600 dark:text-indigo-400" />}
+                {selectedCustomer && <UserCheck size={18} className="text-emerald-600 dark:text-emerald-400" />}
 
                 <span>
                   {drillLevel === 'india' && !hoveredStateObj && 'India (IN)'}
@@ -778,14 +704,11 @@ export default function IndiaMapChart() {
               </div>
 
               <span
+                className="text-[11px] font-extrabold px-2.5 py-1 rounded-md border"
                 style={{
-                  fontSize: '0.72rem',
-                  fontWeight: 800,
-                  padding: '3px 8px',
-                  borderRadius: '6px',
-                  background: selectedCustomer ? '#10b98125' : hoveredCityObj ? '#6366f125' : hoveredStateObj ? '#f59e0b25' : `${selectedState.color}30`,
-                  color: selectedCustomer ? '#10b981' : hoveredCityObj ? '#6366f1' : hoveredStateObj ? '#f59e0b' : selectedState.color,
-                  border: `1px solid ${selectedCustomer ? '#10b98160' : hoveredCityObj ? '#6366f160' : hoveredStateObj ? '#f59e0b60' : selectedState.color + '60'}`
+                  background: selectedCustomer ? '#10b98120' : hoveredCityObj ? '#6366f120' : hoveredStateObj ? '#f59e0b20' : `${selectedState.color}20`,
+                  color: selectedCustomer ? '#059669' : hoveredCityObj ? '#4f46e5' : hoveredStateObj ? '#d97706' : selectedState.color,
+                  borderColor: selectedCustomer ? '#10b98160' : hoveredCityObj ? '#6366f160' : hoveredStateObj ? '#f59e0b60' : `${selectedState.color}60`
                 }}
               >
                 {drillLevel === 'india' && !hoveredStateObj && 'National Summary'}
@@ -801,31 +724,31 @@ export default function IndiaMapChart() {
               
               {/* Level 1: INDIA (National Summary when not hovering; State Preview when hovering) */}
               {drillLevel === 'india' && !hoveredStateObj && (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.75rem', marginTop: '0.6rem' }}>
-                  <div style={{ padding: '0.65rem 0.8rem', background: 'rgba(15, 23, 42, 0.85)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                    <div style={{ fontSize: '0.68rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 700 }}>Gross Sales</div>
-                    <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#6366f1', marginTop: '2px' }}>
+                <div className="grid grid-cols-2 gap-3 mt-2">
+                  <div className="p-3 bg-white dark:bg-slate-900/85 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs">
+                    <div className="text-[11px] text-slate-600 dark:text-slate-400 uppercase font-bold tracking-wider">Gross Sales</div>
+                    <div className="text-lg font-extrabold text-indigo-600 dark:text-indigo-400 mt-0.5">
                       ₹{((Number(indiaData?.gross_sales || 0)) / 10000000).toFixed(2)}Cr
                     </div>
                   </div>
 
-                  <div style={{ padding: '0.65rem 0.8rem', background: 'rgba(15, 23, 42, 0.85)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                    <div style={{ fontSize: '0.68rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 700 }}>Total Orders</div>
-                    <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#f59e0b', marginTop: '2px' }}>
+                  <div className="p-3 bg-white dark:bg-slate-900/85 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs">
+                    <div className="text-[11px] text-slate-600 dark:text-slate-400 uppercase font-bold tracking-wider">Total Orders</div>
+                    <div className="text-lg font-extrabold text-amber-600 dark:text-amber-400 mt-0.5">
                       {Number(indiaData?.orders || indiaData?.total_orders || 0)} Orders
                     </div>
                   </div>
 
-                  <div style={{ padding: '0.65rem 0.8rem', background: 'rgba(15, 23, 42, 0.85)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                    <div style={{ fontSize: '0.68rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 700 }}>Active Outlets</div>
-                    <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#c084fc', marginTop: '2px' }}>
+                  <div className="p-3 bg-white dark:bg-slate-900/85 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs">
+                    <div className="text-[11px] text-slate-600 dark:text-slate-400 uppercase font-bold tracking-wider">Active Outlets</div>
+                    <div className="text-lg font-extrabold text-purple-600 dark:text-purple-400 mt-0.5">
                       {Number(indiaData?.customers || indiaData?.active_dealers || 0)} Dealers
                     </div>
                   </div>
 
-                  <div style={{ padding: '0.65rem 0.8rem', background: 'rgba(15, 23, 42, 0.85)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                    <div style={{ fontSize: '0.68rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 700 }}>Active States</div>
-                    <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#10b981', marginTop: '2px' }}>
+                  <div className="p-3 bg-white dark:bg-slate-900/85 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs">
+                    <div className="text-[11px] text-slate-600 dark:text-slate-400 uppercase font-bold tracking-wider">Active States</div>
+                    <div className="text-lg font-extrabold text-emerald-600 dark:text-emerald-400 mt-0.5">
                       {Number(indiaData?.active_states || (indiaData?.states?.length || 0))} States
                     </div>
                   </div>
@@ -834,31 +757,31 @@ export default function IndiaMapChart() {
 
               {/* Level 1 HOVER: State Preview Metrics */}
               {drillLevel === 'india' && hoveredStateObj && (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.75rem', marginTop: '0.6rem' }}>
-                  <div style={{ padding: '0.65rem 0.8rem', background: 'rgba(15, 23, 42, 0.85)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                    <div style={{ fontSize: '0.68rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 700 }}>Gross Sales</div>
-                    <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#6366f1', marginTop: '2px' }}>
+                <div className="grid grid-cols-2 gap-3 mt-2">
+                  <div className="p-3 bg-white dark:bg-slate-900/85 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs">
+                    <div className="text-[11px] text-slate-600 dark:text-slate-400 uppercase font-bold tracking-wider">Gross Sales</div>
+                    <div className="text-lg font-extrabold text-indigo-600 dark:text-indigo-400 mt-0.5">
                       ₹{((hoveredStateObj.revenue) / 100000).toFixed(1)}L
                     </div>
                   </div>
 
-                  <div style={{ padding: '0.65rem 0.8rem', background: 'rgba(15, 23, 42, 0.85)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                    <div style={{ fontSize: '0.68rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 700 }}>National Share</div>
-                    <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#10b981', marginTop: '2px' }}>
+                  <div className="p-3 bg-white dark:bg-slate-900/85 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs">
+                    <div className="text-[11px] text-slate-600 dark:text-slate-400 uppercase font-bold tracking-wider">National Share</div>
+                    <div className="text-lg font-extrabold text-emerald-600 dark:text-emerald-400 mt-0.5">
                       {hoveredStateObj.share}%
                     </div>
                   </div>
 
-                  <div style={{ padding: '0.65rem 0.8rem', background: 'rgba(15, 23, 42, 0.85)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                    <div style={{ fontSize: '0.68rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 700 }}>Active Outlets</div>
-                    <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#c084fc', marginTop: '2px' }}>
+                  <div className="p-3 bg-white dark:bg-slate-900/85 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs">
+                    <div className="text-[11px] text-slate-600 dark:text-slate-400 uppercase font-bold tracking-wider">Active Outlets</div>
+                    <div className="text-lg font-extrabold text-purple-600 dark:text-purple-400 mt-0.5">
                       {hoveredStateObj.dealers} Dealers
                     </div>
                   </div>
 
-                  <div style={{ padding: '0.65rem 0.8rem', background: 'rgba(15, 23, 42, 0.85)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                    <div style={{ fontSize: '0.68rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 700 }}>Orders Handled</div>
-                    <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#f59e0b', marginTop: '2px' }}>
+                  <div className="p-3 bg-white dark:bg-slate-900/85 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs">
+                    <div className="text-[11px] text-slate-600 dark:text-slate-400 uppercase font-bold tracking-wider">Orders Handled</div>
+                    <div className="text-lg font-extrabold text-amber-600 dark:text-amber-400 mt-0.5">
                       {Math.round(hoveredStateObj.orders)} Orders
                     </div>
                   </div>
@@ -867,31 +790,31 @@ export default function IndiaMapChart() {
 
               {/* Level 2: STATE OVERVIEW (No district hovered) */}
               {drillLevel === 'state' && !hoveredCityObj && !selectedCustomer && (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.75rem', marginTop: '0.6rem' }}>
-                  <div style={{ padding: '0.65rem 0.8rem', background: 'rgba(15, 23, 42, 0.85)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                    <div style={{ fontSize: '0.68rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 700 }}>Gross Sales</div>
-                    <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#6366f1', marginTop: '2px' }}>
+                <div className="grid grid-cols-2 gap-3 mt-2">
+                  <div className="p-3 bg-white dark:bg-slate-900/85 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs">
+                    <div className="text-[11px] text-slate-600 dark:text-slate-400 uppercase font-bold tracking-wider">Gross Sales</div>
+                    <div className="text-lg font-extrabold text-indigo-600 dark:text-indigo-400 mt-0.5">
                       ₹{((selectedState.revenue) / 100000).toFixed(1)}L
                     </div>
                   </div>
 
-                  <div style={{ padding: '0.65rem 0.8rem', background: 'rgba(15, 23, 42, 0.85)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                    <div style={{ fontSize: '0.68rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 700 }}>National Share</div>
-                    <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#10b981', marginTop: '2px' }}>
+                  <div className="p-3 bg-white dark:bg-slate-900/85 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs">
+                    <div className="text-[11px] text-slate-600 dark:text-slate-400 uppercase font-bold tracking-wider">National Share</div>
+                    <div className="text-lg font-extrabold text-emerald-600 dark:text-emerald-400 mt-0.5">
                       {selectedState.share}%
                     </div>
                   </div>
 
-                  <div style={{ padding: '0.65rem 0.8rem', background: 'rgba(15, 23, 42, 0.85)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                    <div style={{ fontSize: '0.68rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 700 }}>Active Outlets</div>
-                    <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#c084fc', marginTop: '2px' }}>
+                  <div className="p-3 bg-white dark:bg-slate-900/85 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs">
+                    <div className="text-[11px] text-slate-600 dark:text-slate-400 uppercase font-bold tracking-wider">Active Outlets</div>
+                    <div className="text-lg font-extrabold text-purple-600 dark:text-purple-400 mt-0.5">
                       {selectedState.dealers} Dealers
                     </div>
                   </div>
 
-                  <div style={{ padding: '0.65rem 0.8rem', background: 'rgba(15, 23, 42, 0.85)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                    <div style={{ fontSize: '0.68rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 700 }}>Orders Handled</div>
-                    <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#f59e0b', marginTop: '2px' }}>
+                  <div className="p-3 bg-white dark:bg-slate-900/85 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs">
+                    <div className="text-[11px] text-slate-600 dark:text-slate-400 uppercase font-bold tracking-wider">Orders Handled</div>
+                    <div className="text-lg font-extrabold text-amber-600 dark:text-amber-400 mt-0.5">
                       {Math.round(selectedState.orders)} Orders
                     </div>
                   </div>
@@ -900,31 +823,31 @@ export default function IndiaMapChart() {
 
               {/* Level 2 HOVER: DISTRICT SUMMARY (District hovered) */}
               {drillLevel === 'state' && hoveredCityObj && !selectedCustomer && (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.75rem', marginTop: '0.6rem' }}>
-                  <div style={{ padding: '0.65rem 0.8rem', background: 'rgba(15, 23, 42, 0.85)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                    <div style={{ fontSize: '0.68rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 700 }}>Gross Sales</div>
-                    <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#6366f1', marginTop: '2px' }}>
+                <div className="grid grid-cols-2 gap-3 mt-2">
+                  <div className="p-3 bg-white dark:bg-slate-900/85 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs">
+                    <div className="text-[11px] text-slate-600 dark:text-slate-400 uppercase font-bold tracking-wider">Gross Sales</div>
+                    <div className="text-lg font-extrabold text-indigo-600 dark:text-indigo-400 mt-0.5">
                       ₹{((hoveredCityObj.revenue) / 100000).toFixed(1)}L
                     </div>
                   </div>
 
-                  <div style={{ padding: '0.65rem 0.8rem', background: 'rgba(15, 23, 42, 0.85)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                    <div style={{ fontSize: '0.68rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 700 }}>Lead Salesman</div>
-                    <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#10b981', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <div className="p-3 bg-white dark:bg-slate-900/85 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs">
+                    <div className="text-[11px] text-slate-600 dark:text-slate-400 uppercase font-bold tracking-wider">Lead Salesman</div>
+                    <div className="text-sm font-extrabold text-emerald-600 dark:text-emerald-400 mt-0.5 truncate">
                       {activeCustomers[0]?.salesman || 'RAVINDER KUMAR'}
                     </div>
                   </div>
 
-                  <div style={{ padding: '0.65rem 0.8rem', background: 'rgba(15, 23, 42, 0.85)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                    <div style={{ fontSize: '0.68rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 700 }}>Outlets / Dealers</div>
-                    <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#c084fc', marginTop: '2px' }}>
+                  <div className="p-3 bg-white dark:bg-slate-900/85 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs">
+                    <div className="text-[11px] text-slate-600 dark:text-slate-400 uppercase font-bold tracking-wider">Outlets / Dealers</div>
+                    <div className="text-lg font-extrabold text-purple-600 dark:text-purple-400 mt-0.5">
                       {hoveredCityObj.dealers || 25} Outlets
                     </div>
                   </div>
 
-                  <div style={{ padding: '0.65rem 0.8rem', background: 'rgba(15, 23, 42, 0.85)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                    <div style={{ fontSize: '0.68rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 700 }}>Total Orders</div>
-                    <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#f59e0b', marginTop: '2px' }}>
+                  <div className="p-3 bg-white dark:bg-slate-900/85 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs">
+                    <div className="text-[11px] text-slate-600 dark:text-slate-400 uppercase font-bold tracking-wider">Total Orders</div>
+                    <div className="text-lg font-extrabold text-amber-600 dark:text-amber-400 mt-0.5">
                       {Math.round(hoveredCityObj.orders)} Orders
                     </div>
                   </div>
@@ -933,43 +856,43 @@ export default function IndiaMapChart() {
 
               {/* CUSTOMER BREAKDOWN (Customer account selected in bottom list) */}
               {selectedCustomer && (
-                <>
-                  <div style={{ padding: '0.65rem 0.8rem', background: 'rgba(15, 23, 42, 0.85)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                    <div style={{ fontSize: '0.68rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 700 }}>Gross Sales</div>
-                    <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#6366f1', marginTop: '2px' }}>
+                <div className="grid grid-cols-2 gap-3 mt-2">
+                  <div className="p-3 bg-white dark:bg-slate-900/85 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs">
+                    <div className="text-[11px] text-slate-600 dark:text-slate-400 uppercase font-bold tracking-wider">Gross Sales</div>
+                    <div className="text-lg font-extrabold text-indigo-600 dark:text-indigo-400 mt-0.5">
                       ₹{((selectedCustomer.revenue) / 100000).toFixed(2)}L
                     </div>
                   </div>
 
-                  <div style={{ padding: '0.65rem 0.8rem', background: 'rgba(15, 23, 42, 0.85)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                    <div style={{ fontSize: '0.68rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 700 }}>Orders</div>
-                    <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#f59e0b', marginTop: '2px' }}>
+                  <div className="p-3 bg-white dark:bg-slate-900/85 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs">
+                    <div className="text-[11px] text-slate-600 dark:text-slate-400 uppercase font-bold tracking-wider">Orders</div>
+                    <div className="text-lg font-extrabold text-amber-600 dark:text-amber-400 mt-0.5">
                       {Math.round(selectedCustomer.orders)}
                     </div>
                   </div>
 
-                  <div style={{ padding: '0.65rem 0.8rem', background: 'rgba(15, 23, 42, 0.85)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                    <div style={{ fontSize: '0.68rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 700 }}>Average Order</div>
-                    <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#10b981', marginTop: '2px' }}>
+                  <div className="p-3 bg-white dark:bg-slate-900/85 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs">
+                    <div className="text-[11px] text-slate-600 dark:text-slate-400 uppercase font-bold tracking-wider">Average Order</div>
+                    <div className="text-lg font-extrabold text-emerald-600 dark:text-emerald-400 mt-0.5">
                       ₹{Math.round(selectedCustomer.avg_order).toLocaleString()}
                     </div>
                   </div>
 
-                  <div style={{ padding: '0.65rem 0.8rem', background: 'rgba(15, 23, 42, 0.85)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                    <div style={{ fontSize: '0.68rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 700 }}>Salesman</div>
-                    <div style={{ fontSize: '1.0rem', fontWeight: 800, color: '#c084fc', marginTop: '2px' }}>
+                  <div className="p-3 bg-white dark:bg-slate-900/85 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs">
+                    <div className="text-[11px] text-slate-600 dark:text-slate-400 uppercase font-bold tracking-wider">Salesman</div>
+                    <div className="text-sm font-extrabold text-purple-600 dark:text-purple-400 mt-0.5 truncate">
                       {selectedCustomer.salesman || 'Rahul'}
                     </div>
                   </div>
-                </>
+                </div>
               )}
 
             </div>
           </div>
 
           {/* ── BOTTOM CONTRIBUTION LIST (Adapts dynamically on state vs district hover) ──── */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <div style={{ fontSize: '0.74rem', color: '#94a3b8', fontWeight: 700 }}>
+          <div className="flex flex-col gap-1.5">
+            <div className="text-xs font-bold text-slate-700 dark:text-slate-300">
               {drillLevel === 'india' && !hoveredStateObj && 'Top State Territory Contributions:'}
               {drillLevel === 'india' && hoveredStateObj && `Top Districts in ${hoveredStateObj.name} Preview:`}
               {drillLevel === 'state' && !hoveredCityObj && !selectedCustomer && `Top Districts in ${selectedState.name}:`}
@@ -977,7 +900,7 @@ export default function IndiaMapChart() {
               {selectedCustomer && `Top Products Purchased by ${selectedCustomer.name}:`}
             </div>
 
-            <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '2px' }}>
+            <div className="flex gap-1.5 overflow-x-auto pb-1">
               
               {/* Level 1: Top States */}
               {drillLevel === 'india' && !hoveredStateObj && topStatesList.map((st: any) => (
@@ -985,16 +908,11 @@ export default function IndiaMapChart() {
                   key={st.code || st.name}
                   type="button"
                   onClick={() => handleSelectState(st.name)}
+                  className="px-2.5 py-1 rounded-lg border text-xs font-bold whitespace-nowrap cursor-pointer transition-colors shadow-xs"
                   style={{
-                    padding: '4px 10px',
-                    borderRadius: '6px',
-                    border: `1px solid ${st.color || '#6366f1'}70`,
-                    background: selectedState.code === st.code ? `${st.color || '#6366f1'}35` : 'rgba(15, 23, 42, 0.6)',
-                    color: '#ffffff',
-                    fontSize: '0.73rem',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    whiteSpace: 'nowrap'
+                    borderColor: `${st.color || '#6366f1'}80`,
+                    background: selectedState.code === st.code ? `${st.color || '#6366f1'}30` : 'var(--surface, #ffffff)',
+                    color: selectedState.code === st.code ? (st.color || '#4f46e5') : 'var(--text-primary, #0f172a)'
                   }}
                 >
                   {st.name} ({st.share || 72.8}%)
@@ -1006,17 +924,7 @@ export default function IndiaMapChart() {
                 <button
                   key={ct.name}
                   type="button"
-                  style={{
-                    padding: '4px 10px',
-                    borderRadius: '6px',
-                    border: `1px solid #6366f170`,
-                    background: 'rgba(15, 23, 42, 0.6)',
-                    color: '#ffffff',
-                    fontSize: '0.73rem',
-                    fontWeight: 700,
-                    cursor: 'default',
-                    whiteSpace: 'nowrap'
-                  }}
+                  className="px-2.5 py-1 rounded-lg border border-indigo-300 dark:border-indigo-800 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 text-xs font-bold whitespace-nowrap cursor-default shadow-xs"
                 >
                   {ct.name} (₹{((ct.revenue) / 100000).toFixed(1)}L)
                 </button>
@@ -1032,17 +940,11 @@ export default function IndiaMapChart() {
                       key={cust.id || cust.name}
                       type="button"
                       onClick={() => handleSelectCustomer(cust)}
-                      style={{
-                        padding: '4px 10px',
-                        borderRadius: '6px',
-                        border: `1px solid #10b98170`,
-                        background: (selectedCustomer as any)?.id === cust?.id ? '#10b98135' : 'rgba(15, 23, 42, 0.6)',
-                        color: '#ffffff',
-                        fontSize: '0.73rem',
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                        whiteSpace: 'nowrap'
-                      }}
+                      className={`px-2.5 py-1 rounded-lg border text-xs font-bold whitespace-nowrap cursor-pointer transition-colors shadow-xs ${
+                        (selectedCustomer as any)?.id === cust?.id
+                          ? 'bg-emerald-100 dark:bg-emerald-950/60 border-emerald-500 text-emerald-800 dark:text-emerald-300'
+                          : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-100 hover:bg-slate-50'
+                      }`}
                     >
                       📍 {cust.name} ({sharePct}%)
                     </button>
@@ -1055,17 +957,7 @@ export default function IndiaMapChart() {
                 <button
                   key={p.name}
                   type="button"
-                  style={{
-                    padding: '4px 10px',
-                    borderRadius: '6px',
-                    border: `1px solid #c084fc70`,
-                    background: 'rgba(15, 23, 42, 0.6)',
-                    color: '#ffffff',
-                    fontSize: '0.73rem',
-                    fontWeight: 700,
-                    cursor: 'default',
-                    whiteSpace: 'nowrap'
-                  }}
+                  className="px-2.5 py-1 rounded-lg border border-purple-200 dark:border-purple-800 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 text-xs font-bold whitespace-nowrap cursor-default shadow-xs"
                 >
                   {p.name.split(' - ')[0]} (₹{(p.revenue / 1000).toFixed(0)}k)
                 </button>

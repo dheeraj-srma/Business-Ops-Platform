@@ -123,19 +123,19 @@ export default function ForecastChart({
       const isFuture = metric === 'procurement_refill' ? true : (d.actual == null && d.sales_actual == null && !isBridge);
 
       return (
-        <div className="bg-slate-900/95 border border-slate-700 p-3.5 rounded-xl shadow-2xl text-xs backdrop-blur-md min-w-[240px]">
-          <div className="flex items-center justify-between text-slate-400 font-semibold border-b border-slate-800 pb-1.5 mb-2">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-3.5 rounded-xl shadow-xl text-xs backdrop-blur-md min-w-[240px] text-slate-800 dark:text-slate-100">
+          <div className="flex items-center justify-between text-slate-600 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-800 pb-1.5 mb-2">
             <span>{d.date || label}</span>
             {isBridge ? (
-              <span className="text-[10px] bg-indigo-500/20 text-indigo-300 font-bold px-1.5 py-0.5 rounded border border-indigo-500/30">
+              <span className="text-[10px] bg-indigo-50 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 font-bold px-1.5 py-0.5 rounded border border-indigo-200 dark:border-indigo-500/30">
                 TRANSITION POINT
               </span>
             ) : isFuture ? (
-              <span className="text-[10px] bg-purple-500/20 text-purple-300 font-bold px-1.5 py-0.5 rounded border border-purple-500/30">
+              <span className="text-[10px] bg-purple-50 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300 font-bold px-1.5 py-0.5 rounded border border-purple-200 dark:border-purple-500/30">
                 FORECAST (+{horizon}D)
               </span>
             ) : (
-              <span className="text-[10px] bg-sky-500/20 text-sky-300 font-bold px-1.5 py-0.5 rounded border border-sky-500/30">
+              <span className="text-[10px] bg-sky-50 dark:bg-sky-500/20 text-sky-700 dark:text-sky-300 font-bold px-1.5 py-0.5 rounded border border-sky-200 dark:border-sky-500/30">
                 HISTORICAL
               </span>
             )}
@@ -146,36 +146,36 @@ export default function ForecastChart({
             {metric === 'sales_and_purchases' && (
               <>
                 {d.sales_actual != null && (
-                  <div className="flex items-center justify-between text-cyan-400 font-bold text-[12px]">
+                  <div className="flex items-center justify-between text-cyan-600 dark:text-cyan-400 font-bold text-[12px]">
                     <span className="flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-cyan-400" />
+                      <span className="w-2 h-2 rounded-full bg-cyan-500" />
                       Historical Sales:
                     </span>
                     <span>{formatValue(d.sales_actual)}</span>
                   </div>
                 )}
                 {d.sales_forecast != null && !isBridge && (
-                  <div className="flex items-center justify-between text-purple-400 font-bold text-[12px]">
+                  <div className="flex items-center justify-between text-purple-600 dark:text-purple-400 font-bold text-[12px]">
                     <span className="flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-purple-400" />
+                      <span className="w-2 h-2 rounded-full bg-purple-500" />
                       Forecasted Sales:
                     </span>
                     <span>{formatValue(d.sales_forecast)}</span>
                   </div>
                 )}
                 {d.purchases_actual != null && (
-                  <div className="flex items-center justify-between text-emerald-400 font-bold text-[12px]">
+                  <div className="flex items-center justify-between text-emerald-600 dark:text-emerald-400 font-bold text-[12px]">
                     <span className="flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                      <span className="w-2 h-2 rounded-full bg-emerald-500" />
                       Historical Purchases:
                     </span>
                     <span>{formatValue(d.purchases_actual)}</span>
                   </div>
                 )}
                 {d.purchases_forecast != null && !isBridge && (
-                  <div className="flex items-center justify-between text-amber-400 font-bold text-[12px]">
+                  <div className="flex items-center justify-between text-amber-600 dark:text-amber-400 font-bold text-[12px]">
                     <span className="flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-amber-400" />
+                      <span className="w-2 h-2 rounded-full bg-amber-500" />
                       Forecasted Purchases:
                     </span>
                     <span>{formatValue(d.purchases_forecast)}</span>
@@ -188,27 +188,27 @@ export default function ForecastChart({
             {(metric === 'demand' || metric === 'profit') && (
               <>
                 {d.actual != null && (
-                  <div className="flex items-center justify-between text-cyan-400 font-bold text-[13px]">
+                  <div className="flex items-center justify-between text-cyan-600 dark:text-cyan-400 font-bold text-[13px]">
                     <span className="flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-cyan-400" />
+                      <span className="w-2 h-2 rounded-full bg-cyan-500" />
                       Historical Actual:
                     </span>
                     <span>{formatValue(d.actual)}</span>
                   </div>
                 )}
                 {d.forecast != null && !isBridge && (
-                  <div className="flex items-center justify-between text-purple-400 font-bold text-[13px]">
+                  <div className="flex items-center justify-between text-purple-600 dark:text-purple-400 font-bold text-[13px]">
                     <span className="flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-purple-400" />
+                      <span className="w-2 h-2 rounded-full bg-purple-500" />
                       Forecast Projection:
                     </span>
                     <span>{formatValue(d.forecast)}</span>
                   </div>
                 )}
                 {d.lowerBound != null && d.upperBound != null && !isBridge && (
-                  <div className="text-[11px] text-slate-400 border-t border-slate-800 pt-1 mt-1 flex items-center justify-between">
+                  <div className="text-[11px] text-slate-500 dark:text-slate-400 border-t border-slate-200 dark:border-slate-800 pt-1 mt-1 flex items-center justify-between">
                     <span>80% Confidence Range:</span>
-                    <span className="text-slate-200">
+                    <span className="text-slate-800 dark:text-slate-200 font-semibold">
                       [{formatValue(d.lowerBound)} – {formatValue(d.upperBound)}]
                     </span>
                   </div>
@@ -219,19 +219,19 @@ export default function ForecastChart({
             {/* Procurement / Refill Tooltip */}
             {metric === 'procurement_refill' && (
               <>
-                <div className="flex items-center justify-between text-violet-400 font-bold text-[13px]">
+                <div className="flex items-center justify-between text-violet-600 dark:text-violet-400 font-bold text-[13px]">
                   <span>Projected Inventory:</span>
                   <span>{formatValue(d.projected_stock)}</span>
                 </div>
-                <div className="flex items-center justify-between text-rose-400 text-[12px]">
+                <div className="flex items-center justify-between text-rose-600 dark:text-rose-400 text-[12px]">
                   <span>Daily Consumption:</span>
                   <span>{formatValue(d.expected_demand)}</span>
                 </div>
-                <div className="flex items-center justify-between text-amber-400 text-[11px] border-t border-slate-800 pt-1">
+                <div className="flex items-center justify-between text-amber-600 dark:text-amber-400 text-[11px] border-t border-slate-200 dark:border-slate-800 pt-1">
                   <span>Reorder Trigger Level:</span>
                   <span>{formatValue(d.reorder_threshold)}</span>
                 </div>
-                <div className="flex items-center justify-between text-emerald-400 text-[11px]">
+                <div className="flex items-center justify-between text-emerald-600 dark:text-emerald-400 text-[11px]">
                   <span>Safety Stock Buffer:</span>
                   <span>{formatValue(d.safety_buffer)}</span>
                 </div>
@@ -245,64 +245,37 @@ export default function ForecastChart({
   };
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        width: '100%',
-        boxSizing: 'border-box',
-        gap: '1rem',
-        backgroundColor: 'rgba(15, 23, 42, 0.95)',
-        border: '1px solid #1e293b',
-        borderRadius: '0.75rem',
-        padding: '1.25rem',
-        boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5)'
-      }}
-    >
+    <div className="flex flex-col w-full box-border gap-4 bg-white dark:bg-slate-900/95 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-xs dark:shadow-2xl">
       {/* ── Header Row ──────────────────────────────────────────────────────── */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem', borderBottom: '1px solid #1e293b', paddingBottom: '0.75rem' }}>
+      <div className="flex items-start justify-between flex-wrap gap-4 border-b border-slate-200 dark:border-slate-800 pb-3">
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
-            <TrendingUp size={18} className="text-indigo-400" style={{ flexShrink: 0 }} />
-            <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#f8fafc', margin: 0 }}>{title}</h3>
-            {loading && <RefreshCw size={14} className="animate-spin text-indigo-400" />}
+          <div className="flex items-center gap-2.5">
+            <TrendingUp size={18} className="text-indigo-600 dark:text-indigo-400 shrink-0" />
+            <h3 className="text-base font-extrabold text-slate-900 dark:text-slate-100 m-0">{title}</h3>
+            {loading && <RefreshCw size={14} className="animate-spin text-indigo-600 dark:text-indigo-400" />}
           </div>
-          <p style={{ fontSize: '0.8rem', color: '#94a3b8', margin: '4px 0 0 0' }}>{subtitle}</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 mb-0">{subtitle}</p>
         </div>
 
         {/* Horizon Controls */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', backgroundColor: '#020617', padding: '0.25rem 0.5rem', borderRadius: '0.5rem', border: '1px solid #1e293b' }}>
-          <span style={{ fontSize: '0.65rem', textTransform: 'uppercase', fontWeight: 700, color: '#64748b', padding: '0 0.5rem' }}>Forecast Horizon:</span>
+        <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-950 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-800">
+          <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 px-2">Forecast Horizon:</span>
           {([7, 30, 90] as const).map(h => (
             <button
               key={h}
               onClick={() => setHorizon(h)}
-              style={{
-                padding: '0.25rem 0.75rem',
-                borderRadius: '0.375rem',
-                fontSize: '0.75rem',
-                fontWeight: 600,
-                fontFamily: 'monospace',
-                cursor: 'pointer',
-                border: 'none',
-                backgroundColor: horizon === h ? '#4f46e5' : 'transparent',
-                color: horizon === h ? '#ffffff' : '#94a3b8',
-                transition: 'all 0.15s ease'
-              }}
+              className={`px-3 py-1 rounded-md text-xs font-semibold font-mono cursor-pointer transition-all border-none ${
+                horizon === h
+                  ? 'bg-indigo-600 text-white shadow-xs'
+                  : 'bg-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+              }`}
             >
               {h} Days
             </button>
           ))}
           <button
             onClick={() => fetchData(horizon, demandShift, safetyStockFactor)}
-            style={{
-              padding: '0.25rem 0.5rem',
-              borderRadius: '0.375rem',
-              backgroundColor: 'transparent',
-              color: '#94a3b8',
-              border: 'none',
-              cursor: 'pointer'
-            }}
+            className="p-1.5 rounded-md bg-transparent text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 border-none cursor-pointer"
             title="Refresh Forecast"
           >
             <RefreshCw size={13} />
@@ -311,23 +284,23 @@ export default function ForecastChart({
       </div>
 
       {/* ── Metadata Summary Grid ────────────────────────────────────────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.75rem', backgroundColor: 'rgba(2, 6, 23, 0.7)', padding: '0.75rem 1rem', borderRadius: '0.5rem', border: '1px solid #1e293b', fontSize: '0.75rem' }}>
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3 bg-slate-50 dark:bg-slate-950/70 p-3 rounded-lg border border-slate-200 dark:border-slate-800 text-xs">
         <div>
-          <span style={{ fontSize: '0.625rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 700, display: 'block' }}>Historical Period</span>
-          <span style={{ color: '#f1f5f9', fontWeight: 700, fontFamily: 'monospace', display: 'block', marginTop: '2px' }}>
+          <span className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-bold block">Historical Period</span>
+          <span className="text-slate-900 dark:text-slate-100 font-bold font-mono block mt-0.5">
             {forecastData?.historical_period ? `${forecastData.historical_period.start} → ${forecastData.historical_period.end}` : 'Jun 1 – Sep 21'}
           </span>
-          <span style={{ fontSize: '0.625rem', color: '#64748b', fontFamily: 'monospace' }}>
+          <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">
             {forecastData?.historical_period?.days || 113} daily observations
           </span>
         </div>
 
         <div>
-          <span style={{ fontSize: '0.625rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 700, display: 'block' }}>Forecast Horizon</span>
-          <span style={{ color: '#c084fc', fontWeight: 700, fontFamily: 'monospace', display: 'block', marginTop: '2px' }}>
+          <span className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-bold block">Forecast Horizon</span>
+          <span className="text-purple-600 dark:text-purple-300 font-bold font-mono block mt-0.5">
             +{horizon} Days Projection
           </span>
-          <span style={{ fontSize: '0.625rem', color: '#94a3b8', fontFamily: 'monospace' }}>
+          <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">
             {forecastData?.forecast_period ? `${forecastData.forecast_period.start} → ${forecastData.forecast_period.end}` : 'Active Horizon'}
           </span>
         </div>
@@ -336,21 +309,21 @@ export default function ForecastChart({
         {metric === 'sales_and_purchases' ? (
           <>
             <div>
-              <span style={{ fontSize: '0.625rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 700, display: 'block' }}>Sales Benchmark</span>
-              <span style={{ color: '#22d3ee', fontWeight: 700, fontFamily: 'monospace', display: 'block', marginTop: '2px' }}>
+              <span className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-bold block">Sales Benchmark</span>
+              <span className="text-cyan-600 dark:text-cyan-400 font-bold font-mono block mt-0.5">
                 Latest: {formatValue(forecastData?.latest_sales)}
               </span>
-              <span style={{ fontSize: '0.625rem', color: '#94a3b8', fontFamily: 'monospace' }}>
+              <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">
                 Avg Forecast: {formatValue(forecastData?.forecast_sales_avg)}
               </span>
             </div>
 
             <div>
-              <span style={{ fontSize: '0.625rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 700, display: 'block' }}>Procurement Inflow</span>
-              <span style={{ color: '#34d399', fontWeight: 700, fontFamily: 'monospace', display: 'block', marginTop: '2px' }}>
+              <span className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-bold block">Procurement Inflow</span>
+              <span className="text-emerald-600 dark:text-emerald-400 font-bold font-mono block mt-0.5">
                 Latest: {formatValue(forecastData?.latest_purchases)}
               </span>
-              <span style={{ fontSize: '0.625rem', color: '#94a3b8', fontFamily: 'monospace' }}>
+              <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">
                 Avg Forecast: {formatValue(forecastData?.forecast_purchases_avg)}
               </span>
             </div>
@@ -358,21 +331,21 @@ export default function ForecastChart({
         ) : metric === 'procurement_refill' ? (
           <>
             <div>
-              <span style={{ fontSize: '0.625rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 700, display: 'block' }}>Starting Inventory</span>
-              <span style={{ color: '#a78bfa', fontWeight: 700, fontFamily: 'monospace', display: 'block', marginTop: '2px' }}>
+              <span className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-bold block">Starting Inventory</span>
+              <span className="text-purple-600 dark:text-purple-300 font-bold font-mono block mt-0.5">
                 {formatValue(forecastData?.starting_stock)}
               </span>
-              <span style={{ fontSize: '0.625rem', color: '#64748b', fontFamily: 'monospace' }}>
+              <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">
                 Available catalog stock
               </span>
             </div>
 
             <div>
-              <span style={{ fontSize: '0.625rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 700, display: 'block' }}>Total Refill Needed</span>
-              <span style={{ color: '#fbbf24', fontWeight: 700, fontFamily: 'monospace', display: 'block', marginTop: '2px' }}>
+              <span className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-bold block">Total Refill Needed</span>
+              <span className="text-amber-600 dark:text-amber-400 font-bold font-mono block mt-0.5">
                 {formatValue(forecastData?.total_replenishment_needed)}
               </span>
-              <span style={{ fontSize: '0.625rem', color: '#94a3b8', fontFamily: 'monospace' }}>
+              <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">
                 Reorder by {forecastData?.reorder_milestone_date}
               </span>
             </div>
@@ -380,21 +353,21 @@ export default function ForecastChart({
         ) : (
           <>
             <div>
-              <span style={{ fontSize: '0.625rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 700, display: 'block' }}>Latest Actual</span>
-              <span style={{ color: '#22d3ee', fontWeight: 700, fontFamily: 'monospace', display: 'block', marginTop: '2px' }}>
+              <span className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-bold block">Latest Actual</span>
+              <span className="text-cyan-600 dark:text-cyan-400 font-bold font-mono block mt-0.5">
                 {formatValue(forecastData?.latest_actual)}
               </span>
-              <span style={{ fontSize: '0.625rem', color: '#64748b', fontFamily: 'monospace' }}>
+              <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">
                 as of Sep 21, 2026
               </span>
             </div>
 
             <div>
-              <span style={{ fontSize: '0.625rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 700, display: 'block' }}>Forecast End / Avg</span>
-              <span style={{ color: '#34d399', fontWeight: 700, fontFamily: 'monospace', display: 'block', marginTop: '2px' }}>
+              <span className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-bold block">Forecast End / Avg</span>
+              <span className="text-emerald-600 dark:text-emerald-400 font-bold font-mono block mt-0.5">
                 {formatValue(forecastData?.forecast_end)}
               </span>
-              <span style={{ fontSize: '0.625rem', color: '#94a3b8', fontFamily: 'monospace' }}>
+              <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">
                 Avg: {formatValue(forecastData?.forecast_avg)} ({forecastData?.expected_change_pct > 0 ? `+${forecastData?.expected_change_pct}` : forecastData?.expected_change_pct}%)
               </span>
             </div>
@@ -402,11 +375,11 @@ export default function ForecastChart({
         )}
 
         <div>
-          <span style={{ fontSize: '0.625rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 700, display: 'block' }}>Engine & Validation</span>
-          <span style={{ color: '#a5b4fc', fontWeight: 700, fontFamily: 'monospace', display: 'block', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={forecastData?.model}>
+          <span className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-bold block">Engine & Validation</span>
+          <span className="text-indigo-600 dark:text-indigo-300 font-bold font-mono block mt-0.5 truncate" title={forecastData?.model}>
             {forecastData?.model || 'AutoETS (StatsForecast)'}
           </span>
-          <span style={{ fontSize: '0.625rem', color: '#64748b', fontFamily: 'monospace' }}>
+          <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">
             {forecastData?.backtest?.mape != null ? `${forecastData.backtest.mape}% holdout MAPE` : '14-day holdout backtest'}
           </span>
         </div>
@@ -427,23 +400,23 @@ export default function ForecastChart({
                 </linearGradient>
               </defs>
 
-              <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.35} />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid, #cbd5e1)" opacity={0.6} />
 
               <XAxis
                 dataKey="name"
-                stroke="#64748b"
+                stroke="var(--chart-axis, #64748b)"
                 fontSize={11}
                 tickLine={false}
                 interval={xAxisInterval}
-                axisLine={{ stroke: '#334155' }}
+                axisLine={{ stroke: 'var(--chart-grid, #cbd5e1)' }}
               />
 
               <YAxis
-                stroke="#64748b"
+                stroke="var(--chart-axis, #64748b)"
                 fontSize={11}
                 tickLine={false}
                 tickFormatter={formatYAxis}
-                axisLine={{ stroke: '#334155' }}
+                axisLine={{ stroke: 'var(--chart-grid, #cbd5e1)' }}
               />
 
               <Tooltip content={renderCustomTooltip} />
@@ -452,13 +425,13 @@ export default function ForecastChart({
               {bridgeLabel && (
                 <ReferenceLine
                   x={bridgeLabel}
-                  stroke="#e2e8f0"
+                  stroke="var(--accent, #6366f1)"
                   strokeDasharray="4 4"
                   strokeWidth={1.5}
                   label={{
                     value: 'FORECAST BEGINS ➔',
                     position: 'insideTopRight',
-                    fill: '#cbd5e1',
+                    fill: 'var(--accent, #6366f1)',
                     fontSize: 10,
                     fontWeight: 700,
                     offset: 10
@@ -474,10 +447,10 @@ export default function ForecastChart({
                     type="linear"
                     dataKey="sales_actual"
                     name="Historical Sales"
-                    stroke="#06b6d4"
+                    stroke="#0284c7"
                     strokeWidth={2.2}
                     dot={false}
-                    activeDot={{ r: 4, fill: '#06b6d4' }}
+                    activeDot={{ r: 4, fill: '#0284c7' }}
                     isAnimationActive={false}
                     connectNulls={false}
                   />
@@ -486,11 +459,11 @@ export default function ForecastChart({
                     type="linear"
                     dataKey="sales_forecast"
                     name="Forecasted Sales"
-                    stroke="#a855f7"
+                    stroke="#9333ea"
                     strokeWidth={2.2}
                     strokeDasharray="5 4"
                     dot={false}
-                    activeDot={{ r: 4, fill: '#a855f7' }}
+                    activeDot={{ r: 4, fill: '#9333ea' }}
                     isAnimationActive={false}
                     connectNulls={false}
                   />
@@ -500,10 +473,10 @@ export default function ForecastChart({
                     type="linear"
                     dataKey="purchases_actual"
                     name="Historical Purchases"
-                    stroke="#10b981"
+                    stroke="#059669"
                     strokeWidth={2.0}
                     dot={false}
-                    activeDot={{ r: 4, fill: '#10b981' }}
+                    activeDot={{ r: 4, fill: '#059669' }}
                     isAnimationActive={false}
                     connectNulls={false}
                   />
@@ -512,11 +485,11 @@ export default function ForecastChart({
                     type="linear"
                     dataKey="purchases_forecast"
                     name="Forecasted Purchases"
-                    stroke="#f59e0b"
+                    stroke="#d97706"
                     strokeWidth={2.0}
                     strokeDasharray="5 4"
                     dot={false}
-                    activeDot={{ r: 4, fill: '#f59e0b' }}
+                    activeDot={{ r: 4, fill: '#d97706' }}
                     isAnimationActive={false}
                     connectNulls={false}
                   />
@@ -540,10 +513,10 @@ export default function ForecastChart({
                     type="linear"
                     dataKey="actual"
                     name="Historical Actual"
-                    stroke="#06b6d4"
+                    stroke="#0284c7"
                     strokeWidth={2.2}
                     dot={false}
-                    activeDot={{ r: 4, fill: '#06b6d4' }}
+                    activeDot={{ r: 4, fill: '#0284c7' }}
                     isAnimationActive={false}
                     connectNulls={false}
                   />
@@ -551,11 +524,11 @@ export default function ForecastChart({
                     type="linear"
                     dataKey="forecast"
                     name="Forecast Projection"
-                    stroke="#a855f7"
+                    stroke="#9333ea"
                     strokeWidth={2.2}
                     strokeDasharray="5 4"
                     dot={false}
-                    activeDot={{ r: 4, fill: '#a855f7' }}
+                    activeDot={{ r: 4, fill: '#9333ea' }}
                     isAnimationActive={false}
                     connectNulls={false}
                   />
@@ -569,28 +542,28 @@ export default function ForecastChart({
                     type="monotone"
                     dataKey="projected_stock"
                     name="Projected Inventory Stock"
-                    stroke="#8b5cf6"
+                    stroke="#7c3aed"
                     strokeWidth={2.5}
                     dot={false}
-                    activeDot={{ r: 5, fill: '#8b5cf6' }}
+                    activeDot={{ r: 5, fill: '#7c3aed' }}
                     isAnimationActive={false}
                   />
                   <Line
                     type="linear"
                     dataKey="expected_demand"
                     name="Daily Demand Consumption"
-                    stroke="#f43f5e"
+                    stroke="#e11d48"
                     strokeWidth={2.0}
                     strokeDasharray="4 4"
                     dot={false}
-                    activeDot={{ r: 4, fill: '#f43f5e' }}
+                    activeDot={{ r: 4, fill: '#e11d48' }}
                     isAnimationActive={false}
                   />
                   <Line
                     type="step"
                     dataKey="reorder_threshold"
                     name="Reorder Trigger Level"
-                    stroke="#f59e0b"
+                    stroke="#d97706"
                     strokeWidth={1.8}
                     strokeDasharray="3 3"
                     dot={false}
@@ -600,7 +573,7 @@ export default function ForecastChart({
                     type="step"
                     dataKey="safety_buffer"
                     name="Safety Buffer Reserve"
-                    stroke="#10b981"
+                    stroke="#059669"
                     strokeWidth={1.8}
                     strokeDasharray="3 3"
                     dot={false}
@@ -611,9 +584,9 @@ export default function ForecastChart({
             </ComposedChart>
           </ResponsiveContainer>
         ) : (
-          <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(2, 6, 23, 0.4)', borderRadius: '0.75rem', border: '1px solid #1e293b' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#94a3b8', fontSize: '0.75rem' }}>
-              <RefreshCw size={14} className="animate-spin text-indigo-400" />
+          <div className="w-full h-full flex items-center justify-center bg-slate-50 dark:bg-slate-950/40 rounded-xl border border-slate-200 dark:border-slate-800">
+            <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-xs">
+              <RefreshCw size={14} className="animate-spin text-indigo-600 dark:text-indigo-400" />
               <span>Generating StatsForecast models...</span>
             </div>
           </div>
@@ -621,62 +594,62 @@ export default function ForecastChart({
       </div>
 
       {/* ── Legend Footer ────────────────────────────────────────────────────── */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1.5rem', paddingTop: '0.625rem', borderTop: '1px solid #1e293b', fontSize: '0.75rem', color: '#94a3b8', flexWrap: 'wrap' }}>
+      <div className="flex items-center justify-center gap-6 pt-2.5 border-t border-slate-200 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-300 flex-wrap">
         {metric === 'sales_and_purchases' && (
           <>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-              <span style={{ width: '1rem', height: '2px', backgroundColor: '#06b6d4', borderRadius: '1px' }} />
-              <span style={{ fontWeight: 600, color: '#f1f5f9' }}>Historical Sales (units/day)</span>
+            <div className="flex items-center gap-1.5">
+              <span className="w-4 h-0.5 bg-[#0284c7] rounded-xs" />
+              <span className="font-semibold text-slate-800 dark:text-slate-200">Historical Sales (units/day)</span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-              <span style={{ width: '1rem', height: '0', borderTop: '2px dashed #a855f7' }} />
-              <span style={{ fontWeight: 600, color: '#f1f5f9' }}>Forecasted Sales ({forecastData?.model ? forecastData.model.split('|')[0].replace('Sales:', '').trim() : 'AutoETS'})</span>
+            <div className="flex items-center gap-1.5">
+              <span className="w-4 h-0 border-t-2 border-dashed border-[#9333ea]" />
+              <span className="font-semibold text-slate-800 dark:text-slate-200">Forecasted Sales ({forecastData?.model ? forecastData.model.split('|')[0].replace('Sales:', '').trim() : 'AutoETS'})</span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-              <span style={{ width: '1rem', height: '2px', backgroundColor: '#10b981', borderRadius: '1px' }} />
-              <span style={{ fontWeight: 600, color: '#f1f5f9' }}>Historical Purchases (units/day)</span>
+            <div className="flex items-center gap-1.5">
+              <span className="w-4 h-0.5 bg-[#059669] rounded-xs" />
+              <span className="font-semibold text-slate-800 dark:text-slate-200">Historical Purchases (units/day)</span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-              <span style={{ width: '1rem', height: '0', borderTop: '2px dashed #f59e0b' }} />
-              <span style={{ fontWeight: 600, color: '#f1f5f9' }}>Forecasted Purchases ({forecastData?.model && forecastData.model.includes('|') ? forecastData.model.split('|')[1].replace('Purchases:', '').trim() : 'AutoARIMA'})</span>
+            <div className="flex items-center gap-1.5">
+              <span className="w-4 h-0 border-t-2 border-dashed border-[#d97706]" />
+              <span className="font-semibold text-slate-800 dark:text-slate-200">Forecasted Purchases ({forecastData?.model && forecastData.model.includes('|') ? forecastData.model.split('|')[1].replace('Purchases:', '').trim() : 'AutoARIMA'})</span>
             </div>
           </>
         )}
 
         {(metric === 'demand' || metric === 'profit') && (
           <>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-              <span style={{ width: '1rem', height: '2px', backgroundColor: '#06b6d4', borderRadius: '1px' }} />
-              <span style={{ fontWeight: 600, color: '#f1f5f9' }}>Historical Actual ({unit})</span>
+            <div className="flex items-center gap-1.5">
+              <span className="w-4 h-0.5 bg-[#0284c7] rounded-xs" />
+              <span className="font-semibold text-slate-800 dark:text-slate-200">Historical Actual ({unit})</span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-              <span style={{ width: '1rem', height: '0', borderTop: '2px dashed #a855f7' }} />
-              <span style={{ fontWeight: 600, color: '#f1f5f9' }}>Forecast Projection ({forecastData?.model || 'AutoETS'})</span>
+            <div className="flex items-center gap-1.5">
+              <span className="w-4 h-0 border-t-2 border-dashed border-[#9333ea]" />
+              <span className="font-semibold text-slate-800 dark:text-slate-200">Forecast Projection ({forecastData?.model || 'AutoETS'})</span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-              <span style={{ width: '0.875rem', height: '0.625rem', backgroundColor: 'rgba(168, 85, 247, 0.2)', border: '1px solid rgba(168, 85, 247, 0.4)', borderRadius: '2px' }} />
-              <span style={{ fontWeight: 600, color: '#cbd5e1' }}>80% Prediction Interval</span>
+            <div className="flex items-center gap-1.5">
+              <span className="w-3.5 h-2.5 bg-purple-500/20 border border-purple-500/40 rounded-xs" />
+              <span className="font-semibold text-slate-700 dark:text-slate-300">80% Prediction Interval</span>
             </div>
           </>
         )}
 
         {metric === 'procurement_refill' && (
           <>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-              <span style={{ width: '1rem', height: '2px', backgroundColor: '#8b5cf6', borderRadius: '1px' }} />
-              <span style={{ fontWeight: 600, color: '#f1f5f9' }}>Projected Inventory Stock</span>
+            <div className="flex items-center gap-1.5">
+              <span className="w-4 h-0.5 bg-[#7c3aed] rounded-xs" />
+              <span className="font-semibold text-slate-800 dark:text-slate-200">Projected Inventory Stock</span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-              <span style={{ width: '1rem', height: '0', borderTop: '2px dashed #f43f5e' }} />
-              <span style={{ fontWeight: 600, color: '#f1f5f9' }}>Daily Demand Consumption</span>
+            <div className="flex items-center gap-1.5">
+              <span className="w-4 h-0 border-t-2 border-dashed border-[#e11d48]" />
+              <span className="font-semibold text-slate-800 dark:text-slate-200">Daily Demand Consumption</span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-              <span style={{ width: '1rem', height: '0', borderTop: '2px dashed #f59e0b' }} />
-              <span style={{ fontWeight: 600, color: '#f1f5f9' }}>Reorder Trigger Level</span>
+            <div className="flex items-center gap-1.5">
+              <span className="w-4 h-0 border-t-2 border-dashed border-[#d97706]" />
+              <span className="font-semibold text-slate-800 dark:text-slate-200">Reorder Trigger Level</span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-              <span style={{ width: '1rem', height: '0', borderTop: '2px dashed #10b981' }} />
-              <span style={{ fontWeight: 600, color: '#f1f5f9' }}>Safety Buffer</span>
+            <div className="flex items-center gap-1.5">
+              <span className="w-4 h-0 border-t-2 border-dashed border-[#059669]" />
+              <span className="font-semibold text-slate-800 dark:text-slate-200">Safety Buffer</span>
             </div>
           </>
         )}
@@ -684,12 +657,12 @@ export default function ForecastChart({
 
       {/* ── Actionable Analytical Insights Banner ────────────────────────────── */}
       {forecastData?.insights && forecastData.insights.length > 0 && (
-        <div style={{ backgroundColor: 'rgba(2, 6, 23, 0.5)', borderRadius: '0.5rem', padding: '0.75rem 1rem', border: '1px solid #1e293b', display: 'flex', flexDirection: 'column', gap: '0.375rem', fontSize: '0.75rem', color: '#cbd5e1' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', fontWeight: 700, color: '#f1f5f9', textTransform: 'uppercase', fontSize: '0.625rem', letterSpacing: '0.05em' }}>
-            <Info size={13} className="text-indigo-400" />
+        <div className="bg-slate-50 dark:bg-slate-950/50 rounded-lg p-3.5 border border-slate-200 dark:border-slate-800 flex flex-col gap-1.5 text-xs text-slate-700 dark:text-slate-300">
+          <div className="flex items-center gap-1.5 font-bold text-slate-900 dark:text-slate-100 uppercase text-[10px] tracking-wider">
+            <Info size={13} className="text-indigo-600 dark:text-indigo-400" />
             <span>Key Forecast Intelligence</span>
           </div>
-          <ul style={{ listStyleType: 'disc', paddingLeft: '1rem', margin: 0, display: 'flex', flexDirection: 'column', gap: '0.25rem', fontSize: '0.7rem', lineHeight: '1.4' }}>
+          <ul className="list-disc pl-4 m-0 flex flex-col gap-1 text-[11px] leading-relaxed">
             {forecastData.insights.map((ins: string, idx: number) => (
               <li key={idx}>{ins}</li>
             ))}
@@ -699,10 +672,10 @@ export default function ForecastChart({
 
       {/* Audit Basis Note for Profit */}
       {forecastData?.audit_info && (
-        <div style={{ backgroundColor: 'rgba(245, 158, 11, 0.05)', borderRadius: '0.5rem', padding: '0.625rem 0.875rem', border: '1px solid rgba(245, 158, 11, 0.2)', fontSize: '0.7rem', color: '#fcd34d', display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
-          <AlertCircle size={14} style={{ flexShrink: 0, marginTop: '2px' }} />
+        <div className="bg-amber-50 dark:bg-amber-500/10 rounded-lg p-3 border border-amber-200 dark:border-amber-500/20 text-xs text-amber-800 dark:text-amber-300 flex items-start gap-2">
+          <AlertCircle size={14} className="shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
           <div>
-            <strong>Cost Basis Audit Note:</strong> {forecastData.audit_info.cogs_basis}. {forecastData.audit_info.data_integrity}
+            <strong className="font-bold">Cost Basis Audit Note:</strong> {forecastData.audit_info.cogs_basis}. {forecastData.audit_info.data_integrity}
           </div>
         </div>
       )}

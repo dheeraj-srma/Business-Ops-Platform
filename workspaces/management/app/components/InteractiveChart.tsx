@@ -945,15 +945,15 @@ export default function InteractiveChart({
                     data={normalizedVisibleData}
                     margin={{ top: 10, right: 30, left: 10, bottom: 10 }}
                   >
-                    <CartesianGrid strokeDasharray="3 3" stroke="#cbd5e1" opacity={0.6} horizontal={false} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid, #334155)" opacity={0.4} horizontal={false} />
                     <XAxis
                       type="number"
                       stroke="#64748b"
                       fontSize={10}
                       tickFormatter={formatYAxis}
                       tickLine={false}
-                      tick={{ fill: '#475569', fontSize: 10, fontWeight: 500 }}
-                      axisLine={{ stroke: '#cbd5e1' }}
+                      tick={{ fill: 'var(--chart-axis, #94a3b8)', fontSize: 10, fontWeight: 500 }}
+                      axisLine={{ stroke: 'var(--chart-grid, #334155)' }}
                     />
                     <YAxis
                       type="category"
@@ -962,8 +962,8 @@ export default function InteractiveChart({
                       fontSize={10}
                       tickLine={false}
                       width={120}
-                      tick={{ fill: '#1e293b', fontSize: 10, fontWeight: 600 }}
-                      axisLine={{ stroke: '#cbd5e1' }}
+                      tick={{ fill: 'var(--chart-axis, #94a3b8)', fontSize: 10, fontWeight: 600 }}
+                      axisLine={{ stroke: 'var(--chart-grid, #334155)' }}
                     />
                     <Tooltip content={renderCustomTooltip} />
                     {multiSeries ? (

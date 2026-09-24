@@ -177,17 +177,17 @@ export const Tooltip: React.FC<TooltipProps> = ({
             }}
             className={cn(
               'z-[9999] pointer-events-none select-none max-w-xs',
-              'px-2.5 py-1.5 rounded-lg text-[11px] font-medium leading-snug',
-              'bg-slate-900/95 dark:bg-slate-950/95 text-slate-100 dark:text-slate-100',
-              'border border-slate-700/80 dark:border-slate-800/80 shadow-xl backdrop-blur-md',
-              'ring-1 ring-white/10 flex items-center gap-1.5',
+              'px-2.5 py-1.5 rounded-lg text-[11px] font-semibold leading-snug',
+              'bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100',
+              'border border-slate-200 dark:border-slate-800 shadow-xl shadow-slate-900/10 dark:shadow-black/60 backdrop-blur-md',
+              'ring-1 ring-black/5 dark:ring-white/10 flex items-center gap-1.5',
               'animate-in fade-in zoom-in-95 duration-150'
             )}
             role="tooltip"
           >
             <span>{content}</span>
             {shortcut && (
-              <kbd className="px-1.5 py-0.5 text-[9px] font-mono font-bold bg-slate-800 dark:bg-slate-900 text-slate-300 rounded border border-slate-700 dark:border-slate-700/80 shadow-2xs">
+              <kbd className="px-1.5 py-0.5 text-[9px] font-mono font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded border border-slate-200 dark:border-slate-700 shadow-2xs">
                 {shortcut}
               </kbd>
             )}
@@ -356,17 +356,17 @@ export const GlobalTooltipProvider: React.FC<{ children?: ReactNode }> = ({ chil
             }}
             className={cn(
               'z-[9999] pointer-events-none select-none max-w-xs',
-              'px-2.5 py-1.5 rounded-lg text-[11px] font-medium leading-snug',
-              'bg-slate-900/95 dark:bg-slate-950/95 text-slate-100 dark:text-slate-100',
-              'border border-slate-700/80 dark:border-slate-800/80 shadow-xl backdrop-blur-md',
-              'ring-1 ring-white/10 flex items-center gap-1.5',
+              'px-2.5 py-1.5 rounded-lg text-[11px] font-semibold leading-snug',
+              'bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100',
+              'border border-slate-200 dark:border-slate-800 shadow-xl shadow-slate-900/10 dark:shadow-black/60 backdrop-blur-md',
+              'ring-1 ring-black/5 dark:ring-white/10 flex items-center gap-1.5',
               'animate-in fade-in zoom-in-95 duration-150'
             )}
             role="tooltip"
           >
             <span>{tooltipState.content}</span>
             {tooltipState.shortcut && (
-              <kbd className="px-1.5 py-0.5 text-[9px] font-mono font-bold bg-slate-800 dark:bg-slate-900 text-slate-300 rounded border border-slate-700 dark:border-slate-700/80 shadow-2xs">
+              <kbd className="px-1.5 py-0.5 text-[9px] font-mono font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded border border-slate-200 dark:border-slate-700 shadow-2xs">
                 {tooltipState.shortcut}
               </kbd>
             )}

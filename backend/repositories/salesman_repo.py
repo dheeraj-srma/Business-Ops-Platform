@@ -84,11 +84,22 @@ class SalesmanRepository:
             conn.close()
 
     @classmethod
-    def get_team_summary(cls, start_date: Optional[str] = None, end_date: Optional[str] = None) -> Dict[str, Any]:
+    def get_team_summary(cls, start_date: Optional[str] = None, end_date: Optional[str] = None, salesman_id: Optional[str] = None) -> Dict[str, Any]:
         conn = cls.get_connection()
         try:
             where_parts = []
             params = []
+            
+            is_all = not salesman_id or salesman_id.lower() in ("all", "team", "unassigned_all")
+            if not is_all:
+                canonical_name = CODE_TO_SALESMAN_MAP.get(salesman_id, salesman_id)
+                is_unresolved = salesman_id.upper() in ("TLY-SLM-UNR", "UNRESOLVED") or canonical_name.lower() == "unresolved"
+                if is_unresolved:
+                    where_parts.append("(s.salesman_id = 'TLY-SLM-UNR' OR UPPER(COALESCE(s.salesman_name, '')) IN ('UNRESOLVED', '') OR s.salesman_id IS NULL)")
+                else:
+                    where_parts.append("(s.salesman_id = ? OR UPPER(s.salesman_name) = UPPER(?) OR UPPER(REPLACE(s.salesman_name, '  ', ' ')) = UPPER(REPLACE(?, '  ', ' ')) OR UPPER(REPLACE(s.salesman_name, '  ', ' ')) = UPPER(REPLACE(?, '  ', ' ')))")
+                    params.extend([salesman_id, salesman_id, salesman_id, canonical_name])
+
             if start_date:
                 where_parts.append("s.voucher_date >= ?")
                 params.append(start_date[:10])
@@ -126,11 +137,13 @@ class SalesmanRepository:
 
             return {
                 "total_team_sales": total_sales,
+                "total_sales": total_sales,
                 "total_orders": total_orders,
                 "total_units_sold": total_units,
-                "total_active_salesmen": max(active_salesmen, 1),
+                "total_active_salesmen": max(active_salesmen, 1) if is_all else 1,
                 "total_customers_served": total_customers,
                 "average_order_value": aov,
+                "salesman_id": salesman_id if not is_all else "all",
                 "start_date": start_date,
                 "end_date": end_date
             }
@@ -138,6 +151,7 @@ class SalesmanRepository:
             logger.error(f"Error fetching team summary: {err}")
             return {
                 "total_team_sales": 0.0,
+                "total_sales": 0.0,
                 "total_orders": 0,
                 "total_units_sold": 0.0,
                 "total_active_salesmen": 0,
@@ -352,8 +366,8 @@ class SalesmanRepository:
             if is_unresolved:
                 where_parts.append("(s.salesman_id = 'TLY-SLM-UNR' OR UPPER(COALESCE(s.salesman_name, '')) IN ('UNRESOLVED', '') OR s.salesman_id IS NULL)")
             elif not is_all:
-                where_parts.append("(UPPER(s.salesman_name) = UPPER(?) OR s.salesman_id = ? OR UPPER(s.salesman_name) = UPPER(?))")
-                params.extend([salesman_id, salesman_id, canonical_name])
+                where_parts.append("(s.salesman_id = ? OR UPPER(s.salesman_name) = UPPER(?) OR UPPER(REPLACE(s.salesman_name, '  ', ' ')) = UPPER(REPLACE(?, '  ', ' ')) OR UPPER(REPLACE(s.salesman_name, '  ', ' ')) = UPPER(REPLACE(?, '  ', ' ')))")
+                params.extend([salesman_id, salesman_id, salesman_id, canonical_name])
 
             if start_date:
                 where_parts.append("s.voucher_date >= ?")

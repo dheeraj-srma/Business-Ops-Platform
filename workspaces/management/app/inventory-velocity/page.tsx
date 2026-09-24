@@ -12,12 +12,18 @@ export default function InventoryVelocityPage() {
   const { inv, sales, kpis, inventoryList, loading, hasData, selectedRange } = useBi();
 
   const movementTimelineData = useMemo(() => {
-    return (sales.daily_sales || []).map(d => ({
-      date: d.date,
-      name: fmtDayMonth(d.date),
-      inward: Number(d.stock_in || 0),
-      outward: Number(d.stock_out || d.outward_qty || 0),
-    }));
+    return (sales.daily_sales || []).map((d: any) => {
+      const inVal = Number(d.stock_in ?? d.inward ?? 0);
+      const outVal = Number(d.stock_out ?? d.outward_qty ?? d.outward ?? d.sales_units ?? d.qty ?? 0);
+      return {
+        date: d.date,
+        name: fmtDayMonth(d.date),
+        inward: inVal,
+        outward: outVal,
+        stock_in: inVal,
+        stock_out: outVal,
+      };
+    });
   }, [sales.daily_sales]);
 
   const movementSeries = [
@@ -136,24 +142,24 @@ export default function InventoryVelocityPage() {
   return (
     <div className="space-y-6 pb-12">
       {/* ── Page Header ─────────────────────────────────────────────────── */}
-      <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-5 shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="bg-white dark:bg-slate-900/70 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-xs dark:shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400 font-bold text-xs uppercase tracking-wider mb-1">
             <Activity size={16} />
             <span>Turnover & Velocity</span>
           </div>
-          <h1 className="text-xl sm:text-2xl font-extrabold text-white tracking-tight">
+          <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">
             Inventory Velocity & Movement
           </h1>
-          <p className="text-xs text-slate-400 mt-0.5">
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
             Turnover ratios, inward vs outward dispatch velocity, inventory health distribution, and dead stock carrying analysis across catalog SKUs.
           </p>
         </div>
 
         <div className="flex items-center gap-3 flex-wrap">
           <DataFreshnessBadge />
-          <div className="px-3.5 py-2 bg-slate-800/60 rounded-xl border border-slate-700/50">
-            <div className="text-[10px] text-slate-400 uppercase font-semibold">Turnover Ratio</div>
+          <div className="px-3.5 py-2 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700/50">
+            <div className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-semibold">Turnover Ratio</div>
             <div className="text-base font-extrabold text-indigo-600 dark:text-indigo-400">
               {kpis.inventory_turnover_ratio ? `${kpis.inventory_turnover_ratio}x` : '—'}
             </div>
@@ -177,12 +183,19 @@ export default function InventoryVelocityPage() {
             const res = await fetch(`/api/analytics/bi?start_date=${bounds.start}&end_date=${bounds.end}`);
             if (!res.ok) return [];
             const d = await res.json();
-            return (d.sales_intelligence?.daily_sales || d.daily_sales || []).map((s: any) => ({
-              date: s.date,
-              name: fmtDayMonth(s.date),
-              stock_in: Number(s.stock_in) || 0,
-              stock_out: Number(s.stock_out) || Number(s.outward_qty) || Number(s.qty) || 0,
-            }));
+            const list = d.sales_intelligence?.daily_sales || d.daily_sales || [];
+            return list.map((s: any) => {
+              const inVal = Number(s.stock_in ?? s.inward ?? 0);
+              const outVal = Number(s.stock_out ?? s.outward_qty ?? s.outward ?? s.sales_units ?? s.qty ?? 0);
+              return {
+                date: s.date,
+                name: fmtDayMonth(s.date),
+                inward: inVal,
+                outward: outVal,
+                stock_in: inVal,
+                stock_out: outVal,
+              };
+            });
           }}
         />
       </div>

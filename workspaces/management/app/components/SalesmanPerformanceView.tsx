@@ -30,11 +30,15 @@ import { fmtDayMonth } from '../utils/formatters';
 
 interface TeamSummary {
   total_team_sales: number;
+  total_sales?: number;
   total_orders: number;
   total_units_sold: number;
   total_active_salesmen: number;
   total_customers_served: number;
   average_order_value: number;
+  salesman_id?: string;
+  start_date?: string;
+  end_date?: string;
 }
 
 export interface AssignedCustomerItem {
@@ -72,6 +76,7 @@ interface SalesmanDetail {
     salesman_code: string;
     role: string;
     location: string;
+    territory?: string;
     is_active: boolean;
   };
   metrics: {
@@ -165,11 +170,14 @@ export default function SalesmanPerformanceView() {
     }
   };
 
-  // Fetch Team Summary
-  const fetchSummary = async () => {
+  // Fetch Team Summary (or Salesman Summary)
+  const fetchSummary = async (salesmanId: string = selectedSalesmanId) => {
     setLoadingSummary(true);
     try {
       let url = `/api/sales/salesmen/summary?start_date=${startDateStr}&end_date=${endDateStr}`;
+      if (salesmanId && salesmanId !== 'all') {
+        url += `&salesman_id=${encodeURIComponent(salesmanId)}`;
+      }
       const res = await fetch(url, { headers: getAuthHeaders() });
       if (res.ok) {
         const data = await res.json();
@@ -212,7 +220,7 @@ export default function SalesmanPerformanceView() {
   const fetchSalesmanDetail = async (salesmanId: string) => {
     setLoadingDetail(true);
     try {
-      const url = `/api/sales/salesmen/${salesmanId}/performance?start_date=${startDateStr}&end_date=${endDateStr}`;
+      const url = `/api/sales/salesmen/${encodeURIComponent(salesmanId)}/performance?start_date=${startDateStr}&end_date=${endDateStr}`;
       const res = await fetch(url, { headers: getAuthHeaders() });
       if (res.ok) {
         const data = await res.json();
@@ -335,11 +343,11 @@ export default function SalesmanPerformanceView() {
     setHeatmapRange(dateRange);
   }, [dateRange]);
 
-  // Trigger fetches on filter updates
+  // Trigger fetches on filter or salesman updates
   useEffect(() => {
-    fetchSummary();
+    fetchSummary(selectedSalesmanId);
     fetchSalesmenList();
-  }, [startDateStr, endDateStr, sortBy, sortOrder, statusFilter, searchQuery]);
+  }, [startDateStr, endDateStr, selectedSalesmanId, sortBy, sortOrder, statusFilter, searchQuery]);
 
   useEffect(() => {
     fetchHeatmap(selectedSalesmanId || 'all', heatmapRange);
@@ -351,7 +359,7 @@ export default function SalesmanPerformanceView() {
       setAssignedCustomers([]);
       setCustomerSearch('');
     }
-  }, [selectedSalesmanId, heatmapRange, customStart, customEnd]);
+  }, [selectedSalesmanId, heatmapRange, startDateStr, endDateStr, customStart, customEnd]);
 
   // Sort handler
   const handleSort = (column: string) => {
@@ -362,6 +370,56 @@ export default function SalesmanPerformanceView() {
       setSortOrder('desc');
     }
   };
+
+  // Single Source of Truth for Top KPI Cards (Scoped to selected salesman or all team)
+  const isAllTeam = !selectedSalesmanId || selectedSalesmanId === 'all';
+
+  const displayedMetrics = useMemo(() => {
+    if (isAllTeam) {
+      const sales = teamSummary?.total_team_sales ?? teamSummary?.total_sales ?? 0;
+      const orders = teamSummary?.total_orders || 0;
+      const aov = teamSummary?.average_order_value || (orders > 0 ? Math.round(sales / orders) : 0);
+      const units = teamSummary?.total_units_sold || 0;
+      const customers = teamSummary?.total_customers_served || 0;
+      const activeSalesmen = teamSummary?.total_active_salesmen || salesmenList.length || 0;
+
+      return {
+        totalSales: sales,
+        orders,
+        averageOrder: aov,
+        unitsSold: units,
+        customers,
+        customersSublabel: 'Unique purchasing accounts',
+        card6Title: 'Active Salesmen',
+        card6Value: String(activeSalesmen),
+        card6Sublabel: 'Active team in period',
+        salesmanName: 'All Salesmen (Entire Team)'
+      };
+    }
+
+    const m = salesmanDetail?.metrics;
+    const h = salesmanDetail?.header;
+    const sales = m?.total_sales ?? teamSummary?.total_sales ?? 0;
+    const orders = m?.total_orders ?? teamSummary?.total_orders ?? 0;
+    const aov = m?.average_order_value ?? (orders > 0 ? Math.round(sales / orders) : 0);
+    const units = m?.total_units_sold ?? teamSummary?.total_units_sold ?? 0;
+    const customers = m?.unique_customers ?? teamSummary?.total_customers_served ?? 0;
+    const assignedCount = m?.assigned_customers_count ?? assignedCustomers.length;
+    const territory = h?.location || h?.territory || 'Northern Region';
+
+    return {
+      totalSales: sales,
+      orders,
+      averageOrder: aov,
+      unitsSold: units,
+      customers,
+      customersSublabel: `${assignedCount} assigned catalog accounts`,
+      card6Title: 'Salesman Status',
+      card6Value: h?.is_active ? 'Active' : 'Inactive',
+      card6Sublabel: territory,
+      salesmanName: h?.name || 'Selected Salesman'
+    };
+  }, [isAllTeam, teamSummary, salesmanDetail, salesmenList.length, assignedCustomers.length]);
 
   // Granular trend chart data aggregation
   const chartData = useMemo(() => {
@@ -444,7 +502,7 @@ export default function SalesmanPerformanceView() {
           <div>
             <div className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider">Scope</div>
             <div className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-              <span>Salesmen Performance</span>
+              <span>{isAllTeam ? 'All Salesmen Performance' : `${displayedMetrics.salesmanName}`}</span>
             </div>
           </div>
         </div>
@@ -515,7 +573,7 @@ export default function SalesmanPerformanceView() {
           )}
 
           <button
-            onClick={() => { fetchSummary(); fetchSalesmenList(); if (selectedSalesmanId) fetchSalesmanDetail(selectedSalesmanId); }}
+            onClick={() => { fetchSummary(selectedSalesmanId); fetchSalesmenList(); if (selectedSalesmanId !== 'all') fetchSalesmanDetail(selectedSalesmanId); }}
             className="p-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-xl transition-all border border-slate-200 dark:border-slate-700/50 cursor-pointer shadow-xs dark:shadow-none"
             title="Refresh Data"
           >
@@ -524,7 +582,7 @@ export default function SalesmanPerformanceView() {
         </div>
       </div>
 
-      {/* ── 1. Team Summary Aggregate KPI Cards ─────────────────────────── */}
+      {/* ── 1. Scoped KPI Cards (Derived dynamically from Selected Salesman & Period) ── */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
         <div className="bg-white dark:bg-slate-900/70 border border-slate-200 dark:border-slate-800/80 rounded-2xl p-4 shadow-xs dark:shadow-lg">
           <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-2">
@@ -532,9 +590,11 @@ export default function SalesmanPerformanceView() {
             <DollarSign size={16} className="text-indigo-600 dark:text-indigo-400" />
           </div>
           <div className="text-lg font-extrabold text-slate-900 dark:text-white">
-            ₹{loadingSummary ? '...' : (teamSummary?.total_team_sales || 0).toLocaleString('en-IN')}
+            ₹{loadingSummary && loadingDetail ? '...' : displayedMetrics.totalSales.toLocaleString('en-IN')}
           </div>
-          <div className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">Live data</div>
+          <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 truncate">
+            {isAllTeam ? 'Live team revenue' : displayedMetrics.salesmanName}
+          </div>
         </div>
 
         <div className="bg-white dark:bg-slate-900/70 border border-slate-200 dark:border-slate-800/80 rounded-2xl p-4 shadow-xs dark:shadow-lg">
@@ -543,9 +603,9 @@ export default function SalesmanPerformanceView() {
             <ShoppingCart size={16} className="text-sky-600 dark:text-sky-400" />
           </div>
           <div className="text-lg font-extrabold text-slate-900 dark:text-white">
-            {loadingSummary ? '...' : (teamSummary?.total_orders || 0)}
+            {loadingSummary && loadingDetail ? '...' : displayedMetrics.orders.toLocaleString('en-IN')}
           </div>
-          <div className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">Completed orders</div>
+          <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-1">Completed vouchers</div>
         </div>
 
         <div className="bg-white dark:bg-slate-900/70 border border-slate-200 dark:border-slate-800/80 rounded-2xl p-4 shadow-xs dark:shadow-lg">
@@ -554,9 +614,9 @@ export default function SalesmanPerformanceView() {
             <TrendingUp size={16} className="text-amber-600 dark:text-amber-400" />
           </div>
           <div className="text-lg font-extrabold text-slate-900 dark:text-white">
-            ₹{loadingSummary ? '...' : (teamSummary?.average_order_value || 0).toLocaleString('en-IN')}
+            ₹{loadingSummary && loadingDetail ? '...' : Math.round(displayedMetrics.averageOrder).toLocaleString('en-IN')}
           </div>
-          <div className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">Average order value</div>
+          <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-1">Realized ticket size</div>
         </div>
 
         <div className="bg-white dark:bg-slate-900/70 border border-slate-200 dark:border-slate-800/80 rounded-2xl p-4 shadow-xs dark:shadow-lg">
@@ -565,9 +625,9 @@ export default function SalesmanPerformanceView() {
             <Package size={16} className="text-indigo-600 dark:text-indigo-400" />
           </div>
           <div className="text-lg font-extrabold text-slate-900 dark:text-white">
-            {loadingSummary ? '...' : (teamSummary?.total_units_sold || 0).toLocaleString('en-IN')}
+            {loadingSummary && loadingDetail ? '...' : displayedMetrics.unitsSold.toLocaleString('en-IN')}
           </div>
-          <div className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">Total units</div>
+          <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-1">Quantity dispatched</div>
         </div>
 
         <div className="bg-white dark:bg-slate-900/70 border border-slate-200 dark:border-slate-800/80 rounded-2xl p-4 shadow-xs dark:shadow-lg">
@@ -576,20 +636,24 @@ export default function SalesmanPerformanceView() {
             <Users size={16} className="text-purple-600 dark:text-purple-400" />
           </div>
           <div className="text-lg font-extrabold text-slate-900 dark:text-white">
-            {loadingSummary ? '...' : (teamSummary?.total_customers_served || 0)}
+            {loadingSummary && loadingDetail ? '...' : displayedMetrics.customers.toLocaleString('en-IN')}
           </div>
-          <div className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">Unique customers</div>
+          <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 truncate">
+            {displayedMetrics.customersSublabel}
+          </div>
         </div>
 
         <div className="bg-white dark:bg-slate-900/70 border border-slate-200 dark:border-slate-800/80 rounded-2xl p-4 shadow-xs dark:shadow-lg">
           <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-2">
-            <span className="text-[11px] font-semibold uppercase tracking-wider">Active Salesmen</span>
+            <span className="text-[11px] font-semibold uppercase tracking-wider">{displayedMetrics.card6Title}</span>
             <UserCheck size={16} className="text-indigo-600 dark:text-indigo-400" />
           </div>
           <div className="text-lg font-extrabold text-indigo-600 dark:text-indigo-400">
-            {loadingSummary ? '...' : (teamSummary?.total_active_salesmen || 0)}
+            {loadingSummary && loadingDetail ? '...' : displayedMetrics.card6Value}
           </div>
-          <div className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">Active team</div>
+          <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 truncate">
+            {displayedMetrics.card6Sublabel}
+          </div>
         </div>
       </div>
 
