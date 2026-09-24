@@ -38,6 +38,7 @@ import {
   formatDayMonth
 } from '../utils/dateRange';
 import { fmtDayMonth } from '../utils/formatters';
+import { useTheme } from '../context/ThemeContext';
 
 interface SeriesOption {
   key: string;
@@ -203,6 +204,7 @@ export default function InteractiveChart({
   groupBy,
   valueKey,
 }: InteractiveChartProps) {
+  const { isDark } = useTheme();
   const [chartType, setChartType] = useState<ChartTypeOption>(defaultChartType);
   const [timeRange, setTimeRange] = useState<DateRangeType>(defaultTimeRange || '30d');
   const initialBounds = useMemo(() => getDateRangeBounds(defaultTimeRange || '30d'), [defaultTimeRange]);
@@ -945,7 +947,9 @@ export default function InteractiveChart({
                     data={normalizedVisibleData}
                     margin={{ top: 10, right: 30, left: 10, bottom: 10 }}
                   >
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid, #334155)" opacity={0.4} horizontal={false} />
+                    {(!isDark || !isEffectiveHero) && (
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid, #334155)" opacity={0.4} horizontal={false} />
+                    )}
                     <XAxis
                       type="number"
                       stroke="#64748b"
@@ -1187,7 +1191,9 @@ export default function InteractiveChart({
                         </linearGradient>
                       )}
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#cbd5e1" opacity={0.6} />
+                    {(!isDark || !isEffectiveHero) && (
+                      <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#334155' : '#cbd5e1'} opacity={isDark ? 0.25 : 0.6} />
+                    )}
                     <XAxis
                       dataKey="name"
                       stroke={xAxisConfig.showTicks ? "#64748b" : "#cbd5e1"}
@@ -1256,7 +1262,9 @@ export default function InteractiveChart({
               {isMounted ? (
                 <ResponsiveContainer width="100%" height="100%" minHeight={isEffectiveHero ? 340 : 250}>
                   <BarChart data={normalizedVisibleData} margin={{ top: 10, right: hasSecondaryYAxis ? 35 : 15, left: -5, bottom: xAxisConfig.bottomMargin }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#94a3b8" opacity={0.2} />
+                    {(!isDark || !isEffectiveHero) && (
+                      <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#334155' : '#94a3b8'} opacity={isDark ? 0.2 : 0.25} />
+                    )}
                     <XAxis
                       dataKey="name"
                       stroke={xAxisConfig.showTicks ? "#64748b" : "#94a3b8"}
@@ -1329,7 +1337,9 @@ export default function InteractiveChart({
               {isMounted ? (
                 <ResponsiveContainer width="100%" height="100%" minHeight={isEffectiveHero ? 340 : 250}>
                   <LineChart data={normalizedVisibleData} margin={{ top: 10, right: hasSecondaryYAxis ? 35 : 15, left: -5, bottom: xAxisConfig.bottomMargin }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#94a3b8" opacity={0.2} />
+                    {(!isDark || !isEffectiveHero) && (
+                      <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#334155' : '#94a3b8'} opacity={isDark ? 0.2 : 0.25} />
+                    )}
                     <XAxis
                       dataKey="name"
                       stroke={xAxisConfig.showTicks ? "#64748b" : "#94a3b8"}

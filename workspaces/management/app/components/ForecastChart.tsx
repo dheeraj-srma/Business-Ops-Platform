@@ -18,6 +18,7 @@ import {
   Info,
   AlertCircle
 } from 'lucide-react';
+import { useTheme } from '../context/ThemeContext';
 
 export interface ForecastChartProps {
   metric: 'sales_and_purchases' | 'demand' | 'profit' | 'procurement_refill';
@@ -38,6 +39,7 @@ export default function ForecastChart({
   demandShift = 0,
   safetyStockFactor = 1.0
 }: ForecastChartProps) {
+  const { isDark } = useTheme();
   const [horizon, setHorizon] = useState<7 | 30 | 90>(defaultHorizon);
   const [forecastData, setForecastData] = useState<any>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -400,7 +402,9 @@ export default function ForecastChart({
                 </linearGradient>
               </defs>
 
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid, #cbd5e1)" opacity={0.6} />
+              {!isDark && (
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid, #cbd5e1)" opacity={0.6} />
+              )}
 
               <XAxis
                 dataKey="name"
