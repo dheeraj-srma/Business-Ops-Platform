@@ -17,9 +17,9 @@ const getApiBaseUrl = (): string => {
     if (process.env.NEXT_PUBLIC_API_URL) {
       return process.env.NEXT_PUBLIC_API_URL;
     }
-    return `${window.location.protocol}//${window.location.hostname}:8000`;
+    return '';
   }
-  return process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
+  return process.env.BACKEND_API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
 };
 
 export async function apiClient<T>(
