@@ -1,143 +1,277 @@
-# Business Ops Platform
+<div align="center">
 
-Consolidated enterprise operations platform integrating three business applications into a single unified application repository, single deployment, single login, and role-based workspaces.
+# 🏢 Business Ops Platform
 
----
+### One repository. One deployment. One login. Three workspaces.
 
-## 1. Executive Summary & Architecture
+A consolidated enterprise operations platform that unifies **sales**, **inventory** and **business intelligence** into a single role-based application.
 
-The **Business Ops Platform** unifies three core business applications into a single repository:
+<br/>
 
-```
-                      BUSINESS OPS PLATFORM
-                                │
-               ┌────────────────┴────────────────┐
-               │                                 │
-         Single Login                     Application Shell
-         (Supabase Auth)                  (Next.js 16 Host)
-               │                                 │
-               └────────────────┬────────────────┘
-                                │
-               ┌────────────────┼────────────────┐
-               │                │                │
-            Sales          Operations        Management
-          Workspace        Workspace         Workspace
-          (Order App)     (Stock App)        (BI App)
-```
+[![Live Demo](https://img.shields.io/badge/🚀_Live_Demo-business--ops--platform-2ea44f?style=for-the-badge)](https://business-ops-platform-rosy.vercel.app)
 
-### Workspaces & Preserved Modules
+<br/>
 
-1. **Sales Workspace (`/sales`)**:
-   - **Original Product**: Order / Sales Application.
-   - **Capabilities**: Sales rep portal, customer/dealer selection, catalog search, order creation & submission, PDF generation, CSV import/export, and offline order queueing.
-2. **Operations Workspace (`/operations`)**:
-   - **Original Product**: Stock & Operations Management Application.
-   - **Capabilities**: Inventory balances, pending order approval lifecycle, restock planner, stock movement modals (In, Out, Adjustments, Returns), and Tally ERP XML/JSON sync engine.
-3. **Management Workspace (`/management`)**:
-   - **Original Product**: BI & Analytics Application.
-   - **Capabilities**: Executive BI insights dashboards, geographic GIS heatmaps, financial valuation, demand forecasting, stock reconciliation, and report exports.
+![Next.js](https://img.shields.io/badge/Next.js_16-000000?style=for-the-badge&logo=nextdotjs&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind_v4-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white)
+![Python](https://img.shields.io/badge/Python_3.10+-3776AB?style=for-the-badge&logo=python&logoColor=white)
+![Node.js](https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)
+![Supabase](https://img.shields.io/badge/Supabase-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)
+![Vercel](https://img.shields.io/badge/Vercel-000000?style=for-the-badge&logo=vercel&logoColor=white)
+![Render](https://img.shields.io/badge/Render-46E3B7?style=for-the-badge&logo=render&logoColor=black)
+
+</div>
 
 ---
 
-## 2. Directory Structure
+## 📑 Table of Contents
 
+- [✨ Overview](#-overview)
+- [🧩 Workspaces](#-workspaces)
+- [🏗️ Architecture](#️-architecture)
+- [📁 Project Structure](#-project-structure)
+- [🚀 Getting Started](#-getting-started)
+- [🔌 API Proxy & Routes](#-api-proxy--routes)
+- [☁️ Deployment](#️-deployment)
+- [🔐 Security Model](#-security-model)
+- [🧾 Tally ERP Integration](#-tally-erp-integration)
+- [🛠️ Troubleshooting](#️-troubleshooting)
+
+---
+
+## ✨ Overview
+
+**Business Ops Platform** merges three standalone business applications into one codebase:
+
+| | |
+|---|---|
+| 🔑 **Single login** | Supabase Auth, one sign-in for every workspace |
+| 🧭 **Role-based workspaces** | Users land in the workspace their role allows |
+| 📦 **One repo, one deploy** | A single Next.js 16 shell hosts everything |
+| 🛡️ **Preservation first** | Original UI, charts, forms and database logic are kept intact |
+
+---
+
+## 🧩 Workspaces
+
+| Workspace | Route | Origin | What it does |
+|:--|:--|:--|:--|
+| 🛒 **Sales** | `/sales` | Order App | Sales rep portal, dealer/customer selection, catalog search, order creation and submission, PDF generation, CSV import/export, offline order queueing |
+| 📦 **Operations** | `/operations` | Stock App | Inventory balances, pending-order approval lifecycle, restock planner, stock movements (In, Out, Adjustments, Returns), Tally ERP sync |
+| 📊 **Management** | `/management` | BI App | Executive BI dashboards, geographic GIS heatmaps, financial valuation, demand forecasting, stock reconciliation, report exports |
+
+---
+
+## 🏗️ Architecture
+
+```mermaid
+flowchart TD
+    U([👤 User]) --> V["▲ Vercel<br/>Next.js 16 App Shell"]
+    V -->|"/api/* rewrite"| R["⚙️ Render<br/>FastAPI Backend"]
+    V --> A["🔑 Supabase Auth"]
+    R --> A
+    R --> D[("🗄️ Supabase Database")]
+
+    V --> S["🛒 Sales<br/>/sales"]
+    V --> O["📦 Operations<br/>/operations"]
+    V --> M["📊 Management<br/>/management"]
+
+    O -.-> T["🧾 Express Tally Server<br/>XML/JSON Sync"]
 ```
+
+The browser only ever talks to the Vercel origin. Next.js rewrites every `/api/*` request to the FastAPI backend, so there are no CORS or cross-site cookie headaches.
+
+---
+
+## 📁 Project Structure
+
+```text
 business-ops-platform/
 │
-├── app/                        # Unified Next.js 16 App Router Shell
-│   ├── page.tsx                # Platform Landing & Workspace Switcher
-│   ├── login/                  # Unified Single Login Page
-│   ├── sales/                  # Sales Workspace Page Route (Order App)
-│   ├── operations/             # Operations Workspace Page Route (Stock App)
-│   ├── management/             # Management Workspace Page Route (BI App)
-│   ├── globals.css             # Unified Global Styles & Tailwind CSS v4
-│   └── layout.tsx              # Root Layout & Platform Navigation Bar
+├── app/                    # Next.js 16 App Router shell
+│   ├── page.tsx            #   Landing page & workspace switcher
+│   ├── login/              #   Unified login
+│   ├── sales/              #   Sales workspace route
+│   ├── operations/         #   Operations workspace route
+│   ├── management/         #   Management workspace route
+│   ├── globals.css         #   Global styles & Tailwind CSS v4
+│   └── layout.tsx          #   Root layout & platform navigation
 │
-├── workspaces/                 # Preserved Workspace Codebases
-│   ├── sales/                  # Isolated Order App source code & assets
-│   ├── operations/             # Isolated Stock Management App source code & assets
-│   └── management/             # Isolated BI App pages, components & assets
+├── workspaces/             # Preserved source of each original app
+│   ├── sales/
+│   ├── operations/
+│   └── management/
 │
-├── backend/                    # Python FastAPI Backend (Orders, Inventory, RBAC)
-├── server/                     # Express Node.js Server & Tally Sync Engine
-├── shared/                     # Platform Header & Unified Navigation Components
-├── public/                     # Consolidated static assets (logos, icons)
-├── package.json                # Root dependency configuration
-├── next.config.ts              # Next.js configuration & API proxy rewrites
-└── README.md                   # System Architecture & Documentation
+├── backend/                # Python FastAPI (orders, inventory, RBAC)
+├── server/                 # Express server & Tally sync engine
+├── shared/                 # Shared header, navigation, auth helpers, API client
+├── public/                 # Static assets (logos, icons)
+├── docs/                   # Additional documentation
+├── middleware.ts           # Route protection for workspace pages
+├── next.config.ts          # Config & /api proxy rewrites
+└── package.json
 ```
 
 ---
 
-## 3. Quick Start & Development Setup
+## 🚀 Getting Started
 
-### Prerequisites
-- **Node.js**: v18.0.0+ or v20.0.0+
-- **npm**: v9.0.0+
-- **Python**: v3.10+ (for FastAPI backend)
+### 📋 Prerequisites
 
-### Step 1: Environment Setup
-Copy `.env.example` to `.env`:
+| Tool | Version |
+|:--|:--|
+| 🟢 Node.js | 18+ or 20+ |
+| 📦 npm | 9+ |
+| 🐍 Python | 3.10+ |
+
+### 1️⃣ Clone and configure
+
 ```bash
+git clone https://github.com/dheeraj-srma/Business-Ops-Platform.git
+cd Business-Ops-Platform
 cp .env.example .env
 ```
 
-Default configuration connects to the shared Supabase instance:
+Fill in your own values in `.env`:
+
 ```env
-NEXT_PUBLIC_SUPABASE_URL=https://deqrfmjzoxlirgfhuouh.supabase.co
-NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_bvWbNpkJMLzR0NOgQTOFQQ_C-G9N-2P
-SUPABASE_URL=https://deqrfmjzoxlirgfhuouh.supabase.co
-SUPABASE_ANON_KEY=sb_publishable_bvWbNpkJMLzR0NOgQTOFQQ_C-G9N-2P
+NEXT_PUBLIC_SUPABASE_URL=https://<your-project>.supabase.co
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<your-publishable-key>
+SUPABASE_URL=https://<your-project>.supabase.co
+SUPABASE_ANON_KEY=<your-publishable-key>
 NEXT_PUBLIC_API_URL=http://127.0.0.1:8000
 ```
 
-### Step 2: Install Dependencies
+### 2️⃣ Install dependencies
+
 ```bash
 npm install
 ```
 
-### Step 3: Run Development Servers
+### 3️⃣ Run the dev servers
 
-**Run Frontend Application (Port 3000)**:
-```bash
-npm run dev
-```
+| Service | Command |
+|:--|:--|
+| 🖥️ Frontend (Next.js) | `npm run dev` |
+| ⚙️ FastAPI backend (port 8000) | `npm run dev:backend` |
+| 🧾 Express Tally server | `npm run dev:tally` |
 
-**Run Python FastAPI Backend (Port 8000)**:
-```bash
-npm run dev:backend
-```
+### 4️⃣ Production build check
 
-**Run Express Tally Server (Port 3000 API/Bridge)**:
-```bash
-npm run dev:tally
-```
-
----
-
-## 4. Production Build Verification
-
-Build the production application bundle:
 ```bash
 npm run build
-```
-
-Start the production server:
-```bash
 npm run start
 ```
 
 ---
 
-## 5. Security & Authentication Model
+## 🔌 API Proxy & Routes
 
-- **Authentication Boundary**: Authentication is enforced at the backend via Supabase Auth and FastAPI JWT verification.
-- **Frontend Role Checks**: Used exclusively for UX and workspace navigation (`/sales`, `/operations`, `/management`).
-- **Data Protection**: Zero secrets or private service-role keys are committed in source code.
+`next.config.ts` forwards all API traffic to the backend:
+
+```ts
+const BACKEND_URL =
+  process.env.BACKEND_API_URL || "https://business-ops-platform-api.onrender.com";
+
+async rewrites() {
+  return [
+    {
+      source: "/api/:path*",
+      destination: `${BACKEND_URL.replace(/\/+$/, "")}/api/:path*`,
+    },
+  ];
+}
+```
+
+| Method | Frontend path | Backend path | Purpose |
+|:--:|:--|:--|:--|
+| `GET` | `/api/auth/me` | `/api/auth/me` | Current session (401 when signed out) |
+| `POST` | `/api/auth/login` | `/api/auth/login` | Sign in |
+| `POST` | `/api/auth/logout` | `/api/auth/logout` | Sign out |
+| `GET` | *(root, not proxied)* | `/healthz` | Backend health check |
 
 ---
 
-## 6. Business Logic & Integration Principles
+## ☁️ Deployment
 
-- **Preservation First**: Zero functionality, UI styling, charts, forms, or database interactions from the original applications were destroyed or rewritten.
-- **Tally ERP Subsystem**: The Tally XML/JSON synchronization engine, mappers, parsers, and dead-letter queue semantics in `server/tally` are fully preserved.
+| Layer | Host | Notes |
+|:--|:--|:--|
+| 🖥️ Frontend | **Vercel** | Framework preset: Next.js, root directory: repo root |
+| ⚙️ Backend | **Render** | FastAPI service, health check at `/healthz` |
+| 🔑 Auth & data | **Supabase** | Auth and Postgres |
+
+### Vercel environment variables
+
+| Key | Value |
+|:--|:--|
+| `BACKEND_API_URL` | Backend **origin only**, e.g. `https://business-ops-platform-api.onrender.com` (no trailing `/` or `/api`) |
+| `NEXT_PUBLIC_SUPABASE_URL` | Your Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Your Supabase publishable key |
+
+> 💡 Environment variable changes only apply to **new** deployments. Redeploy after changing them.
+
+### ✅ Verify a deployment
+
+```bash
+# Backend is alive
+curl -i https://business-ops-platform-api.onrender.com/healthz
+
+# Proxy works: expect 401 with a JSON body from FastAPI
+curl -i https://<your-production-domain>/api/auth/me
+```
+
+---
+
+## 🔐 Security Model
+
+- 🛡️ **Authentication is enforced on the backend** through Supabase Auth and FastAPI JWT verification.
+- 🧭 **Frontend role checks are UX only.** They drive workspace navigation, not access control.
+- 🔒 **No private keys in source.** Service-role keys and secrets are never committed. Only publishable keys belong in client-side env vars.
+
+---
+
+## 🧾 Tally ERP Integration
+
+The Tally synchronization subsystem lives in `server/tally` and is fully preserved from the original Stock App:
+
+- 🔄 XML/JSON synchronization engine
+- 🗺️ Mappers and parsers
+- 📮 Dead-letter queue semantics for failed syncs
+
+---
+
+## 🛠️ Troubleshooting
+
+<details>
+<summary><b>🔴 <code>/api/auth/*</code> returns 404 on Vercel</b></summary>
+
+<br/>
+
+- Test on your **production domain**, not an old deployment-specific URL. Those are immutable snapshots and are protected by Vercel login.
+- Confirm `BACKEND_API_URL` is the origin only, with no `/api` suffix.
+- Do **not** add a `vercel.json` with an `/index.html` fallback. This is a Next.js app, not a static SPA.
+- Redeploy after changing `next.config.ts` or environment variables.
+- Read the response: FastAPI's 401 body contains `Authentication token required.`. A 404 with `x-vercel-error: NOT_FOUND` points to project settings.
+
+</details>
+
+<details>
+<summary><b>🐢 First request is slow or times out</b></summary>
+
+<br/>
+
+On Render's free tier the backend sleeps after inactivity and can take 30–60 seconds to wake. Retry, or hit `/healthz` first.
+
+</details>
+
+---
+
+<div align="center">
+
+**Built with ❤️ by [@dheeraj-srma](https://github.com/dheeraj-srma)**
+
+⭐ Star this repo if you find it useful
+
+</div>
