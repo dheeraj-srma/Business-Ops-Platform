@@ -80,7 +80,7 @@ export default function WorkspaceSwitcher({ currentWorkspace: propWorkspace }: W
       setUserProfile(session?.user || null);
     };
 
-    const refreshProfile = async () => {
+    const refreshProfile = async (retries = 2) => {
       try {
         const session = getAuthSession();
         const headers: Record<string, string> = {};
@@ -100,9 +100,15 @@ export default function WorkspaceSwitcher({ currentWorkspace: propWorkspace }: W
             };
             setUserProfile(freshUser);
           }
+        } else if (res.status === 502 || res.status === 503 || res.status === 504) {
+          if (retries > 0) {
+            setTimeout(() => refreshProfile(retries - 1), 3000);
+          }
         }
       } catch {
-        // preserve local session gracefully
+        if (retries > 0) {
+          setTimeout(() => refreshProfile(retries - 1), 3000);
+        }
       }
     };
 
