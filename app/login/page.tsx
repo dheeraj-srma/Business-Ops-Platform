@@ -178,8 +178,8 @@ function LoginContent() {
     <div className="min-h-[calc(100vh-3.5rem)] flex items-center justify-center p-4 bg-slate-950">
       <div className="max-w-md w-full bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl space-y-6">
         <div className="text-center space-y-2">
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-blue-600 flex items-center justify-center text-white mx-auto shadow-lg shadow-indigo-500/20">
-            <Shield className="w-6 h-6" />
+          <div className="w-16 h-16 mx-auto flex items-center justify-center">
+            <img src="/icon.svg" alt="Business Ops Platform Logo" className="w-full h-full object-contain drop-shadow-md" />
           </div>
           <h1 className="text-xl font-extrabold text-white">Business Ops Platform</h1>
           <p className="text-xs text-slate-400">Unified Single Sign-On</p>

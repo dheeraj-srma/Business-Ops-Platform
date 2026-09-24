@@ -5,6 +5,13 @@ import WorkspaceSwitcher from '@/shared/components/WorkspaceSwitcher';
 export const metadata: Metadata = {
   title: 'Business Ops Platform',
   description: 'Unified Business Operations Platform integrating Sales, Operations, and Management Workspaces.',
+  icons: {
+    icon: [
+      { url: '/icon.svg', type: 'image/svg+xml' },
+      { url: '/icon.png', type: 'image/png' },
+    ],
+    apple: '/icon.png',
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

@@ -10,6 +10,13 @@ import { AppShell } from "./components/layout/AppShell";
 export const metadata: Metadata = {
   title: "Nalka Metals | PowerBI Analytics & Business Intelligence",
   description: "Enterprise Business Intelligence, Financial Valuation & Demand Forecasting Platform for Nalka Metals.",
+  icons: {
+    icon: [
+      { url: '/icon.svg', type: 'image/svg+xml' },
+      { url: '/icon.png', type: 'image/png' },
+    ],
+    apple: '/icon.png',
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

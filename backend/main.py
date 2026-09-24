@@ -53,7 +53,9 @@ logger = logging.getLogger("nalka_metals")
 app = FastAPI(
     title=settings.PROJECT_NAME,
     description="Centralized Application & Data Access Layer for Nalka Metals Platform.",
-    version=settings.VERSION
+    version=settings.VERSION,
+    swagger_favicon_url="https://business-ops-platform-28pey9sxa.vercel.app/icon.svg",
+    redoc_favicon_url="https://business-ops-platform-28pey9sxa.vercel.app/icon.svg"
 )
 
 # ─── CORS Middleware ────────────────────────────────────────────────────────
